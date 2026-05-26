@@ -253,42 +253,43 @@ def _seed_demo_data():
 
     # ---- Create Invoices ----
     now = datetime.now()
+    tax_rate = demo_user.default_tax_rate  # 30%
     invoice_data = [
-        # Paid invoices (past)
+        # Paid invoices (past) — with proper tax amounts
         {'client_id': client_objects[0].id, 'status': 'paid', 'invoice_number': 'INV-0001',
          'issue_date': now - timedelta(days=90), 'due_date': now - timedelta(days=60),
-         'paid_date': now - timedelta(days=55), 'subtotal': 4000, 'tax_amount': 0, 'total': 4000,
+         'paid_date': now - timedelta(days=55), 'subtotal': 4000, 'tax_amount': round(4000 * tax_rate, 2), 'total': round(4000 + 4000 * tax_rate, 2),
          'line_items': [('Website redesign - Phase 1', 1, 4000, 4000)]},
         {'client_id': client_objects[1].id, 'status': 'paid', 'invoice_number': 'INV-0002',
          'issue_date': now - timedelta(days=60), 'due_date': now - timedelta(days=30),
-         'paid_date': now - timedelta(days=25), 'subtotal': 5250, 'tax_amount': 0, 'total': 5250,
+         'paid_date': now - timedelta(days=25), 'subtotal': 5250, 'tax_amount': round(5250 * tax_rate, 2), 'total': round(5250 + 5250 * tax_rate, 2),
          'line_items': [('Development hours - 42hrs', 42, 125, 5250)]},
         {'client_id': client_objects[2].id, 'status': 'paid', 'invoice_number': 'INV-0003',
          'issue_date': now - timedelta(days=45), 'due_date': now - timedelta(days=15),
-         'paid_date': now - timedelta(days=10), 'subtotal': 3000, 'tax_amount': 0, 'total': 3000,
+         'paid_date': now - timedelta(days=10), 'subtotal': 3000, 'tax_amount': round(3000 * tax_rate, 2), 'total': round(3000 + 3000 * tax_rate, 2),
          'line_items': [('Logo design & brand guide - Phase 1', 1, 3000, 3000)]},
         {'client_id': client_objects[0].id, 'status': 'paid', 'invoice_number': 'INV-0004',
          'issue_date': now - timedelta(days=30), 'due_date': now,
-         'paid_date': now - timedelta(days=5), 'subtotal': 8000, 'tax_amount': 0, 'total': 8000,
+         'paid_date': now - timedelta(days=5), 'subtotal': 8000, 'tax_amount': round(8000 * tax_rate, 2), 'total': round(8000 + 8000 * tax_rate, 2),
          'line_items': [('Website redesign - Phase 2', 1, 8000, 8000)]},
-        # Sent (outstanding) invoices
+        # Sent (outstanding) invoices — with tax amounts
         {'client_id': client_objects[3].id, 'status': 'sent', 'invoice_number': 'INV-0005',
          'issue_date': now - timedelta(days=15), 'due_date': now + timedelta(days=15),
-         'subtotal': 6300, 'tax_amount': 0, 'total': 6300,
+         'subtotal': 6300, 'tax_amount': round(6300 * tax_rate, 2), 'total': round(6300 + 6300 * tax_rate, 2),
          'line_items': [('API development - 42hrs', 42, 150, 6300)]},
         {'client_id': client_objects[1].id, 'status': 'sent', 'invoice_number': 'INV-0006',
          'issue_date': now - timedelta(days=10), 'due_date': now + timedelta(days=20),
-         'subtotal': 5250, 'tax_amount': 0, 'total': 5250,
+         'subtotal': 5250, 'tax_amount': round(5250 * tax_rate, 2), 'total': round(5250 + 5250 * tax_rate, 2),
          'line_items': [('Development hours - 42hrs (March)', 42, 125, 5250)]},
-        # Draft invoice
+        # Draft invoice — with tax amounts
         {'client_id': client_objects[6].id, 'status': 'draft', 'invoice_number': 'INV-0007',
          'issue_date': now, 'due_date': now + timedelta(days=30),
-         'subtotal': 7200, 'tax_amount': 0, 'total': 7200,
+         'subtotal': 7200, 'tax_amount': round(7200 * tax_rate, 2), 'total': round(7200 + 7200 * tax_rate, 2),
          'line_items': [('Consulting hours - 36hrs', 36, 200, 7200)]},
-        # Overdue invoice
+        # Overdue invoice — with tax amounts
         {'client_id': client_objects[4].id, 'status': 'overdue', 'invoice_number': 'INV-0008',
          'issue_date': now - timedelta(days=45), 'due_date': now - timedelta(days=15),
-         'subtotal': 2750, 'tax_amount': 0, 'total': 2750,
+         'subtotal': 2750, 'tax_amount': round(2750 * tax_rate, 2), 'total': round(2750 + 2750 * tax_rate, 2),
          'line_items': [('UX Audit - Phase 1', 1, 2750, 2750)]},
     ]
     invoice_objects = []
@@ -301,12 +302,20 @@ def _seed_demo_data():
             db.session.add(InvoiceLineItem(invoice_id=inv.id, description=desc, quantity=qty, rate=rate, amount=amt))
         invoice_objects.append(inv)
 
-        # Create transaction for paid invoices
+        # Create transactions for paid invoices: income + auto tax reserve
         if inv.status == 'paid':
+            client_name = next((c.name for c in client_objects if c.id == inv.client_id), 'Unknown Client')
+            # Income transaction
             tx = Transaction(user_id=demo_user.id, amount=inv.total, date=inv.paid_date or inv.issue_date,
-                           category='Client Payment', description=f'Payment for {inv.invoice_number}',
+                           category='Client Payment', description=f'Payment for Invoice {inv.invoice_number} - {client_name}',
                            is_tax_deductible=False, source='invoice', invoice_id=inv.id)
             db.session.add(tx)
+            # Tax reserve expense transaction (auto-set-aside)
+            if inv.tax_amount and inv.tax_amount > 0:
+                tax_tx = Transaction(user_id=demo_user.id, amount=-inv.tax_amount, date=inv.paid_date or inv.issue_date,
+                                   category='Tax Reserve', description=f'Tax reserve for Invoice {inv.invoice_number} - {client_name} ({tax_rate*100:.0f}%)',
+                                   is_tax_deductible=False, source='invoice', invoice_id=inv.id)
+                db.session.add(tax_tx)
     db.session.commit()
 
     # ---- Create Transactions (same as before but more) ----

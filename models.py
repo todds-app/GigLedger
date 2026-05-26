@@ -11,7 +11,7 @@ db = SQLAlchemy()
 # Default categories that ship with the app
 DEFAULT_INCOME_CATEGORIES = ['Client Payment', 'Consulting', 'Freelance Project', 'Royalty']
 DEFAULT_EXPENSE_CATEGORIES = ['Software', 'Internet', 'Office Supplies', 'Marketing',
-                               'Travel', 'Equipment', 'Meal', 'Entertainment']
+                               'Travel', 'Equipment', 'Meal', 'Entertainment', 'Tax Reserve']
 
 
 class User(UserMixin, db.Model):

@@ -169,13 +169,14 @@ def update_status(id):
         flash('Invalid status.', 'error')
         return redirect(url_for('invoices.detail', id=id))
 
-    # If marking as paid, create a transaction and set paid_date
+    # If marking as paid, create transactions and set paid_date
     if new_status == 'paid' and invoice.status != 'paid':
         invoice.paid_date = datetime.now()
 
-        # Create an income transaction linked to this invoice
         client_name = invoice.client.name if invoice.client else 'Unknown Client'
-        transaction = Transaction(
+
+        # 1. Create an income transaction for the full invoice total
+        income_transaction = Transaction(
             user_id=current_user.id,
             amount=invoice.total,
             date=datetime.now(),
@@ -184,13 +185,27 @@ def update_status(id):
             is_tax_deductible=False,
             source='invoice',
             invoice_id=invoice.id)
-        db.session.add(transaction)
+        db.session.add(income_transaction)
 
-    # If moving away from paid, remove the linked transaction
+        # 2. Auto-create a tax reserve expense transaction for the tax portion
+        # This ensures the tax owed on this invoice is explicitly set aside
+        if invoice.tax_amount and invoice.tax_amount > 0:
+            tax_transaction = Transaction(
+                user_id=current_user.id,
+                amount=-invoice.tax_amount,
+                date=datetime.now(),
+                category='Tax Reserve',
+                description=f'Tax reserve for Invoice {invoice.invoice_number} - {client_name} ({current_user.default_tax_rate*100:.0f}%)',
+                is_tax_deductible=False,
+                source='invoice',
+                invoice_id=invoice.id)
+            db.session.add(tax_transaction)
+
+    # If moving away from paid, remove ALL linked transactions
     if invoice.status == 'paid' and new_status != 'paid':
         invoice.paid_date = None
-        linked_tx = Transaction.query.filter_by(invoice_id=invoice.id).first()
-        if linked_tx:
+        linked_txs = Transaction.query.filter_by(invoice_id=invoice.id).all()
+        for linked_tx in linked_txs:
             db.session.delete(linked_tx)
 
     invoice.status = new_status
@@ -200,7 +215,11 @@ def update_status(id):
         'draft': 'Draft', 'sent': 'Sent', 'paid': 'Paid',
         'overdue': 'Overdue', 'cancelled': 'Cancelled'
     }
-    flash(f'Invoice {invoice.invoice_number} marked as {status_labels.get(new_status, new_status)}.', 'success')
+    if new_status == 'paid' and invoice.tax_amount and invoice.tax_amount > 0:
+        sym = {'USD':'$','EUR':'€','GBP':'£','CAD':'C$','AUD':'A$','INR':'₹','JPY':'¥'}.get(current_user.currency, '$')
+        flash(f'Invoice {invoice.invoice_number} marked as Paid! Income of {sym}{invoice.total:,.2f} recorded and {sym}{invoice.tax_amount:,.2f} tax reserve auto-set aside.', 'success')
+    else:
+        flash(f'Invoice {invoice.invoice_number} marked as {status_labels.get(new_status, new_status)}.', 'success')
     return redirect(url_for('invoices.detail', id=id))
 
 
