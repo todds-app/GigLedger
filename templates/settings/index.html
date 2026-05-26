@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Settings - FreelanceCash{% endblock %}
+{% block content %}
+<div class="space-y-6 max-w-2xl">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900">Settings</h1>
+        <p class="text-sm text-gray-500 mt-1">Manage your account and preferences</p>
+    </div>
+
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Profile</h2>
+        <div class="flex items-center gap-4">
+            <div class="w-14 h-14 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xl font-semibold">{{ user.email[0]|upper }}</div>
+            <div>
+                <p class="font-medium text-gray-900">{{ user.email }}</p>
+                <p class="text-sm text-gray-500">Member since {{ user.created_at.strftime('%b %Y') if user.created_at else 'N/A' }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <h2 class="text-lg font-semibold text-gray-900 mb-2">Tax Rate</h2>
+        <p class="text-sm text-gray-500 mb-6">Your default tax rate is used to calculate quarterly estimates and deductible savings. US freelancers typically set aside 25-35% for self-employment taxes.</p>
+        <form method="POST" action="{{ url_port('settings.update_tax_rate') }}" class="flex items-end gap-4">
+            <div class="flex-1">
+                <label for="tax_rate" class="block text-sm font-medium text-gray-700 mb-1">Tax Rate (%)</label>
+                <input type="number" id="tax_rate" name="tax_rate" min="0" max="100" step="1" value="{{ tax_rate_percent }}" class="block w-full px-4 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+            </div>
+            <button type="submit" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-medium rounded-lg transition-colors text-sm">Update</button>
+        </form>
+        <div class="mt-4 flex gap-2">
+            <button onclick="document.getElementById('tax_rate').value='25'" class="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">25%</button>
+            <button onclick="document.getElementById('tax_rate').value='30'" class="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">30%</button>
+            <button onclick="document.getElementById('tax_rate').value='35'" class="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">35%</button>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <h2 class="text-lg font-semibold text-gray-900 mb-2">Currency</h2>
+        <p class="text-sm text-gray-500 mb-6">Select your preferred display currency.</p>
+        <form method="POST" action="{{ url_port('settings.update_currency') }}" class="flex items-end gap-4">
+            <div class="flex-1">
+                <label for="currency" class="block text-sm font-medium text-gray-700 mb-1">Display Currency</label>
+                <select id="currency" name="currency" class="block w-full px-4 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+                    <option value="USD" {% if user.currency == 'USD' %}selected{% endif %}>USD - US Dollar</option>
+                    <option value="EUR" {% if user.currency == 'EUR' %}selected{% endif %}>EUR - Euro</option>
+                    <option value="GBP" {% if user.currency == 'GBP' %}selected{% endif %}>GBP - British Pound</option>
+                    <option value="CAD" {% if user.currency == 'CAD' %}selected{% endif %}>CAD - Canadian Dollar</option>
+                    <option value="AUD" {% if user.currency == 'AUD' %}selected{% endif %}>AUD - Australian Dollar</option>
+                    <option value="INR" {% if user.currency == 'INR' %}selected{% endif %}>INR - Indian Rupee</option>
+                    <option value="JPY" {% if user.currency == 'JPY' %}selected{% endif %}>JPY - Japanese Yen</option>
+                </select>
+            </div>
+            <button type="submit" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-medium rounded-lg transition-colors text-sm">Update</button>
+        </form>
+    </div>
+
+    <!-- Income Categories -->
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <div class="flex items-center justify-between mb-2">
+            <h2 class="text-lg font-semibold text-gray-900">Income Categories</h2>
+            <span class="text-xs text-gray-400">Used in Quick Add and Transaction forms</span>
+        </div>
+        <p class="text-sm text-gray-500 mb-4">Add or remove categories for your income sources. Changes take effect immediately.</p>
+
+        <!-- Add new category -->
+        <form method="POST" action="{{ url_port('settings.add_income_category') }}" class="flex gap-2 mb-4">
+            <input type="text" name="category_name" placeholder="New income category..." required class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm">
+            <button type="submit" class="px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-medium rounded-lg text-sm">Add</button>
+        </form>
+
+        <!-- Current categories -->
+        <div class="flex flex-wrap gap-2">
+            {% for cat in income_categories %}
+            <div class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-sm font-medium">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12" /></svg>
+                {{ cat }}
+                {% if cat not in default_income_categories %}
+                <form method="POST" action="{{ url_port('settings.delete_income_category') }}" class="inline" onsubmit="return confirm('Remove {{ cat }}?')">
+                    <input type="hidden" name="category_name" value="{{ cat }}">
+                    <button type="submit" class="text-green-400 hover:text-red-500 transition-colors ml-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </form>
+                {% else %}
+                <span class="text-green-300 ml-1" title="Default category">&#8226;</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Expense Categories -->
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <div class="flex items-center justify-between mb-2">
+            <h2 class="text-lg font-semibold text-gray-900">Expense Categories</h2>
+            <span class="text-xs text-gray-400">Tax-deductible expenses reduce your tax burden</span>
+        </div>
+        <p class="text-sm text-gray-500 mb-4">Add or remove categories for your business expenses. Mark expenses as deductible when adding them.</p>
+
+        <!-- Add new category -->
+        <form method="POST" action="{{ url_port('settings.add_expense_category') }}" class="flex gap-2 mb-4">
+            <input type="text" name="category_name" placeholder="New expense category..." required class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm">
+            <button type="submit" class="px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-medium rounded-lg text-sm">Add</button>
+        </form>
+
+        <!-- Current categories -->
+        <div class="flex flex-wrap gap-2">
+            {% for cat in expense_categories %}
+            <div class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-700 rounded-lg text-sm font-medium">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 13l-5 5m0 0l-5-5m5 5V6" /></svg>
+                {{ cat }}
+                {% if cat not in default_expense_categories %}
+                <form method="POST" action="{{ url_port('settings.delete_expense_category') }}" class="inline" onsubmit="return confirm('Remove {{ cat }}?')">
+                    <input type="hidden" name="category_name" value="{{ cat }}">
+                    <button type="submit" class="text-red-400 hover:text-red-700 transition-colors ml-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </form>
+                {% else %}
+                <span class="text-red-300 ml-1" title="Default category">&#8226;</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Reset categories -->
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <h2 class="text-lg font-semibold text-gray-900 mb-2">Reset Categories</h2>
+        <p class="text-sm text-gray-500 mb-4">Reset all categories back to the default list. Your custom categories will be removed but existing transactions are not affected.</p>
+        <form method="POST" action="{{ url_port('settings.reset_categories') }}" onsubmit="return confirm('Reset all categories to defaults? Your custom categories will be removed.')">
+            <button type="submit" class="px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">Reset to Defaults</button>
+        </form>
+    </div>
+
+    <div class="bg-white rounded-2xl p-6 border border-red-100 shadow-sm">
+        <h2 class="text-lg font-semibold text-red-700 mb-2">Danger Zone</h2>
+        <p class="text-sm text-gray-500 mb-4">These actions are irreversible.</p>
+        <a href="{{ url_port('auth.logout') }}" class="inline-flex items-center gap-2 px-4 py-2 border border-red-300 text-red-700 font-medium rounded-lg hover:bg-red-50 transition-colors text-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+            Sign Out
+        </a>
+    </div>
+</div>
+{% endblock %}

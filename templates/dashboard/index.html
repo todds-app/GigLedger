@@ -1,0 +1,412 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - FreelanceCash{% endblock %}
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+            <p class="text-sm text-gray-500 mt-1">Your financial overview at a glance</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <span class="text-sm text-gray-500">Q{{ current_quarter }} &middot; Runway:</span>
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold {% if runway_months >= 6 %}bg-green-100 text-green-800{% elif runway_months >= 3 %}bg-yellow-100 text-yellow-800{% else %}bg-red-100 text-red-800{% endif %}">
+                {% if runway_months == 'inf' %}&infin;{% else %}{{ runway_months | decimal1 }}{% endif %} months
+            </span>
+        </div>
+    </div>
+
+    <!-- 4 Hero Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Income Card -->
+        <div class="card-hover bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12" /></svg>
+                </div>
+                <div class="flex items-center gap-1">
+                    <span class="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full">Income</span>
+                    {% if income_trend > 0 %}
+                    <span class="text-xs text-green-600 font-medium">+{{ income_trend | int }}%</span>
+                    {% elif income_trend < 0 %}
+                    <span class="text-xs text-red-500 font-medium">{{ income_trend | int }}%</span>
+                    {% endif %}
+                </div>
+            </div>
+            <p class="text-sm text-gray-500 mb-1">This Month</p>
+            <p class="text-2xl font-bold text-gray-900">{{ currency | currency_symbol }}{{ month_income | money }}</p>
+        </div>
+
+        <!-- Expenses Card -->
+        <div class="card-hover bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 13l-5 5m0 0l-5-5m5 5V6" /></svg>
+                </div>
+                <div class="flex items-center gap-1">
+                    <span class="text-xs font-medium text-red-600 bg-red-50 px-2 py-1 rounded-full">Expenses</span>
+                    {% if expense_trend > 0 %}
+                    <span class="text-xs text-red-500 font-medium">+{{ expense_trend | int }}%</span>
+                    {% elif expense_trend < 0 %}
+                    <span class="text-xs text-green-600 font-medium">{{ expense_trend | int }}%</span>
+                    {% endif %}
+                </div>
+            </div>
+            <p class="text-sm text-gray-500 mb-1">This Month</p>
+            <p class="text-2xl font-bold text-gray-900">{{ currency | currency_symbol }}{{ month_expenses | money }}</p>
+        </div>
+
+        <!-- Safe to Spend Card (KILLER FEATURE) -->
+        <div class="card-hover bg-white rounded-2xl p-6 border-2 border-brand-300 shadow-md shadow-brand-100 relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-24 h-24 bg-brand-50 rounded-bl-full opacity-60"></div>
+            <div class="relative">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                    </div>
+                    <span class="text-xs font-medium text-brand-600 bg-brand-50 px-2 py-1 rounded-full">Safe to Spend</span>
+                </div>
+                <p class="text-sm text-gray-500 mb-1">After Tax Reserve</p>
+                <p class="text-2xl font-bold {% if safe_balance >= 0 %}text-brand-700{% else %}text-red-600{% endif %}">{{ currency | currency_symbol }}{{ safe_balance | money }}</p>
+            </div>
+        </div>
+
+        <!-- Tax Reserve Card -->
+        <div class="card-hover bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <span class="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded-full">Tax Reserve</span>
+            </div>
+            <p class="text-sm text-gray-500 mb-1">Do NOT spend this</p>
+            <p class="text-2xl font-bold text-amber-700">{{ currency | currency_symbol }}{{ tax_obligation | money }}</p>
+        </div>
+    </div>
+
+    <!-- Chart + Quick Add -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Income vs Expenses Chart -->
+        <div class="lg:col-span-2 bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900">Income vs. Expenses</h2>
+                    <p class="text-sm text-gray-500">Last 6 months performance</p>
+                </div>
+                <div class="flex items-center gap-4 text-sm">
+                    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-green-500"></span> Income</span>
+                    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-red-400"></span> Expenses</span>
+                </div>
+            </div>
+            <div class="relative" style="height: 300px;">
+                <canvas id="incomeExpenseChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Quick Add Form - Simple reliable form POST -->
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Quick Add</h2>
+            <form method="POST" action="{{ url_port('transactions.add') }}" id="quickAddForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                    <div class="flex gap-2">
+                        <label class="flex-1 cursor-pointer">
+                            <input type="radio" name="type" value="income" class="peer sr-only" checked onchange="updateQuickCategories()">
+                            <div class="text-center py-2 rounded-lg border-2 border-gray-200 peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:text-green-700 text-sm font-medium transition-all">Income</div>
+                        </label>
+                        <label class="flex-1 cursor-pointer">
+                            <input type="radio" name="type" value="expense" class="peer sr-only" onchange="updateQuickCategories()">
+                            <div class="text-center py-2 rounded-lg border-2 border-gray-200 peer-checked:border-red-500 peer-checked:bg-red-50 peer-checked:text-red-700 text-sm font-medium transition-all">Expense</div>
+                        </label>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500">{{ currency | currency_symbol }}</span>
+                        <input type="number" name="amount" id="qa_amount" step="0.01" min="0.01" required class="block w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500" placeholder="0.00">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                    <input type="date" name="date" id="qa_date" required class="block w-full px-3 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <select name="category" id="qa_category" class="block w-full px-3 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <input type="text" name="description" class="block w-full px-3 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500" placeholder="What was this for?">
+                </div>
+                <!-- Tax Deductible - only visible for expenses, with real-time impact -->
+                <div id="qa_deductible_section" class="hidden">
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" name="is_tax_deductible" id="q_ded" class="h-4 w-4 text-brand-600 border-gray-300 rounded focus:ring-brand-500" onchange="updateTaxImpact()">
+                        <label for="q_ded" class="text-sm text-gray-700">Tax deductible</label>
+                    </div>
+                    <div id="qa_tax_impact" class="hidden mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <p class="text-xs text-green-700 font-medium">Tax savings: <span id="qa_tax_saving" class="font-bold">{{ currency | currency_symbol }}0.00</span></p>
+                        <p class="text-xs text-green-600 mt-1">This deduction reduces your taxable income, saving you <span id="qa_tax_pct">{{ (tax_rate * 100) | int }}</span>% in taxes.</p>
+                    </div>
+                </div>
+                <button type="submit" class="w-full py-2.5 px-4 bg-brand-600 hover:bg-brand-700 text-white font-medium rounded-lg transition-colors text-sm">Add Transaction</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bottom Row: Balance + Runway + Recent + Category -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Bank Balance -->
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center gap-3 mb-2">
+                <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center">
+                    <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                </div>
+                <h3 class="text-sm font-medium text-gray-500">Bank Balance</h3>
+            </div>
+            <p class="text-3xl font-bold text-gray-900">{{ currency | currency_symbol }}{{ balance | money }}</p>
+            <p class="text-xs text-gray-400 mt-1">All-time net (income - expenses)</p>
+        </div>
+
+        <!-- Runway -->
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center gap-3 mb-2">
+                <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center">
+                    <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <h3 class="text-sm font-medium text-gray-500">Runway</h3>
+            </div>
+            <p class="text-3xl font-bold {% if runway_months >= 6 %}text-green-700{% elif runway_months >= 3 %}text-yellow-700{% else %}text-red-700{% endif %}">
+                {% if runway_months == 'inf' %}&infin;{% else %}{{ runway_months | decimal1 }}{% endif %} months
+            </p>
+            <p class="text-xs text-gray-400 mt-1">Based on avg expenses of {{ currency | currency_symbol }}{{ avg_monthly_expenses | money }}/mo</p>
+        </div>
+
+        <!-- Net This Month -->
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center gap-3 mb-2">
+                <div class="w-8 h-8 rounded-lg {% if net_this_month >= 0 %}bg-green-50{% else %}bg-red-50{% endif %} flex items-center justify-center">
+                    <svg class="w-4 h-4 {% if net_this_month >= 0 %}text-green-600{% else %}text-red-600{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                </div>
+                <h3 class="text-sm font-medium text-gray-500">Net This Month</h3>
+            </div>
+            <p class="text-3xl font-bold {% if net_this_month >= 0 %}text-green-700{% else %}text-red-600{% endif %}">{{ currency | currency_symbol }}{{ net_this_month | money }}</p>
+            <p class="text-xs text-gray-400 mt-1">Income minus expenses</p>
+        </div>
+
+        <!-- Tax Savings from Deductions -->
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center gap-3 mb-2">
+                <div class="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center">
+                    <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <h3 class="text-sm font-medium text-gray-500">Tax Savings</h3>
+            </div>
+            <p class="text-3xl font-bold text-green-700">{{ currency | currency_symbol }}{{ tax_saving_this_month | money }}</p>
+            <p class="text-xs text-gray-400 mt-1">From {{ currency | currency_symbol }}{{ deductible_this_month | money }} deductions this month</p>
+        </div>
+    </div>
+
+    <!-- Recent Transactions + Category Breakdown -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Recent Transactions -->
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-semibold text-gray-900">Recent Transactions</h2>
+                <a href="{{ url_port('transactions.list_transactions') }}" class="text-sm text-brand-600 hover:text-brand-700 font-medium">View all &rarr;</a>
+            </div>
+            {% if recent_transactions %}
+            <div class="space-y-3">
+                {% for tx in recent_transactions %}
+                <div class="flex items-center justify-between py-2 {% if not loop.last %}border-b border-gray-50{% endif %}">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center {% if tx.amount > 0 %}bg-green-50{% else %}bg-red-50{% endif %}">
+                            {% if tx.amount > 0 %}
+                            <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12" /></svg>
+                            {% else %}
+                            <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 13l-5 5m0 0l-5-5m5 5V6" /></svg>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-900 truncate max-w-[200px]">{{ tx.description or tx.category or 'Transaction' }}</p>
+                            <p class="text-xs text-gray-400">{{ tx.date.strftime('%b %d') }} &middot; {{ tx.category or 'Other' }}{% if tx.is_tax_deductible %} &middot; <span class="text-green-600">Deductible</span>{% endif %}</p>
+                        </div>
+                    </div>
+                    <p class="text-sm font-semibold {% if tx.amount > 0 %}text-green-600{% else %}text-red-600{% endif %}">
+                        {% if tx.amount > 0 %}+{% endif %}{{ currency | currency_symbol }}{{ tx.amount|abs | money }}
+                    </p>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-400 text-center py-8">No transactions yet. Add one above!</p>
+            {% endif %}
+        </div>
+
+        <!-- Category Breakdown -->
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <h2 class="text-lg font-semibold text-gray-900 mb-1">Expense Breakdown</h2>
+            <p class="text-sm text-gray-500 mb-4">This month by category</p>
+            {% if cat_totals %}
+            <div class="relative" style="height: 250px;">
+                <canvas id="categoryChart"></canvas>
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-400 text-center py-12">No expenses this month</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Set today's date
+    var qaDate = document.getElementById('qa_date');
+    if (qaDate) qaDate.value = new Date().toISOString().split('T')[0];
+
+    // Categories data from server
+    var incomeCategories = {{ current_user.get_income_categories() | tojson }};
+    var expenseCategories = {{ current_user.get_expense_categories() | tojson }};
+    var taxRate = {{ tax_rate }};
+    var currencySymbol = '{{ currency | currency_symbol }}';
+
+    // Update category dropdown based on type selection
+    function updateQuickCategories() {
+        var type = document.querySelector('input[name="type"]:checked').value;
+        var select = document.getElementById('qa_category');
+        var dedSection = document.getElementById('qa_deductible_section');
+        var cats = type === 'income' ? incomeCategories : expenseCategories;
+
+        select.innerHTML = '';
+        cats.forEach(function(cat) {
+            var opt = document.createElement('option');
+            opt.value = cat;
+            opt.textContent = cat;
+            select.appendChild(opt);
+        });
+
+        // Show/hide deductible section
+        if (type === 'expense') {
+            dedSection.classList.remove('hidden');
+        } else {
+            dedSection.classList.add('hidden');
+            document.getElementById('q_ded').checked = false;
+            document.getElementById('qa_tax_impact').classList.add('hidden');
+        }
+        updateTaxImpact();
+    }
+
+    // Show real-time tax impact when deductible is checked
+    function updateTaxImpact() {
+        var dedChecked = document.getElementById('q_ded').checked;
+        var amountInput = document.getElementById('qa_amount');
+        var impactDiv = document.getElementById('qa_tax_impact');
+        var savingSpan = document.getElementById('qa_tax_saving');
+
+        if (dedChecked && amountInput.value) {
+            var amount = parseFloat(amountInput.value) || 0;
+            var saving = amount * taxRate;
+            savingSpan.textContent = currencySymbol + saving.toFixed(2);
+            impactDiv.classList.remove('hidden');
+        } else {
+            impactDiv.classList.add('hidden');
+        }
+    }
+
+    // Listen for amount changes to update tax impact
+    document.getElementById('qa_amount').addEventListener('input', updateTaxImpact);
+
+    // Initialize categories
+    updateQuickCategories();
+
+    // Income vs Expenses Bar Chart
+    var ctx1 = document.getElementById('incomeExpenseChart').getContext('2d');
+    new Chart(ctx1, {
+        type: 'bar',
+        data: {
+            labels: {{ chart_labels | tojson }},
+            datasets: [
+                {
+                    label: 'Income',
+                    data: {{ chart_income | tojson }},
+                    backgroundColor: 'rgba(34,197,94,0.8)',
+                    borderColor: 'rgba(34,197,94,1)',
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    barPercentage: 0.7
+                },
+                {
+                    label: 'Expenses',
+                    data: {{ chart_expenses | tojson }},
+                    backgroundColor: 'rgba(239,68,68,0.8)',
+                    borderColor: 'rgba(239,68,68,1)',
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    barPercentage: 0.7
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(c) {
+                            return c.dataset.label + ': {{ currency | currency_symbol }}' + c.parsed.y.toLocaleString('en-US', {minimumFractionDigits:2});
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { callback: function(v) { return '{{ currency | currency_symbol }}' + v.toLocaleString(); } },
+                    grid: { color: 'rgba(0,0,0,0.05)' }
+                },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+
+    // Category Doughnut Chart
+    {% if cat_totals %}
+    var ctx2 = document.getElementById('categoryChart').getContext('2d');
+    var catColors = ['#22c55e','#3b82f6','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#6366f1','#84cc16'];
+    new Chart(ctx2, {
+        type: 'doughnut',
+        data: {
+            labels: {{ cat_labels | tojson }},
+            datasets: [{
+                data: {{ cat_totals | tojson }},
+                backgroundColor: catColors.slice(0, {{ cat_labels | tojson }}.length),
+                borderWidth: 0,
+                hoverOffset: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '65%',
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: { usePointStyle: true, padding: 12, font: { size: 12 } }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(c) {
+                            return c.label + ': {{ currency | currency_symbol }}' + c.parsed.toLocaleString('en-US', {minimumFractionDigits:2});
+                        }
+                    }
+                }
+            }
+        }
+    });
+    {% endif %}
+</script>
+{% endblock %}
