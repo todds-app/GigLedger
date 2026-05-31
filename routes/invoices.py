@@ -114,6 +114,12 @@ def create_invoice():
     tax_amount = subtotal * current_user.default_tax_rate
     total = subtotal + tax_amount
 
+    # Resolve the client, ensuring it belongs to the current user. Referencing
+    # another user's client id would leak their details on the invoice/PDF (IDOR).
+    client_obj = None
+    if client_id and client_id.isdigit():
+        client_obj = Client.query.filter_by(id=int(client_id), user_id=uid).first()
+
     # Generate invoice number
     invoice_number = current_user.get_next_invoice_number()
 
@@ -123,7 +129,7 @@ def create_invoice():
     # Create invoice
     invoice = Invoice(
         user_id=uid,
-        client_id=int(client_id) if client_id else None,
+        client_id=client_obj.id if client_obj else None,
         invoice_number=invoice_number,
         status=status,
         issue_date=issue_date,

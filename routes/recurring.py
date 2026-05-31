@@ -233,7 +233,8 @@ def generate():
 
     if generated > 0:
         db.session.commit()
-        flash(f'Generated {generated} transaction{{"s" if generated != 1 else ""}} from recurring items.', 'success')
+        plural = 's' if generated != 1 else ''
+        flash(f'Generated {generated} transaction{plural} from recurring items.', 'success')
     else:
         flash('No pending recurring transactions to generate.', 'info')
 

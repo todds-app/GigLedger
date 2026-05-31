@@ -12,9 +12,6 @@ bcrypt = Bcrypt()
 login_manager.login_view = 'auth.login'
 login_manager.login_message_category = 'info'
 
-# Use lower bcrypt rounds for the sandbox environment
-bcrypt._bcrypt_rounds = 4
-
 CURRENCY_SYMBOLS = {
     'USD': '$', 'EUR': '€', 'GBP': '£',
     'CAD': 'C$', 'AUD': 'A$', 'INR': '₹', 'JPY': '¥'
@@ -27,7 +24,28 @@ def create_app():
     base_dir = os.path.abspath(os.path.dirname(__file__))
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(base_dir, 'freelancecash.db')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'freelancecash-dev-secret-key-2024')
+
+    # SECRET_KEY must come from the environment. Never ship a hardcoded fallback:
+    # the signing key for session/login cookies would be public and forgeable.
+    secret_key = os.environ.get('SECRET_KEY')
+    if not secret_key:
+        import secrets
+        secret_key = secrets.token_hex(32)
+        print("WARNING: SECRET_KEY is not set. Generated an ephemeral key for this "
+              "process; sessions will not survive a restart. Set SECRET_KEY in production.")
+    app.config['SECRET_KEY'] = secret_key
+
+    # Cookie hardening. SameSite=Lax stops the session/remember cookies from being
+    # sent on cross-site POSTs, which mitigates CSRF on the state-changing routes.
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['REMEMBER_COOKIE_HTTPONLY'] = True
+    app.config['REMEMBER_COOKIE_SAMESITE'] = 'Lax'
+    # Opt in to Secure cookies when served over HTTPS (kept off by default so local
+    # HTTP deployments keep working). Set SESSION_COOKIE_SECURE=1 behind TLS.
+    if os.environ.get('SESSION_COOKIE_SECURE', '').lower() in ('1', 'true', 'yes'):
+        app.config['SESSION_COOKIE_SECURE'] = True
+        app.config['REMEMBER_COOKIE_SECURE'] = True
 
     db.init_app(app)
     login_manager.init_app(app)

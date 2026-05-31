@@ -54,8 +54,12 @@ def add():
         flash('Project name is required.', 'error')
         return redirect(url_for('projects.list_projects'))
 
-    client_id = request.form.get('client_id', '')
-    client_id = int(client_id) if client_id else None
+    # Only accept a client id that belongs to the current user (prevents IDOR).
+    client_id_raw = request.form.get('client_id', '')
+    client_id = None
+    if client_id_raw and client_id_raw.isdigit():
+        owned = Client.query.filter_by(id=int(client_id_raw), user_id=current_user.id).first()
+        client_id = owned.id if owned else None
 
     rate_type = request.form.get('rate_type', 'hourly')
     try:
@@ -110,8 +114,13 @@ def edit(id):
         flash('Project name is required.', 'error')
         return redirect(url_for('projects.list_projects'))
 
-    client_id = request.form.get('client_id', '')
-    project.client_id = int(client_id) if client_id else None
+    # Only accept a client id that belongs to the current user (prevents IDOR).
+    client_id_raw = request.form.get('client_id', '')
+    if client_id_raw and client_id_raw.isdigit():
+        owned = Client.query.filter_by(id=int(client_id_raw), user_id=current_user.id).first()
+        project.client_id = owned.id if owned else None
+    else:
+        project.client_id = None
     project.name = name
     project.description = request.form.get('description', '')
     project.rate_type = request.form.get('rate_type', 'hourly')
