@@ -188,23 +188,43 @@ When you mark an invoice as paid, GigLedger automatically creates two transactio
 
 ### Installation
 
+> **Important:** the application package is named `freelancecash` and uses
+> relative imports, so the project folder **must** be named `freelancecash`.
+> Clone directly into that folder name (as shown below).
+
 ```bash
-# Clone the repository
-git clone https://github.com/YOUR_USERNAME/gigledger.git
-cd gigledger
+# Clone the repository into a folder named "freelancecash"
+git clone https://github.com/YOUR_USERNAME/gigledger.git freelancecash
+cd freelancecash
 
 # Create a virtual environment
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
-pip install -r freelancecash/requirements.txt
+pip install -r requirements.txt
 
-# Run the app
-python freelancecash/run.py
+# Run the app — run.py imports the package as "freelancecash",
+# so launch it from the PARENT directory:
+cd ..
+python -m freelancecash.run
+# (or, equivalently, from inside the folder: python run.py
+#  as long as the parent directory is on PYTHONPATH)
 ```
 
 The app starts at **http://localhost:3030**
+
+> **Already cloned into a differently-named folder** (e.g. `GigLedger`)?
+> Create a symlink so the package resolves, then run as above:
+> ```bash
+> ln -s "$(pwd)" ../freelancecash
+> ```
+
+> **Optional:** set a persistent `SECRET_KEY` so login sessions survive restarts
+> (otherwise an ephemeral key is generated each launch):
+> ```bash
+> export SECRET_KEY="your-random-secret"
+> ```
 
 ### Demo Account
 
