@@ -1,5 +1,5 @@
 """
-FreelanceCash - Core Financial Logic
+GigLedger - Core Financial Logic
 
 Implements:
   A. The "Safe to Spend" Formula

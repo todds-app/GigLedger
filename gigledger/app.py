@@ -1,11 +1,20 @@
 """
-FreelanceCash - Flask Application Factory
+GigLedger - Flask Application Factory
 """
 import os
 from flask import Flask, request as req, url_for as _url_for
 from flask_login import LoginManager
 from flask_bcrypt import Bcrypt
 from .models import db, User
+
+# The database lives in the repository root, one level above this package, so
+# that user data is not stored inside the importable source tree. Derived once
+# and shared: create_app() and _migrate_db() must never disagree about which
+# file they are opening, or a rename silently turns the migration into a no-op.
+DB_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(os.path.dirname(__file__))),
+    'gigledger.db',
+)
 
 login_manager = LoginManager()
 bcrypt = Bcrypt()
@@ -21,8 +30,7 @@ CURRENCY_SYMBOLS = {
 def create_app():
     app = Flask(__name__, template_folder='templates', static_folder='static')
 
-    base_dir = os.path.abspath(os.path.dirname(__file__))
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(base_dir, 'freelancecash.db')
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + DB_PATH
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     # SECRET_KEY must come from the environment. Never ship a hardcoded fallback:
@@ -135,12 +143,10 @@ def create_app():
 def _migrate_db(db):
     """Add new columns to existing tables if they don't exist."""
     import sqlite3
-    base_dir = os.path.abspath(os.path.dirname(__file__))
-    db_path = os.path.join(base_dir, 'freelancecash.db')
-    if not os.path.exists(db_path):
+    if not os.path.exists(DB_PATH):
         return
 
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     # Check existing columns in users table
@@ -189,11 +195,11 @@ def _seed_demo_data():
                           Project, Goal, RecurringTransaction)
     from flask_bcrypt import generate_password_hash
 
-    if User.query.filter_by(email='demo@freelancecash.com').first():
+    if User.query.filter_by(email='demo@gigledger.com').first():
         return
 
     password_hash = generate_password_hash('demo1234').decode('utf-8')
-    demo_user = User(email='demo@freelancecash.com', password_hash=password_hash,
+    demo_user = User(email='demo@gigledger.com', password_hash=password_hash,
                      default_tax_rate=0.30, currency='USD',
                      business_name='Demo Freelance Studio',
                      business_address='123 Creative Ave, San Francisco, CA 94102',

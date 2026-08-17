@@ -188,14 +188,10 @@ When you mark an invoice as paid, GigLedger automatically creates two transactio
 
 ### Installation
 
-> **Important:** the application package is named `freelancecash` and uses
-> relative imports, so the project folder **must** be named `freelancecash`.
-> Clone directly into that folder name (as shown below).
-
 ```bash
-# Clone the repository into a folder named "freelancecash"
-git clone https://github.com/YOUR_USERNAME/gigledger.git freelancecash
-cd freelancecash
+# Clone the repository — the folder may be named anything
+git clone https://github.com/YOUR_USERNAME/gigledger.git
+cd gigledger
 
 # Create a virtual environment
 python -m venv venv
@@ -204,21 +200,17 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Run the app — run.py imports the package as "freelancecash",
-# so launch it from the PARENT directory:
-cd ..
-python -m freelancecash.run
-# (or, equivalently, from inside the folder: python run.py
-#  as long as the parent directory is on PYTHONPATH)
+# Run the app
+python run.py
 ```
 
 The app starts at **http://localhost:3030**
 
-> **Already cloned into a differently-named folder** (e.g. `GigLedger`)?
-> Create a symlink so the package resolves, then run as above:
-> ```bash
-> ln -s "$(pwd)" ../freelancecash
-> ```
+> The application package is the `gigledger/` directory inside the repository,
+> so it is importable under that name no matter what the checkout folder is
+> called. Earlier versions derived the package name from the folder and
+> required a matching folder name or a symlink; that is no longer the case.
+> See [docs/adr/0001](docs/adr/0001-declare-package-identity.md).
 
 > **Optional:** set a persistent `SECRET_KEY` so login sessions survive restarts
 > (otherwise an ephemeral key is generated each launch):
@@ -232,7 +224,7 @@ Log in instantly with pre-loaded data:
 
 | Field | Value |
 |---|---|
-| **Email** | `demo@freelancecash.com` |
+| **Email** | `demo@gigledger.com` |
 | **Password** | `demo1234` |
 
 The demo account includes a complete freelancer workspace:
@@ -249,14 +241,14 @@ The demo account includes a complete freelancer workspace:
 ## 📁 Project Structure
 
 ```
-gigledger/
-├── freelancecash/
+gigledger/                      # Repository root — may be named anything
+├── run.py                      # Entry point (port 3030)
+├── requirements.txt            # Python dependencies
+├── gigledger.db                # SQLite database (auto-created, gitignored)
+├── gigledger/                  # The application package
 │   ├── app.py                  # Flask app factory, config, seed data, DB migrations
 │   ├── models.py               # SQLAlchemy models (8 models)
 │   ├── finance.py              # Core financial calculation engine
-│   ├── run.py                  # Entry point (port 3030)
-│   ├── requirements.txt        # Python dependencies
-│   ├── freelancecash.db        # SQLite database (auto-created)
 │   ├── routes/
 │   │   ├── auth.py             # Login / Signup / Logout
 │   │   ├── dashboard.py        # Main dashboard + Quick Add
@@ -297,6 +289,11 @@ gigledger/
 │       │   └── index.html      # Yearly financial report
 │       └── settings/
 │           └── index.html      # Profile, tax rate, currency, categories, themes
+├── tests/
+│   └── test_smoke.py           # Startup guards: import name + database path
+├── docs/
+│   ├── glossary.md             # Shared vocabulary
+│   └── adr/                    # Architecture decision records
 └── README.md
 ```
 
