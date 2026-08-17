@@ -87,7 +87,19 @@ No more setting aside random percentages. No more spreadsheet gymnastics. Just c
 - **Deadline tracking** — Visual deadline indicators
 - **Color-coded** — Custom colors per project
 - **Create transactions from hours** — Optional: auto-create income when logging hours
+- **Project detail page** — Full view of a single project with its documents
 - **7 demo projects** — Showing various states and rate types
+
+### 📎 Project Documents
+- **Attach files to a project** — Contracts, briefs, spreadsheets, presentations, images, archives (25 MB each)
+- **Or link a document** — Paste a Google Drive URL and GigLedger keeps the reference
+- **Downloads are always attachments** — Never rendered in the browser, whatever the file type
+- **Stored under generated names** — The name you chose is data; the file on disk is an opaque token
+- **Deleting a project deletes its documents** — Rows *and* bytes
+
+> **Linked documents are a reference, not an integration.** GigLedger stores the
+> URL; Google decides who can open it. Access rules are *enforced* for uploads
+> and *advisory* for links — see [docs/adr/0007](docs/adr/0007-google-drive-as-reference.md).
 
 ### 🎯 Savings Goals
 - **Visual progress bars** — Color-coded with percentage complete
@@ -252,9 +264,11 @@ gigledger/                      # Repository root — may be named anything
 ├── run.py                      # Entry point (port 3030)
 ├── requirements.txt            # Python dependencies
 ├── gigledger.db                # SQLite database (auto-created, gitignored)
+├── uploads/                    # Attached project documents (auto-created, gitignored)
 ├── gigledger/                  # The application package
 │   ├── app.py                  # Flask app factory, config, seed data, DB migrations
-│   ├── models.py               # SQLAlchemy models (8 models)
+│   ├── models.py               # SQLAlchemy models (10 models)
+│   ├── documents.py            # Document storage: upload root, allowlist, URL scheme rules
 │   ├── finance.py              # Core financial calculation engine
 │   ├── routes/
 │   │   ├── auth.py             # Login / Signup / Logout
@@ -285,7 +299,8 @@ gigledger/                      # Repository root — may be named anything
 │       │   ├── index.html      # Client list
 │       │   └── detail.html     # Client detail with invoicing stats
 │       ├── projects/
-│       │   └── index.html      # Project dashboard
+│       │   ├── index.html      # Project dashboard
+│       │   └── detail.html     # Single project with its documents
 │       ├── goals/
 │       │   └── index.html      # Savings goals tracker
 │       ├── recurring/
@@ -316,6 +331,7 @@ gigledger/                      # Repository root — may be named anything
 | **InvoiceLineItem** | `invoice_line_items` | invoice_id, description, quantity, rate, amount |
 | **Client** | `clients` | name, email, phone, company, address, notes, is_active |
 | **Project** | `projects` | client_id, name, description, status, rate_type, rate, hours_logged, deadline, color |
+| **ProjectDocument** | `project_documents` | project_id, kind (upload/link), title, stored_name, original_name, byte_size, external_url, provider |
 | **Goal** | `goals` | name, target_amount, current_amount, deadline, icon, color, is_completed |
 | **RecurringTransaction** | `recurring_transactions` | description, amount, category, frequency, day_of_month, is_active, last_generated, next_date |
 | **TaxEstimate** | `tax_estimates` | quarter, year, total_income, total_deductions, estimated_tax_owed |
@@ -349,6 +365,11 @@ gigledger/                      # Repository root — may be named anything
 | `POST` | `/clients/toggle/<id>` | Toggle active/inactive |
 | `GET` | `/clients/<id>` | Client detail with stats |
 | `GET` | `/projects` | Project list |
+| `GET` | `/projects/<id>` | Project detail with documents |
+| `POST` | `/projects/<id>/documents/upload` | Attach an uploaded file |
+| `POST` | `/projects/<id>/documents/link` | Attach a Google Drive (or other) link |
+| `GET` | `/projects/documents/<id>/download` | Download an attached file |
+| `POST` | `/projects/documents/<id>/delete` | Remove a document and its bytes |
 | `POST` | `/projects/add` | Add new project |
 | `POST` | `/projects/log-hours/<id>` | Log hours to project |
 | `POST` | `/projects/status/<id>` | Update project status |

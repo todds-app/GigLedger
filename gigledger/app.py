@@ -7,6 +7,7 @@ from flask_login import LoginManager, current_user
 from flask_bcrypt import Bcrypt
 from flask_wtf.csrf import CSRFProtect, CSRFError, generate_csrf
 from markupsafe import Markup
+from . import documents
 from .models import db, User
 
 # The database lives in the repository root, one level above this package, so
@@ -35,6 +36,12 @@ def create_app():
 
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + DB_PATH
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+    # Rejected by Flask before the request body is read, so an oversized upload
+    # never reaches disk - a check inside the route would run too late. There is
+    # deliberately no per-user quota: this is self-hosted and the operator owns
+    # the disk. See ADR-0006.
+    app.config['MAX_CONTENT_LENGTH'] = documents.MAX_UPLOAD_BYTES
 
     # SECRET_KEY must come from the environment. Never ship a hardcoded fallback:
     # the signing key for session/login cookies would be public and forgeable.

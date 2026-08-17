@@ -1,11 +1,14 @@
 """
 GigLedger - Projects Blueprint
 """
+import os
 import re
 from datetime import datetime
-from flask import Blueprint, render_template, redirect, url_for, request, flash
+from flask import (Blueprint, render_template, redirect, url_for, request, flash,
+                   abort, send_file)
 from flask_login import login_required, current_user
-from ..models import Project, Client, Transaction, db
+from .. import documents
+from ..models import Project, Client, ProjectDocument, Transaction, db
 
 projects_bp = Blueprint('projects', __name__, url_prefix='/projects')
 
@@ -233,9 +236,143 @@ def update_status(id):
 def delete(id):
     project = Project.query.filter_by(id=id, user_id=current_user.id).first()
     if project:
+        # The ORM cascade removes the document rows; nothing in SQLAlchemy
+        # removes their bytes, and SQLite is not enforcing the foreign key
+        # either (ADR-0006). Collect the names before the rows go, unlink after
+        # the commit succeeds - so a failed delete never orphans a live row from
+        # its file.
+        stored = [d.stored_name for d in project.documents if d.stored_name]
         db.session.delete(project)
         db.session.commit()
+        for stored_name in stored:
+            documents.delete(stored_name)
         flash('Project deleted.', 'success')
     else:
         flash('Project not found.', 'error')
     return redirect(url_for('projects.list_projects'))
+
+
+# --- Documents -----------------------------------------------------------
+#
+# Ownership is checked by filtering on user_id at every entry point rather than
+# by fetching and then comparing, so a missed comparison cannot expose a row.
+# In this commit "may see it" means "owns it"; the client-facing half of the
+# rule arrives with the portal.
+
+def _owned_project(id):
+    project = Project.query.filter_by(id=id, user_id=current_user.id).first()
+    if not project:
+        abort(404)
+    return project
+
+
+def _owned_document(doc_id):
+    doc = ProjectDocument.query.filter_by(id=doc_id, user_id=current_user.id).first()
+    if not doc:
+        abort(404)
+    return doc
+
+
+@projects_bp.route('/<int:id>')
+@login_required
+def detail(id):
+    project = _owned_project(id)
+    return render_template('projects/detail.html',
+        project=project,
+        documents=ProjectDocument.query.filter_by(project_id=project.id)
+                                       .order_by(ProjectDocument.created_at.desc()).all(),
+        clients=Client.query.filter_by(user_id=current_user.id, is_active=True)
+                            .order_by(Client.name).all(),
+        max_upload_mb=documents.MAX_UPLOAD_BYTES // (1024 * 1024),
+        now=datetime.now(),
+        currency=current_user.currency)
+
+
+@projects_bp.route('/<int:id>/documents/upload', methods=['POST'])
+@login_required
+def upload_document(id):
+    project = _owned_project(id)
+
+    upload = request.files.get('file')
+    if not upload or not upload.filename:
+        flash('Choose a file to upload.', 'error')
+        return redirect(url_for('projects.detail', id=project.id))
+
+    if not documents.is_allowed_upload(upload.filename):
+        flash(f'That file type is not accepted. Allowed: '
+              f'{", ".join(sorted(e.lstrip(".") for e in documents.ALLOWED_EXTENSIONS))}.',
+              'error')
+        return redirect(url_for('projects.detail', id=project.id))
+
+    stored_name, byte_size = documents.store(upload)
+
+    db.session.add(ProjectDocument(
+        user_id=current_user.id,
+        project_id=project.id,
+        kind='upload',
+        title=request.form.get('title', '').strip() or upload.filename,
+        stored_name=stored_name,
+        original_name=upload.filename,
+        byte_size=byte_size))
+    db.session.commit()
+
+    flash('Document uploaded.', 'success')
+    return redirect(url_for('projects.detail', id=project.id))
+
+
+@projects_bp.route('/<int:id>/documents/link', methods=['POST'])
+@login_required
+def link_document(id):
+    project = _owned_project(id)
+
+    url = documents.clean_external_url(request.form.get('url', ''))
+    if not url:
+        flash('Enter a document link starting with http:// or https://.', 'error')
+        return redirect(url_for('projects.detail', id=project.id))
+
+    db.session.add(ProjectDocument(
+        user_id=current_user.id,
+        project_id=project.id,
+        kind='link',
+        title=request.form.get('title', '').strip() or url,
+        external_url=url,
+        provider=documents.provider_of(url)))
+    db.session.commit()
+
+    flash('Document link added.', 'success')
+    return redirect(url_for('projects.detail', id=project.id))
+
+
+@projects_bp.route('/documents/<int:doc_id>/download')
+@login_required
+def download_document(doc_id):
+    doc = _owned_document(doc_id)
+    if doc.kind != 'upload':
+        abort(404)
+
+    path = documents.path_for(doc.stored_name)
+    if not os.path.exists(path):
+        # The row outlived its bytes. A 404 is the honest answer; a 500 would
+        # send the reader looking for a bug in the download path.
+        abort(404)
+
+    # Always an attachment, always a type no browser will try to render. The
+    # file's real type is not consulted: this response must not become a page
+    # on this origin no matter what was uploaded.
+    return send_file(path, mimetype='application/octet-stream',
+                     as_attachment=True,
+                     download_name=doc.original_name or 'document')
+
+
+@projects_bp.route('/documents/<int:doc_id>/delete', methods=['POST'])
+@login_required
+def delete_document(doc_id):
+    doc = _owned_document(doc_id)
+    project_id, stored_name = doc.project_id, doc.stored_name
+
+    db.session.delete(doc)
+    db.session.commit()
+    documents.delete(stored_name)
+
+    flash('Document removed.', 'success')
+    return redirect(url_for('projects.detail', id=project_id))

@@ -1,6 +1,9 @@
 # Database (contains user data and password hashes — never commit)
 *.db
 
+# Uploaded project documents (client contracts and the like — never commit)
+uploads/
+
 # Python
 __pycache__/
 *.py[cod]

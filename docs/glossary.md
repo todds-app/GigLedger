@@ -119,9 +119,56 @@ back to f-string HTML. See [ADR-0005](adr/0005-render-documents-from-templates.m
 ### Constrained Column
 
 A column that only ever holds a value from a fixed set — `Project.rate_type`,
-`Project.color`, `Goal.icon`, `Goal.color`, `Project.status`. Validated at the
-write by a `clean_*` helper rather than trusted from the form, so the set is
-enforced rather than merely intended.
+`Project.color`, `Goal.icon`, `Goal.color`, `Project.status`,
+`ProjectDocument.kind`, `ProjectDocument.provider`. Validated at the write by a
+`clean_*` helper rather than trusted from the form, so the set is enforced
+rather than merely intended.
+
+`ProjectDocument.external_url` is the same idea applied to a *part* of a value:
+the whole URL is free text, but its **scheme** is constrained to `http`/`https`
+by `clean_external_url()`. HTML-escaping a URL protects the attribute's syntax
+and says nothing about its meaning, so `javascript:` survives autoescape intact.
+
+### Document Kind
+
+`ProjectDocument.kind` — `upload` or `link`. The column that says which half of
+the row is meaningful: `stored_name`/`original_name`/`byte_size` for an upload,
+`external_url`/`provider` for a link.
+
+One table rather than two, because the two kinds differ only in how content is
+fetched and are identical for listing, deleting, and authorising. The reason
+that matters: two tables means writing the authorisation check twice, and the
+second copy is where it gets forgotten. See
+[ADR-0006](adr/0006-document-storage-and-serving.md).
+
+### Opaque Name
+
+`ProjectDocument.stored_name` — the generated `uuid4` token a file is written
+under. Distinguished from `original_name`, the name the user chose, which is
+display data and **never** reaches the filesystem.
+
+The distinction is the whole defence: a user-supplied name that reaches
+`os.path.join` is a path, and `../` is a traversal. Only the extension crosses
+over, and only one the allowlist already accepted.
+
+### Upload Root
+
+`UPLOAD_ROOT` in [gigledger/documents.py](../gigledger/documents.py) — the
+absolute path to the uploads directory, derived once at module level exactly as
+**Data Path** is, resolving to the repository root beside the database. Same
+reasoning, same reason it is shared rather than recomputed: a test points it at
+a temporary directory and every writer follows.
+
+### Reference, not Integration
+
+What "shared via Google Drive" means in GigLedger: the app stores a **URL**, and
+Google decides who may open it. GigLedger holds no Google credentials and never
+fetches the file.
+
+The consequence to keep in mind whenever document access is discussed: the
+access rule is **enforced** for uploads and **advisory** for links. The two must
+never be presented to a user as equivalent. See
+[ADR-0007](adr/0007-google-drive-as-reference.md).
 
 ### Secret Key
 

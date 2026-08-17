@@ -167,6 +167,9 @@ class Project(db.Model):
     color = db.Column(db.String(20), default='#34d399')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    documents = db.relationship('ProjectDocument', backref='project', lazy=True,
+                                cascade='all, delete-orphan')
+
     @property
     def earned(self):
         if self.rate_type == 'hourly':
@@ -183,6 +186,52 @@ class Project(db.Model):
         if self.rate_type == 'fixed' and self.rate > 0:
             return min(100, (self.hours_logged / 100) * 100)
         return 0
+
+
+class ProjectDocument(db.Model):
+    """A file or a link attached to a project.
+
+    One table with a `kind` discriminator rather than two tables: an upload and
+    a link differ only in how the content is fetched, and every other operation
+    - listing, sharing, deleting, authorising - is identical. Two tables would
+    mean writing the authorisation check twice, and the second copy is where it
+    gets forgotten. See docs/adr/0006.
+
+    The per-kind columns are nullable because they are per-kind; `kind` is the
+    column that says which set is meaningful.
+    """
+    __tablename__ = 'project_documents'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    kind = db.Column(db.String(20), nullable=False)  # upload, link
+    title = db.Column(db.String(200), nullable=False)
+
+    # kind == 'upload'
+    stored_name = db.Column(db.String(80), nullable=True)   # generated; the name on disk
+    original_name = db.Column(db.String(255), nullable=True)  # user's name; display only
+    byte_size = db.Column(db.Integer, nullable=True)
+
+    # kind == 'link'
+    external_url = db.Column(db.Text, nullable=True)
+    provider = db.Column(db.String(20), nullable=True)  # google_drive, other
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @property
+    def is_link(self):
+        return self.kind == 'link'
+
+    @property
+    def size_label(self):
+        size = self.byte_size or 0
+        if size >= 1024 * 1024:
+            return f"{size / (1024 * 1024):.1f} MB"
+        if size >= 1024:
+            return f"{size / 1024:.0f} KB"
+        return f"{size} B"
 
 
 class Goal(db.Model):
