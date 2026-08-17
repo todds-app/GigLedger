@@ -158,7 +158,7 @@
                         </td>
                         <td class="px-5 py-3.5 text-center">
                             <div class="flex items-center justify-center gap-1">
-                                <button onclick="openEditModal({{ tx.id }}, '{{ tx.amount|abs }}', '{% if tx.amount > 0 %}income{% else %}expense{% endif %}', '{{ tx.date.strftime('%Y-%m-%d') }}', '{{ tx.category or '' }}', '{{ tx.description or '' }}', {{ 'true' if tx.is_tax_deductible else 'false' }})" class="text-gray-300 hover:text-brand-500 transition-all p-1 hover:scale-110" title="Edit">
+                                <button onclick="openEditModal({{ tx.id|tojson|forceescape }}, {{ (tx.amount|abs)|tojson|forceescape }}, {{ ('income' if tx.amount > 0 else 'expense')|tojson|forceescape }}, {{ tx.date.strftime('%Y-%m-%d')|tojson|forceescape }}, {{ (tx.category or '')|tojson|forceescape }}, {{ (tx.description or '')|tojson|forceescape }}, {{ tx.is_tax_deductible|tojson|forceescape }})" class="text-gray-300 hover:text-brand-500 transition-all p-1 hover:scale-110" title="Edit">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                 </button>
                                 <form method="POST" action="{{ url_port('transactions.delete', id=tx.id) }}" onsubmit="return confirm('Delete this transaction?')" class="inline">

@@ -1,9 +1,27 @@
+import re
 from datetime import datetime
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
 from ..models import Goal, db
 
 goals_bp = Blueprint('goals', __name__, url_prefix='/goals')
+
+# Same treatment as projects: both columns hold a value from a fixed set offered
+# by radio buttons in the form, so enforce that at the write instead of storing
+# whatever was posted.
+GOAL_ICONS = {'target', 'vacation', 'emergency', 'house',
+              'car', 'education', 'tech', 'gaming'}
+DEFAULT_ICON = 'target'
+DEFAULT_COLOR = '#34d399'
+HEX_COLOR = re.compile(r'^#[0-9a-fA-F]{6}$')
+
+
+def clean_icon(value, fallback=DEFAULT_ICON):
+    return value if value in GOAL_ICONS else fallback
+
+
+def clean_color(value, fallback=DEFAULT_COLOR):
+    return value if value and HEX_COLOR.match(value) else fallback
 
 
 @goals_bp.route('/')
@@ -41,8 +59,8 @@ def add():
             flash('Invalid deadline date.', 'error')
             return redirect(url_for('goals.index'))
 
-    icon = request.form.get('icon', 'target')
-    color = request.form.get('color', '#34d399')
+    icon = clean_icon(request.form.get('icon', DEFAULT_ICON))
+    color = clean_color(request.form.get('color', DEFAULT_COLOR))
 
     if not name:
         flash('Goal name is required.', 'error')
@@ -123,13 +141,9 @@ def edit(id):
     else:
         goal.deadline = None
 
-    icon = request.form.get('icon', goal.icon)
-    if icon:
-        goal.icon = icon
+    goal.icon = clean_icon(request.form.get('icon', goal.icon), fallback=goal.icon)
 
-    color = request.form.get('color', goal.color)
-    if color:
-        goal.color = color
+    goal.color = clean_color(request.form.get('color', goal.color), fallback=goal.color)
 
     # Re-check completion after edit
     if goal.current_amount >= goal.target_amount:

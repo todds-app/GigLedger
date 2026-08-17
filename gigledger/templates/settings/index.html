@@ -191,7 +191,7 @@
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12" /></svg>
                 {{ cat }}
                 {% if cat not in default_income_categories %}
-                <form method="POST" action="{{ url_port('settings.delete_income_category') }}" class="inline" onsubmit="return confirm('Remove {{ cat }}?')">
+                <form method="POST" action="{{ url_port('settings.delete_income_category') }}" class="inline" onsubmit="return confirm({{ ('Remove ' ~ cat ~ '?')|tojson|forceescape }})">
                     {{ csrf_field() }}
                     <input type="hidden" name="category_name" value="{{ cat }}">
                     <button type="submit" class="text-green-300 hover:text-red-500 transition-colors ml-1">
@@ -224,7 +224,7 @@
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 13l-5 5m0 0l-5-5m5 5V6" /></svg>
                 {{ cat }}
                 {% if cat not in default_expense_categories %}
-                <form method="POST" action="{{ url_port('settings.delete_expense_category') }}" class="inline" onsubmit="return confirm('Remove {{ cat }}?')">
+                <form method="POST" action="{{ url_port('settings.delete_expense_category') }}" class="inline" onsubmit="return confirm({{ ('Remove ' ~ cat ~ '?')|tojson|forceescape }})">
                     {{ csrf_field() }}
                     <input type="hidden" name="category_name" value="{{ cat }}">
                     <button type="submit" class="text-red-300 hover:text-red-700 transition-colors ml-1">

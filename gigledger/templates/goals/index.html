@@ -96,12 +96,12 @@
                 <!-- Actions -->
                 <div class="flex items-center gap-2 flex-wrap">
                     {% if not goal.is_completed %}
-                    <button onclick="openAddFundsModal({{ goal.id }}, '{{ goal.name | e }}')" class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all hover:scale-105" style="background: {{ goal.color }}20; color: {{ goal.color }}">
+                    <button onclick="openAddFundsModal({{ goal.id|tojson|forceescape }}, {{ (goal.name or '')|tojson|forceescape }})" class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all hover:scale-105" style="background: {{ goal.color }}20; color: {{ goal.color }}">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                         Add Funds
                     </button>
                     {% endif %}
-                    <button onclick="openEditGoalModal({{ goal.id }}, '{{ goal.name | e }}', {{ goal.target_amount }}, '{{ goal.deadline.strftime('%Y-%m-%d') if goal.deadline else '' }}', '{{ goal.icon }}', '{{ goal.color }}')" class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100/80 text-gray-600 transition-all hover:scale-105">
+                    <button onclick="openEditGoalModal({{ goal.id|tojson|forceescape }}, {{ (goal.name or '')|tojson|forceescape }}, {{ goal.target_amount|tojson|forceescape }}, {{ (goal.deadline.strftime('%Y-%m-%d') if goal.deadline else '')|tojson|forceescape }}, {{ (goal.icon or '')|tojson|forceescape }}, {{ (goal.color or '')|tojson|forceescape }})" class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100/80 text-gray-600 transition-all hover:scale-105">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                         Edit
                     </button>

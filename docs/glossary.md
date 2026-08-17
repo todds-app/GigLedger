@@ -93,6 +93,25 @@ enforcement test proves nothing. Written because the first version of the
 enforcement test passed for the wrong reason — `@login_required` was refusing
 the requests before CSRF was ever consulted.
 
+### Event-Handler Context
+
+An `on*="..."` attribute — JavaScript living inside an HTML attribute, so it
+passes through **two** parsers. The HTML parser decodes entities *before* the
+JavaScript engine sees the value, which is why HTML-escaping alone (`| e`) does
+not make it safe: the escaped quote is decoded back into a real quote and closes
+the string literal early.
+
+The rule for this context is `| tojson | forceescape`, enforced by
+`tests/test_template_escaping.py`. Distinct from a `<script>` body, where bare
+`| tojson` is correct. See [ADR-0004](adr/0004-template-escaping-in-event-handlers.md).
+
+### Constrained Column
+
+A column that only ever holds a value from a fixed set — `Project.rate_type`,
+`Project.color`, `Goal.icon`, `Goal.color`, `Project.status`. Validated at the
+write by a `clean_*` helper rather than trusted from the form, so the set is
+enforced rather than merely intended.
+
 ### Secret Key
 
 `SECRET_KEY`, read from the environment in `create_app()`. Signs session cookies

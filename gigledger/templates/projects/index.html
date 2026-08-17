@@ -158,7 +158,7 @@
                 <!-- Quick Actions -->
                 <div class="flex items-center gap-1.5 pt-2 border-t border-gray-100/50">
                     {% if project.status == 'active' %}
-                    <button onclick="openLogHoursModal({{ project.id }}, '{{ project.name | e }}')" class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-brand-600 hover:bg-brand-50 transition-all" title="Log Hours">
+                    <button onclick="openLogHoursModal({{ project.id|tojson|forceescape }}, {{ (project.name or '')|tojson|forceescape }})" class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-brand-600 hover:bg-brand-50 transition-all" title="Log Hours">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         Log
                     </button>
@@ -180,7 +180,7 @@
                         </button>
                     </form>
                     {% endif %}
-                    <button onclick="openEditModal({{ project.id }}, '{{ project.name | e }}', {{ project.client_id or 'null' }}, '{{ project.description | e }}', '{{ project.rate_type }}', {{ project.rate }}, '{{ project.start_date.strftime('%Y-%m-%d') if project.start_date else '' }}', '{{ project.deadline.strftime('%Y-%m-%d') if project.deadline else '' }}', '{{ project.color }}')" class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-all" title="Edit">
+                    <button onclick="openEditModal({{ project.id|tojson|forceescape }}, {{ (project.name or '')|tojson|forceescape }}, {{ project.client_id|tojson|forceescape }}, {{ (project.description or '')|tojson|forceescape }}, {{ (project.rate_type or '')|tojson|forceescape }}, {{ project.rate|tojson|forceescape }}, {{ (project.start_date.strftime('%Y-%m-%d') if project.start_date else '')|tojson|forceescape }}, {{ (project.deadline.strftime('%Y-%m-%d') if project.deadline else '')|tojson|forceescape }}, {{ (project.color or '')|tojson|forceescape }})" class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-all" title="Edit">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                         Edit
                     </button>

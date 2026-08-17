@@ -1,12 +1,30 @@
 """
 GigLedger - Projects Blueprint
 """
+import re
 from datetime import datetime
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
 from ..models import Project, Client, Transaction, db
 
 projects_bp = Blueprint('projects', __name__, url_prefix='/projects')
+
+# These two columns only ever hold a value from a fixed set, so enforce that at
+# the write rather than trusting the form. The previous colour check accepted
+# anything beginning with '#', which let arbitrary text into a field that is
+# interpolated into templates.
+RATE_TYPES = {'hourly', 'fixed', 'daily'}
+DEFAULT_RATE_TYPE = 'hourly'
+DEFAULT_COLOR = '#34d399'
+HEX_COLOR = re.compile(r'^#[0-9a-fA-F]{6}$')
+
+
+def clean_rate_type(value, fallback=DEFAULT_RATE_TYPE):
+    return value if value in RATE_TYPES else fallback
+
+
+def clean_color(value, fallback=DEFAULT_COLOR):
+    return value if value and HEX_COLOR.match(value) else fallback
 
 
 @projects_bp.route('/')
@@ -61,7 +79,7 @@ def add():
         owned = Client.query.filter_by(id=int(client_id_raw), user_id=current_user.id).first()
         client_id = owned.id if owned else None
 
-    rate_type = request.form.get('rate_type', 'hourly')
+    rate_type = clean_rate_type(request.form.get('rate_type', DEFAULT_RATE_TYPE))
     try:
         rate = float(request.form.get('rate', '0'))
     except ValueError:
@@ -79,9 +97,7 @@ def add():
     except (ValueError, TypeError):
         deadline = None
 
-    color = request.form.get('color', '#34d399')
-    if not color.startswith('#'):
-        color = '#34d399'
+    color = clean_color(request.form.get('color', DEFAULT_COLOR))
 
     project = Project(
         user_id=current_user.id,
@@ -123,7 +139,8 @@ def edit(id):
         project.client_id = None
     project.name = name
     project.description = request.form.get('description', '')
-    project.rate_type = request.form.get('rate_type', 'hourly')
+    project.rate_type = clean_rate_type(request.form.get('rate_type', DEFAULT_RATE_TYPE),
+                                        fallback=project.rate_type)
     try:
         project.rate = float(request.form.get('rate', '0'))
     except ValueError:
@@ -141,9 +158,8 @@ def edit(id):
     except (ValueError, TypeError):
         project.deadline = None
 
-    color = request.form.get('color', project.color)
-    if color.startswith('#'):
-        project.color = color
+    project.color = clean_color(request.form.get('color', project.color),
+                                fallback=project.color)
 
     db.session.commit()
     flash(f'Project "{name}" updated!', 'success')
