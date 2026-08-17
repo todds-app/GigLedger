@@ -96,6 +96,9 @@ No more setting aside random percentages. No more spreadsheet gymnastics. Just c
 - **Downloads are always attachments** — Never rendered in the browser, whatever the file type
 - **Stored under generated names** — The name you chose is data; the file on disk is an opaque token
 - **Deleting a project deletes its documents** — Rows *and* bytes
+- **Private by default** — A document is visible to nobody until you grant it to named clients
+- **Share with any of your clients** — Not just the project's own client; unchecking a box revokes access immediately
+- **Access log** — Every successful download is recorded, by you or by a client
 
 > **Linked documents are a reference, not an integration.** GigLedger stores the
 > URL; Google decides who can open it. Access rules are *enforced* for uploads
@@ -107,6 +110,8 @@ No more setting aside random percentages. No more spreadsheet gymnastics. Just c
 - **Immediate revocation** — Revoking signs the client out on their next request, not whenever their cookie happens to expire
 - **One login per person** — A client working with several freelancers uses one account
 - **Login throttling** — Repeated failures lock an address out for 15 minutes, on the client login *and* yours
+- **Documents grouped by who shared them** — One login shows every freelancer's documents, never as one undifferentiated list
+- **Project name only** — Clients see the project a document belongs to, never its rate, hours or internal description
 - **Off switch** — `PORTAL_ENABLED=0` removes the portal routes entirely
 
 > **Clients are not users.** Portal sessions live outside Flask-Login on purpose:
@@ -280,7 +285,7 @@ gigledger/                      # Repository root — may be named anything
 ├── uploads/                    # Attached project documents (auto-created, gitignored)
 ├── gigledger/                  # The application package
 │   ├── app.py                  # Flask app factory, config, seed data, DB migrations
-│   ├── models.py               # SQLAlchemy models (13 models)
+│   ├── models.py               # SQLAlchemy models (15 models)
 │   ├── documents.py            # Document storage: upload root, allowlist, URL scheme rules
 │   ├── portal_auth.py          # Client Portal sessions, invites, revocation, throttling
 │   ├── finance.py              # Core financial calculation engine
@@ -354,6 +359,8 @@ gigledger/                      # Repository root — may be named anything
 | **LoginAttempt** | `login_attempts` | scope (portal/app), identifier, ip, at |
 | **Project** | `projects` | client_id, name, description, status, rate_type, rate, hours_logged, deadline, color |
 | **ProjectDocument** | `project_documents` | project_id, kind (upload/link), title, stored_name, original_name, byte_size, external_url, provider |
+| **DocumentShare** | `document_shares` | document_id, client_id (unique pair) |
+| **DocumentAccess** | `document_accesses` | document_id, user_id or portal_account_id, ip, at |
 | **Goal** | `goals` | name, target_amount, current_amount, deadline, icon, color, is_completed |
 | **RecurringTransaction** | `recurring_transactions` | description, amount, category, frequency, day_of_month, is_active, last_generated, next_date |
 | **TaxEstimate** | `tax_estimates` | quarter, year, total_income, total_deductions, estimated_tax_owed |
@@ -392,6 +399,8 @@ gigledger/                      # Repository root — may be named anything
 | `GET/POST` | `/portal/invite/<token>` | Redeem an invitation and set a password |
 | `POST` | `/portal/logout` | Client Portal sign-out |
 | `GET` | `/portal/` | Documents shared with the signed-in client |
+| `GET` | `/portal/documents/<id>/download` | Download a document shared with you |
+| `POST` | `/projects/documents/<id>/share` | Set which clients a document is shared with |
 | `GET` | `/projects` | Project list |
 | `GET` | `/projects/<id>` | Project detail with documents |
 | `POST` | `/projects/<id>/documents/upload` | Attach an uploaded file |

@@ -9,12 +9,15 @@ Every view here is @client_required except login and invite redemption, which
 cannot be: you cannot log in from inside a session you do not have.
 tests/test_portal_auth.py walks the url_map and fails on any other exception.
 """
-from flask import (Blueprint, render_template, redirect, url_for, request, flash,
-                   g)
+import os
 
+from flask import (Blueprint, render_template, redirect, url_for, request, flash,
+                   abort, g, send_file)
+
+from .. import documents as documents_module
 from .. import portal_auth
 from ..portal_auth import client_required
-from ..models import PortalAccount, db
+from ..models import PortalAccount, Project, ProjectDocument, User, db
 
 portal_bp = Blueprint('portal', __name__, url_prefix='/portal')
 
@@ -88,6 +91,50 @@ def redeem(token):
 @portal_bp.route('/')
 @client_required
 def index():
+    clients = portal_auth.visible_clients(g.portal_account)
+    documents = documents_module.documents_shared_with(clients)
+
+    # Grouped by the freelancer who shared them, then by project. A portal
+    # account is global (ADR-0008), so one page can carry two tenants' material;
+    # rendering it as one undifferentiated list would be a leak of context even
+    # though every individual row is authorised.
+    by_owner = {}
+    for doc in documents:
+        owner = db.session.get(User, doc.user_id)
+        group = by_owner.setdefault(doc.user_id, {
+            'name': owner.business_name or owner.email,
+            'projects': {},
+        })
+        project = db.session.get(Project, doc.project_id)
+        group['projects'].setdefault(project.name, []).append(doc)
+
     return render_template('portal/index.html',
                            account=g.portal_account,
-                           clients=portal_auth.visible_clients(g.portal_account))
+                           groups=list(by_owner.values()))
+
+
+@portal_bp.route('/documents/<int:doc_id>/download')
+@client_required
+def download(doc_id):
+    """The client-facing half of the rule the owner's download route enforces.
+
+    Written as its own route rather than as a branch inside the owner's, so the
+    two authorisation questions - "do you own it" and "was it granted to you" -
+    never share a code path where one could be reached with the other's answer.
+    """
+    doc = db.session.get(ProjectDocument, doc_id)
+    clients = portal_auth.visible_clients(g.portal_account)
+    if not doc or doc.kind != 'upload' or not documents_module.is_shared_with(doc, clients):
+        # One 404 for "no such document", "not shared with you" and "it is a
+        # link". Which of those it is would itself be information.
+        abort(404)
+
+    path = documents_module.path_for(doc.stored_name)
+    if not os.path.exists(path):
+        abort(404)
+
+    documents_module.record_access(doc, portal_account_id=g.portal_account.id)
+
+    return send_file(path, mimetype='application/octet-stream',
+                     as_attachment=True,
+                     download_name=doc.original_name or 'document')

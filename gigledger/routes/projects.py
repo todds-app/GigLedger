@@ -8,7 +8,8 @@ from flask import (Blueprint, render_template, redirect, url_for, request, flash
                    abort, send_file)
 from flask_login import login_required, current_user
 from .. import documents
-from ..models import Project, Client, ProjectDocument, Transaction, db
+from ..models import (Project, Client, ProjectDocument, DocumentShare,
+                      Transaction, db)
 
 projects_bp = Blueprint('projects', __name__, url_prefix='/projects')
 
@@ -356,12 +357,43 @@ def download_document(doc_id):
         # send the reader looking for a bug in the download path.
         abort(404)
 
+    documents.record_access(doc, user_id=current_user.id)
+
     # Always an attachment, always a type no browser will try to render. The
     # file's real type is not consulted: this response must not become a page
     # on this origin no matter what was uploaded.
     return send_file(path, mimetype='application/octet-stream',
                      as_attachment=True,
                      download_name=doc.original_name or 'document')
+
+
+@projects_bp.route('/documents/<int:doc_id>/share', methods=['POST'])
+@login_required
+def share_document(doc_id):
+    """Set the whole grant list for a document, rather than adding one at a time.
+
+    The form posts the complete set of clients who should have it, so a client
+    absent from the post is a client whose access is withdrawn - unchecking a box
+    revokes, without a separate unshare route that could be forgotten.
+    """
+    doc = _owned_document(doc_id)
+
+    # Only ids that are this user's clients. Filtering rather than validating
+    # means an id belonging to somebody else is dropped, not honoured.
+    requested = {int(v) for v in request.form.getlist('client_ids') if v.isdigit()}
+    allowed = {c.id for c in Client.query.filter_by(user_id=current_user.id).all()}
+    target = requested & allowed
+
+    current = doc.shared_client_ids
+    for client_id in target - current:
+        db.session.add(DocumentShare(document_id=doc.id, client_id=client_id))
+    for share in list(doc.shares):
+        if share.client_id not in target:
+            db.session.delete(share)
+    db.session.commit()
+
+    flash('Sharing updated.' if target else 'Document is no longer shared.', 'success')
+    return redirect(url_for('projects.detail', id=doc.project_id))
 
 
 @projects_bp.route('/documents/<int:doc_id>/delete', methods=['POST'])

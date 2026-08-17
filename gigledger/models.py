@@ -293,6 +293,15 @@ class ProjectDocument(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    shares = db.relationship('DocumentShare', backref='document', lazy=True,
+                             cascade='all, delete-orphan')
+    accesses = db.relationship('DocumentAccess', backref='document', lazy=True,
+                               cascade='all, delete-orphan')
+
+    @property
+    def shared_client_ids(self):
+        return {s.client_id for s in self.shares}
+
     @property
     def is_link(self):
         return self.kind == 'link'
@@ -305,6 +314,48 @@ class ProjectDocument(db.Model):
         if size >= 1024:
             return f"{size / 1024:.0f} KB"
         return f"{size} B"
+
+
+class DocumentShare(db.Model):
+    """A grant of one document to one client.
+
+    Default-private: a document with no rows here is visible to its owner alone,
+    so a mis-click leaks nothing because there is nothing to mis-click into.
+
+    A share names a `Client`, not a `PortalAccount`. The grant is made by a
+    freelancer to a client of theirs, and stays meaningful whether or not that
+    client has ever signed in - revoking portal access unlinks the account and
+    leaves the grants intact, ready if access is granted again.
+    """
+    __tablename__ = 'document_shares'
+    __table_args__ = (db.UniqueConstraint('document_id', 'client_id',
+                                          name='uq_document_share'),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    document_id = db.Column(db.Integer, db.ForeignKey('project_documents.id'),
+                            nullable=False)
+    client_id = db.Column(db.Integer, db.ForeignKey('clients.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class DocumentAccess(db.Model):
+    """One row per document actually fetched.
+
+    Exactly one of `user_id` / `portal_account_id` is set, saying which kind of
+    principal read it. Written only after authorisation succeeds, so the table
+    is a record of access rather than of attempts - a refused request is not an
+    access and must not read like one.
+    """
+    __tablename__ = 'document_accesses'
+
+    id = db.Column(db.Integer, primary_key=True)
+    document_id = db.Column(db.Integer, db.ForeignKey('project_documents.id'),
+                            nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    portal_account_id = db.Column(db.Integer, db.ForeignKey('portal_accounts.id'),
+                                  nullable=True)
+    ip = db.Column(db.String(64), default='')
+    at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
 
 class Goal(db.Model):

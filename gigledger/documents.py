@@ -106,6 +106,43 @@ def store(file_storage):
     return stored_name, os.path.getsize(path)
 
 
+def documents_shared_with(clients):
+    """Every document granted to any of these Client rows.
+
+    The portal's only way in. Deliberately expressed as "granted to a client I
+    hold" rather than "belonging to a project I am on": the grant is the access
+    rule, and a project relationship is not one. See ADR-0006.
+    """
+    from .models import DocumentShare, ProjectDocument
+
+    client_ids = [c.id for c in clients]
+    if not client_ids:
+        return []
+    return (ProjectDocument.query
+            .join(DocumentShare, DocumentShare.document_id == ProjectDocument.id)
+            .filter(DocumentShare.client_id.in_(client_ids))
+            .order_by(ProjectDocument.created_at.desc())
+            .distinct()
+            .all())
+
+
+def is_shared_with(document, clients):
+    return document.shared_client_ids & {c.id for c in clients}
+
+
+def record_access(document, user_id=None, portal_account_id=None):
+    """Called only after authorisation succeeds. A refused request is not an
+    access and must not be recorded as one."""
+    from flask import request
+    from .models import DocumentAccess, db
+
+    db.session.add(DocumentAccess(document_id=document.id,
+                                  user_id=user_id,
+                                  portal_account_id=portal_account_id,
+                                  ip=(request.remote_addr or '')[:64]))
+    db.session.commit()
+
+
 def delete(stored_name):
     """Remove a stored file. Missing is success: this runs during row deletion,
     and a file already gone must not block the row from going too."""

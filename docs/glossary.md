@@ -159,6 +159,36 @@ absolute path to the uploads directory, derived once at module level exactly as
 reasoning, same reason it is shared rather than recomputed: a test points it at
 a temporary directory and every writer follows.
 
+### Share Grant
+
+A `DocumentShare` row — one document granted to one **Client**, unique on the
+pair. A document with no grants is visible to its owner alone: **private by
+default**, so a mis-click leaks nothing because there is nothing to mis-click
+into.
+
+Points at a `Client` rather than a [[Portal Account]] deliberately: the
+freelancer grants access to a client of theirs, and whether that client has ever
+signed in is a separate question. Revoking portal access leaves the grants
+standing. See [ADR-0009](adr/0009-share-documents-by-explicit-grant.md).
+
+### Access Log
+
+`DocumentAccess` — one row per document actually fetched, naming which kind of
+principal read it. Written **only after authorisation succeeds**: a refused
+request is not an access and must not read like one, which also means the table
+does not show you someone probing for documents they were never granted.
+
+### Enforced vs Advisory
+
+The distinction that runs through every discussion of document access here.
+
+For an **upload**, GigLedger holds the bytes and serves them only to the owner
+and to holders of a [[Share Grant]] — the rule is *enforced*. For a **link**,
+GigLedger controls who is shown the URL and Google controls who can open it —
+the rule is *advisory*. The share form says so on link documents rather than
+letting an identical-looking checkbox imply a guarantee it cannot make. See
+**Reference, not Integration** below.
+
 ### Reference, not Integration
 
 What "shared via Google Drive" means in GigLedger: the app stores a **URL**, and

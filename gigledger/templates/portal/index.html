@@ -1,19 +1,64 @@
 {% extends "portal/base.html" %}
 {% block title %}Your documents - Client Portal{% endblock %}
 {% block content %}
-<div class="panel p-7">
-    <h1 class="text-xl font-extrabold text-gray-800 mb-1">Your documents</h1>
-    <p class="text-xs text-gray-400 mb-6">Files that have been shared with you.</p>
+{#
+  Grouped by the business that shared each document, then by project. A portal
+  account is global, so one page may carry material from two freelancers who do
+  not know about each other - they must never read as one list. See ADR-0008.
 
-    {# Document sharing arrives in the next change. Until then this page exists
-       to prove the session works and to give a redeemed invite somewhere to
-       land - a login that leads nowhere is worse than no login. #}
+  Only the project *name* appears. A project also carries a description, a rate
+  and hours logged; none of that belongs to the client who was granted one file.
+#}
+<div class="mb-6">
+    <h1 class="text-xl font-extrabold text-gray-800">Your documents</h1>
+    <p class="text-xs text-gray-400 mt-1">Files that have been shared with you.</p>
+</div>
+
+{% if groups %}
+    {% for group in groups %}
+    <section class="panel p-6 mb-5">
+        <h2 class="text-sm font-bold text-gray-700">{{ group.name }}</h2>
+
+        {% for project_name, docs in group.projects.items() %}
+        <div class="mt-5">
+            <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{{ project_name }}</p>
+            <div class="mt-2 space-y-2">
+                {% for doc in docs %}
+                <div class="flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-100">
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-semibold text-gray-700 truncate">{{ doc.title }}</p>
+                        <p class="text-[11px] text-gray-400">
+                            {% if doc.is_link %}
+                                {% if doc.provider == 'google_drive' %}Google Drive{% else %}External link{% endif %}
+                            {% else %}
+                                {{ doc.original_name }} &middot; {{ doc.size_label }}
+                            {% endif %}
+                            &middot; {{ doc.created_at.strftime('%d %b %Y') }}
+                        </p>
+                    </div>
+                    {% if doc.is_link %}
+                    <a href="{{ doc.external_url }}" target="_blank" rel="noopener noreferrer" class="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100">Open</a>
+                    {% else %}
+                    <a href="{{ url_for('portal.download', doc_id=doc.id) }}" class="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100">Download</a>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </section>
+    {% endfor %}
+
+    <p class="text-[11px] text-gray-400 px-1">
+        Links open where the file lives &mdash; if one asks you to sign in, that
+        request comes from that service, not from this portal.
+    </p>
+{% else %}
+<div class="panel p-6">
     <div class="text-center py-12">
         <p class="text-sm font-semibold text-gray-500">Nothing shared with you yet</p>
-        <p class="text-xs text-gray-400 mt-1">
-            When {% if clients %}{{ clients[0].user.business_name or 'your contact' }}{% else %}your contact{% endif %}
-            shares a document with you, it will appear here.
-        </p>
+        <p class="text-xs text-gray-400 mt-1">When a document is shared with you, it will appear here.</p>
     </div>
 </div>
+{% endif %}
 {% endblock %}
