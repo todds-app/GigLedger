@@ -264,7 +264,7 @@ def export_pdf():
   .badge-nd {{ background: #f3f4f6; color: #9ca3af; }}
   .footer {{ margin-top: 30px; padding-top: 12px; border-top: 1px solid #e5e7eb; color: #9ca3af; font-size: 10px; }}
 </style></head><body>
-  <h1>FreelanceCash</h1>
+  <h1>GigLedger</h1>
   <p class="subtitle">Transaction Report &middot; {current_user.email} &middot; Generated {datetime.now().strftime('%B %d, %Y at %I:%M %p')}</p>
 
   <h2>Summary</h2>
@@ -300,7 +300,7 @@ def export_pdf():
     html += f"""
     </tbody>
   </table>
-  <div class="footer">FreelanceCash &middot; This report is for informational purposes only and does not constitute tax advice.</div>
+  <div class="footer">GigLedger &middot; This report is for informational purposes only and does not constitute tax advice.</div>
 </body></html>"""
 
     # Use weasyprint to convert HTML to PDF if available, else use a simpler approach

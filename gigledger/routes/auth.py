@@ -53,7 +53,7 @@ def signup():
             db.session.add(user)
             db.session.commit()
             login_user(user, remember=True)
-            flash('Account created! Welcome to FreelanceCash.', 'success')
+            flash('Account created! Welcome to GigLedger.', 'success')
             return redirect(url_for('dashboard.index'))
 
     return render_template('auth/signup.html')
