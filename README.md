@@ -101,6 +101,19 @@ No more setting aside random percentages. No more spreadsheet gymnastics. Just c
 > URL; Google decides who can open it. Access rules are *enforced* for uploads
 > and *advisory* for links — see [docs/adr/0007](docs/adr/0007-google-drive-as-reference.md).
 
+### 🔑 Client Portal
+- **Invite-based access** — Enable portal access per client; GigLedger generates a single-use link that expires in 7 days
+- **You deliver the invite** — GigLedger sends no email, so the link is shown once for you to copy and send however you already talk to your client
+- **Immediate revocation** — Revoking signs the client out on their next request, not whenever their cookie happens to expire
+- **One login per person** — A client working with several freelancers uses one account
+- **Login throttling** — Repeated failures lock an address out for 15 minutes, on the client login *and* yours
+- **Off switch** — `PORTAL_ENABLED=0` removes the portal routes entirely
+
+> **Clients are not users.** Portal sessions live outside Flask-Login on purpose:
+> `current_user` means *freelancer* everywhere in this app, and ~40 routes filter
+> rows with `user_id=current_user.id`. See
+> [docs/adr/0008](docs/adr/0008-client-portal-authentication.md).
+
 ### 🎯 Savings Goals
 - **Visual progress bars** — Color-coded with percentage complete
 - **Target amounts** — Set a goal and track progress
@@ -267,8 +280,9 @@ gigledger/                      # Repository root — may be named anything
 ├── uploads/                    # Attached project documents (auto-created, gitignored)
 ├── gigledger/                  # The application package
 │   ├── app.py                  # Flask app factory, config, seed data, DB migrations
-│   ├── models.py               # SQLAlchemy models (10 models)
+│   ├── models.py               # SQLAlchemy models (13 models)
 │   ├── documents.py            # Document storage: upload root, allowlist, URL scheme rules
+│   ├── portal_auth.py          # Client Portal sessions, invites, revocation, throttling
 │   ├── finance.py              # Core financial calculation engine
 │   ├── routes/
 │   │   ├── auth.py             # Login / Signup / Logout
@@ -301,6 +315,11 @@ gigledger/                      # Repository root — may be named anything
 │       ├── projects/
 │       │   ├── index.html      # Project dashboard
 │       │   └── detail.html     # Single project with its documents
+│       ├── portal/             # Client Portal — its own base, no freelancer nav
+│       │   ├── base.html
+│       │   ├── login.html
+│       │   ├── redeem.html
+│       │   └── index.html
 │       ├── goals/
 │       │   └── index.html      # Savings goals tracker
 │       ├── recurring/
@@ -329,7 +348,10 @@ gigledger/                      # Repository root — may be named anything
 | **Transaction** | `transactions` | amount (+income/-expense), date, category, description, is_tax_deductible, source (manual/invoice/project/recurring), invoice_id |
 | **Invoice** | `invoices` | client_id, invoice_number, status, issue_date, due_date, subtotal, tax_amount, total, paid_date |
 | **InvoiceLineItem** | `invoice_line_items` | invoice_id, description, quantity, rate, amount |
-| **Client** | `clients` | name, email, phone, company, address, notes, is_active |
+| **Client** | `clients` | name, email, phone, company, address, notes, is_active, portal_account_id |
+| **PortalAccount** | `portal_accounts` | email (global, unique), password_hash, session_epoch, last_login_at |
+| **PortalInvite** | `portal_invites` | client_id, email, token_hash, expires_at, redeemed_at |
+| **LoginAttempt** | `login_attempts` | scope (portal/app), identifier, ip, at |
 | **Project** | `projects` | client_id, name, description, status, rate_type, rate, hours_logged, deadline, color |
 | **ProjectDocument** | `project_documents` | project_id, kind (upload/link), title, stored_name, original_name, byte_size, external_url, provider |
 | **Goal** | `goals` | name, target_amount, current_amount, deadline, icon, color, is_completed |
@@ -364,6 +386,12 @@ gigledger/                      # Repository root — may be named anything
 | `POST` | `/clients/edit/<id>` | Edit client |
 | `POST` | `/clients/toggle/<id>` | Toggle active/inactive |
 | `GET` | `/clients/<id>` | Client detail with stats |
+| `POST` | `/clients/<id>/portal/invite` | Create a portal invitation (link shown once) |
+| `POST` | `/clients/<id>/portal/revoke` | Revoke portal access immediately |
+| `GET/POST` | `/portal/login` | Client Portal sign-in |
+| `GET/POST` | `/portal/invite/<token>` | Redeem an invitation and set a password |
+| `POST` | `/portal/logout` | Client Portal sign-out |
+| `GET` | `/portal/` | Documents shared with the signed-in client |
 | `GET` | `/projects` | Project list |
 | `GET` | `/projects/<id>` | Project detail with documents |
 | `POST` | `/projects/<id>/documents/upload` | Attach an uploaded file |

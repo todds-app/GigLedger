@@ -102,9 +102,16 @@ class Client(db.Model):
     address = db.Column(db.Text, default='')
     notes = db.Column(db.Text, default='')
     is_active = db.Column(db.Boolean, default=True)
+    # Set when the client redeems a portal invite; cleared when access is
+    # revoked. Null means "this client cannot log in", which is the default and
+    # stays the default until the freelancer deliberately changes it.
+    portal_account_id = db.Column(db.Integer, db.ForeignKey('portal_accounts.id'),
+                                  nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     invoices = db.relationship('Invoice', backref='client', lazy=True)
+    portal_invites = db.relationship('PortalInvite', backref='client', lazy=True,
+                                     cascade='all, delete-orphan')
     projects = db.relationship('Project', backref='client', lazy=True)
 
     def total_invoiced(self):
@@ -115,6 +122,72 @@ class Client(db.Model):
 
     def total_outstanding(self):
         return sum(inv.total for inv in self.invoices if inv.status in ('sent', 'overdue'))
+
+
+class PortalAccount(db.Model):
+    """A client's login for the Client Portal.
+
+    Deliberately **not** a User, and deliberately not loaded by Flask-Login. If
+    a portal account could become `current_user`, every existing
+    `filter_by(user_id=current_user.id)` in the app would match on its id and
+    serve another tenant's rows. See docs/adr/0008.
+
+    Also deliberately **global**, keyed by email rather than scoped to one
+    freelancer: the same person is routinely a client of several freelancers,
+    and one row per (freelancer, email) makes the login form ambiguous. This is
+    the only cross-tenant object in the schema, and it holds credentials only -
+    never documents, never project data. Everything a portal session can see is
+    reached through the tenant-scoped Client rows linked to it.
+    """
+    __tablename__ = 'portal_accounts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(200), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
+
+    # Bumped on revocation and on reissue. The session carries the value it saw
+    # at login; a mismatch ends the session on the next request. Without this,
+    # "revoke access" would mean "revoked whenever the cookie happens to lapse".
+    session_epoch = db.Column(db.Integer, nullable=False, default=1)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_login_at = db.Column(db.DateTime, nullable=True)
+
+    clients = db.relationship('Client', backref='portal_account', lazy=True)
+
+
+class PortalInvite(db.Model):
+    """A single-use, expiring grant that turns a Client into a login.
+
+    The token is stored hashed. It is a bearer credential that will be pasted
+    into email and chat, and a database read - a backup, a stray SELECT - must
+    not hand over working invites.
+    """
+    __tablename__ = 'portal_invites'
+
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(db.Integer, db.ForeignKey('clients.id'), nullable=False)
+    email = db.Column(db.String(200), nullable=False)
+    token_hash = db.Column(db.String(64), nullable=False, index=True)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    redeemed_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def is_open(self):
+        return self.redeemed_at is None and self.expires_at > datetime.utcnow()
+
+
+class LoginAttempt(db.Model):
+    """Failed logins, for throttling. Durable rather than in-memory so a restart
+    is not a way to clear the counter, and so it works with more than one worker
+    process."""
+    __tablename__ = 'login_attempts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    scope = db.Column(db.String(20), nullable=False)  # portal, app
+    identifier = db.Column(db.String(200), nullable=False, index=True)
+    ip = db.Column(db.String(64), default='')
+    at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
 
 class Invoice(db.Model):

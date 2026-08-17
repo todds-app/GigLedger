@@ -170,6 +170,50 @@ access rule is **enforced** for uploads and **advisory** for links. The two must
 never be presented to a user as equivalent. See
 [ADR-0007](adr/0007-google-drive-as-reference.md).
 
+### Portal Account
+
+`PortalAccount` — a client's login for the Client Portal. Keyed by email and
+**global**, linked many-to-one from tenant-scoped `Client` rows, because the
+same person is routinely a client of several freelancers and one row per
+(freelancer, email) makes the login form ambiguous.
+
+The schema's only deliberately cross-tenant object. It holds credentials and
+nothing else; `portal_auth.visible_clients()` is the single seam where a portal
+request drops back into tenant-scoped data.
+
+### Portal Session
+
+The `portal_account_id` key in the Flask session — how a client is
+authenticated. Deliberately **not** Flask-Login.
+
+The distinction is not stylistic. `current_user` is assumed to be a freelancer
+by ~40 routes that filter rows with `user_id=current_user.id`; if a client could
+become `current_user`, a portal account with id 3 would be served freelancer
+#3's rows. A **Portal Session** and a freelancer session are mutually exclusive,
+so no request has two principals. See
+[ADR-0008](adr/0008-client-portal-authentication.md).
+
+### Session Epoch
+
+`PortalAccount.session_epoch` — an integer stamped into the session at login and
+compared on every request. Revoking access or reissuing an invite bumps it,
+which ends live sessions on their next request.
+
+Exists because unlinking a client alone would leave an already-issued cookie
+working until it lapsed. The epoch is what makes "revoke" mean *signed out now*.
+
+### Invite Token
+
+The one-time secret in a portal invitation URL. Generated with
+`secrets.token_urlsafe(32)`, stored only as a SHA-256 hash, single-use, expiring
+after seven days.
+
+SHA-256 rather than bcrypt on purpose: it is a 256-bit random token, not a
+password, so there is no dictionary to slow down — the only property needed is
+that the stored form cannot be used as the token. Delivered by the freelancer,
+not emailed, because **this app cannot send email** and an invite flow that
+assumes SMTP is one that fails silently.
+
 ### Secret Key
 
 `SECRET_KEY`, read from the environment in `create_app()`. Signs session cookies

@@ -1,0 +1,19 @@
+{% extends "portal/base.html" %}
+{% block title %}Your documents - Client Portal{% endblock %}
+{% block content %}
+<div class="panel p-7">
+    <h1 class="text-xl font-extrabold text-gray-800 mb-1">Your documents</h1>
+    <p class="text-xs text-gray-400 mb-6">Files that have been shared with you.</p>
+
+    {# Document sharing arrives in the next change. Until then this page exists
+       to prove the session works and to give a redeemed invite somewhere to
+       land - a login that leads nowhere is worse than no login. #}
+    <div class="text-center py-12">
+        <p class="text-sm font-semibold text-gray-500">Nothing shared with you yet</p>
+        <p class="text-xs text-gray-400 mt-1">
+            When {% if clients %}{{ clients[0].user.business_name or 'your contact' }}{% else %}your contact{% endif %}
+            shares a document with you, it will appear here.
+        </p>
+    </div>
+</div>
+{% endblock %}

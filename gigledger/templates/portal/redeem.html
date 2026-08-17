@@ -1,0 +1,28 @@
+{% extends "portal/base.html" %}
+{% block title %}Set up access - Client Portal{% endblock %}
+{% block content %}
+<div class="panel p-7 max-w-sm mx-auto mt-6">
+    <h1 class="text-xl font-extrabold text-gray-800 mb-1">Set up your access</h1>
+    <p class="text-xs text-gray-400 mb-6">for <span class="font-semibold text-gray-600">{{ invite.email }}</span></p>
+
+    <form method="POST" action="{{ url_for('portal.redeem', token=token) }}" class="space-y-4">
+        {{ csrf_field() }}
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1.5">Password</label>
+            <input type="password" name="password" required autofocus minlength="12" class="field">
+            <p class="text-[11px] text-gray-400 mt-1.5">
+                At least 12 characters. If you already use this email for another
+                portal, enter that existing password instead and the two will be
+                linked.
+            </p>
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1.5">Confirm password</label>
+            <input type="password" name="confirm_password" required class="field">
+        </div>
+        <button type="submit" class="btn w-full">Continue</button>
+    </form>
+
+    <p class="text-[11px] text-gray-400 mt-5">This invitation can be used once, and expires seven days after it was created.</p>
+</div>
+{% endblock %}

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+{#
+  The portal's own layout. It deliberately does not extend base.html.
+
+  base.html carries the freelancer's navigation - transactions, taxes, reports,
+  settings - and inherits its context from `current_user`, which a portal
+  session does not have. Extending it would mean the portal's chrome was one
+  forgotten {% if %} away from rendering a link into the freelancer's app. A
+  separate file makes that impossible rather than merely unlikely.
+
+  Same reasoning ADR-0005 applied to the export documents.
+#}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Client Portal - GigLedger{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #f6f8f7; font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif; }
+        .panel { background: rgba(255,255,255,0.85); border: 1px solid rgba(255,255,255,0.9); box-shadow: 0 10px 30px rgba(16,24,40,0.06); border-radius: 1.25rem; }
+        .field { width: 100%; padding: 0.7rem 1rem; border-radius: 0.85rem; background: #fff; border: 1px solid #e5e7eb; font-size: 0.9rem; }
+        .field:focus { outline: none; border-color: #34d399; box-shadow: 0 0 0 3px rgba(52,211,153,0.15); }
+        .btn { padding: 0.7rem 1.1rem; border-radius: 0.85rem; font-weight: 700; font-size: 0.9rem; background: #10b981; color: #fff; }
+        .btn:hover { background: #059669; }
+    </style>
+</head>
+<body class="min-h-screen">
+    <header class="max-w-3xl mx-auto px-5 pt-8 pb-4 flex items-center justify-between">
+        <div>
+            <p class="text-lg font-extrabold text-gray-800">Client Portal</p>
+            <p class="text-xs text-gray-400">Documents shared with you</p>
+        </div>
+        {% if account %}
+        <div class="flex items-center gap-3">
+            <span class="text-xs text-gray-400">{{ account.email }}</span>
+            <form method="POST" action="{{ url_for('portal.logout') }}">
+                {{ csrf_field() }}
+                <button type="submit" class="text-xs font-semibold text-gray-500 hover:text-gray-800">Sign out</button>
+            </form>
+        </div>
+        {% endif %}
+    </header>
+
+    <main class="max-w-3xl mx-auto px-5 pb-16">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="mb-4 px-4 py-3 rounded-xl text-sm font-medium
+                    {% if category == 'error' %}bg-red-50 text-red-700 border border-red-100
+                    {% elif category == 'success' %}bg-emerald-50 text-emerald-700 border border-emerald-100
+                    {% else %}bg-gray-50 text-gray-600 border border-gray-100{% endif %}">
+                    {{ message }}
+                </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

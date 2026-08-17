@@ -40,3 +40,4 @@ the failure modes the decision does *not* protect against.
 | [0005](0005-render-documents-from-templates.md) | Render export documents from templates; drop the WeasyPrint branch | Accepted |
 | [0006](0006-document-storage-and-serving.md) | Store project documents under opaque names; serve them only as attachments | Accepted |
 | [0007](0007-google-drive-as-reference.md) | Reference Google Drive documents by link; do not integrate with Drive | Accepted |
+| [0008](0008-client-portal-authentication.md) | Authenticate portal clients outside Flask-Login, in their own session | Accepted |

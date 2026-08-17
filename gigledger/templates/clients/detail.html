@@ -45,6 +45,46 @@
         </div>
     </div>
 
+    <!-- Client Portal access -->
+    {% if portal_enabled %}
+    <div class="glass-card p-5 fade-up fade-up-delay-2">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+                <h2 class="text-sm font-bold text-gray-400 uppercase tracking-wider">Client Portal</h2>
+                <p class="text-xs text-gray-400 mt-1">
+                    {% if client.portal_account %}
+                        {{ client.name }} can sign in as <span class="font-semibold text-gray-600">{{ client.portal_account.email }}</span>.
+                    {% else %}
+                        {{ client.name }} cannot sign in. Create an invitation and send it to them yourself &mdash; GigLedger does not send email.
+                    {% endif %}
+                </p>
+            </div>
+            <div class="shrink-0">
+                {% if client.portal_account %}
+                <form method="POST" action="{{ url_port('clients.portal_revoke', id=client.id) }}" onsubmit="return confirm('Revoke portal access? They will be signed out immediately.')">
+                    {{ csrf_field() }}
+                    <button type="submit" class="px-4 py-2.5 glass-card font-semibold rounded-xl text-sm text-red-500 hover:text-red-600 hover:scale-105 transition-all">Revoke access</button>
+                </form>
+                {% else %}
+                <form method="POST" action="{{ url_port('clients.portal_invite', id=client.id) }}" class="flex items-center gap-2">
+                    {{ csrf_field() }}
+                    <input type="email" name="email" value="{{ client.email }}" placeholder="client@example.com" required class="px-3 py-2 rounded-xl bg-white/70 border border-white/60 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200">
+                    <button type="submit" class="px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-brand-500 hover:bg-brand-600 shadow-lg shadow-brand-200 whitespace-nowrap">Enable access</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if invite_url %}
+        <div class="mt-4 p-4 rounded-xl bg-amber-50/70 border border-amber-100">
+            <p class="text-xs font-bold text-amber-800 mb-2">Copy this link now &mdash; it is shown once and cannot be recovered.</p>
+            <input type="text" readonly value="{{ invite_url }}" onclick="this.select()" class="w-full px-3 py-2 rounded-lg bg-white border border-amber-200 text-xs font-mono text-gray-700">
+            <p class="text-[11px] text-amber-700 mt-2">Single use, expires in 7 days. Send it to {{ client.name }} however you normally reach them.</p>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <!-- Contact Info Card -->
     <div class="glass-card p-5 fade-up fade-up-delay-2">
         <h2 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Contact Info</h2>

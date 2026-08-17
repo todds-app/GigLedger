@@ -171,6 +171,14 @@ def create_app():
     app.register_blueprint(goals_bp)
     app.register_blueprint(recurring_bp)
 
+    # Registered conditionally, so switching the portal off removes the routes
+    # rather than making them refuse. A route that exists and refuses is still a
+    # surface, and still announces that the feature is there. See ADR-0008.
+    from . import portal_auth
+    if portal_auth.is_enabled():
+        from .routes.portal import portal_bp
+        app.register_blueprint(portal_bp)
+
     with app.app_context():
         db.create_all()
         _migrate_db(db)
@@ -218,6 +226,13 @@ def _migrate_db(db):
     tx_columns = {row[1] for row in cursor.fetchall()}
     if 'invoice_id' not in tx_columns:
         cursor.execute("ALTER TABLE transactions ADD COLUMN invoice_id INTEGER REFERENCES invoices(id)")
+
+    # Migrate clients table - Client Portal access
+    cursor.execute("PRAGMA table_info(clients)")
+    client_columns = {row[1] for row in cursor.fetchall()}
+    if 'portal_account_id' not in client_columns:
+        cursor.execute("ALTER TABLE clients ADD COLUMN portal_account_id "
+                       "INTEGER REFERENCES portal_accounts(id)")
 
     # Migrate tax_estimates table - fix foreign key
     cursor.execute("PRAGMA table_info(tax_estimates)")

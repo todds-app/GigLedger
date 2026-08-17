@@ -1,5 +1,7 @@
-from flask import Blueprint, render_template, redirect, url_for, request, flash
+from flask import (Blueprint, render_template, redirect, url_for, request, flash,
+                   abort, session)
 from flask_login import login_required, current_user
+from .. import portal_auth
 from ..models import Client, Invoice, Project, db
 
 clients_bp = Blueprint('clients', __name__, url_prefix='/clients')
@@ -109,4 +111,55 @@ def detail(id):
         total_invoiced=total_invoiced,
         total_paid=total_paid,
         total_outstanding=total_outstanding,
+        portal_enabled=portal_auth.is_enabled(),
+        invite_url=session.pop('portal_invite_url', None),
         currency=current_user.currency)
+
+
+# --- Client Portal access ------------------------------------------------
+#
+# The freelancer delivers the invite themselves. GigLedger sends no email, and
+# an invite flow that quietly depends on working SMTP is a flow that quietly
+# fails. See docs/adr/0008.
+
+def _owned_client(id):
+    client = Client.query.filter_by(id=id, user_id=current_user.id).first()
+    if not client:
+        abort(404)
+    return client
+
+
+@clients_bp.route('/<int:id>/portal/invite', methods=['POST'])
+@login_required
+def portal_invite(id):
+    client = _owned_client(id)
+
+    email = (request.form.get('email', '') or client.email or '').strip().lower()
+    if not email:
+        flash('An email address is needed to create a portal invitation.', 'error')
+        return redirect(url_for('clients.detail', id=client.id))
+
+    _, token = portal_auth.create_invite(client, email)
+    db.session.commit()
+
+    # Handed back through the session for one render. The token exists nowhere
+    # else in a readable form, so this page is the only chance to copy it - and
+    # putting it in the session rather than the URL keeps it out of the browser
+    # history and out of any access log.
+    session['portal_invite_url'] = url_for('portal.redeem', token=token,
+                                           _external=True)
+    flash('Invitation created. Copy the link below and send it to your client.',
+          'success')
+    return redirect(url_for('clients.detail', id=client.id))
+
+
+@clients_bp.route('/<int:id>/portal/revoke', methods=['POST'])
+@login_required
+def portal_revoke(id):
+    client = _owned_client(id)
+
+    portal_auth.revoke(client)
+    db.session.commit()
+
+    flash(f'Portal access for {client.name} has been revoked.', 'success')
+    return redirect(url_for('clients.detail', id=client.id))
