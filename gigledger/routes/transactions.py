@@ -239,77 +239,19 @@ def export_pdf():
     net = total_income - total_expenses
     tax_saving = total_deductible * current_user.default_tax_rate
 
-    html = f"""<!DOCTYPE html>
-<html><head><meta charset="UTF-8">
-<style>
-  body {{ font-family: 'Helvetica Neue', Arial, sans-serif; color: #1a1a1a; margin: 40px; font-size: 12px; }}
-  h1 {{ font-size: 24px; color: #16a34a; margin-bottom: 4px; }}
-  h2 {{ font-size: 16px; color: #374151; margin-top: 24px; border-bottom: 2px solid #e5e7eb; padding-bottom: 6px; }}
-  .subtitle {{ color: #6b7280; font-size: 13px; margin-bottom: 20px; }}
-  .summary-grid {{ display: flex; gap: 16px; margin-bottom: 20px; }}
-  .summary-card {{ flex: 1; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; }}
-  .summary-card .label {{ font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }}
-  .summary-card .value {{ font-size: 18px; font-weight: 700; margin-top: 4px; }}
-  .green {{ color: #16a34a; }}
-  .red {{ color: #dc2626; }}
-  .amber {{ color: #d97706; }}
-  table {{ width: 100%; border-collapse: collapse; margin-top: 8px; }}
-  th {{ background: #f3f4f6; text-align: left; padding: 8px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; border-bottom: 2px solid #e5e7eb; }}
-  td {{ padding: 7px 10px; border-bottom: 1px solid #f3f4f6; }}
-  tr:nth-child(even) {{ background: #fafafa; }}
-  .amount-pos {{ color: #16a34a; font-weight: 600; }}
-  .amount-neg {{ color: #dc2626; font-weight: 600; }}
-  .badge {{ display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; }}
-  .badge-ded {{ background: #dcfce7; color: #16a34a; }}
-  .badge-nd {{ background: #f3f4f6; color: #9ca3af; }}
-  .footer {{ margin-top: 30px; padding-top: 12px; border-top: 1px solid #e5e7eb; color: #9ca3af; font-size: 10px; }}
-</style></head><body>
-  <h1>GigLedger</h1>
-  <p class="subtitle">Transaction Report &middot; {current_user.email} &middot; Generated {datetime.now().strftime('%B %d, %Y at %I:%M %p')}</p>
+    # Rendered from a template, not built as an f-string, so that autoescape
+    # applies to the description and category fields by default. See docs/adr/0005.
+    generated_at = datetime.now()
+    html = render_template('transactions/export.html',
+        transactions=transactions,
+        sym=sym,
+        total_income=total_income,
+        total_expenses=total_expenses,
+        total_deductible=total_deductible,
+        net=net,
+        tax_saving=tax_saving,
+        generated_at=generated_at)
 
-  <h2>Summary</h2>
-  <div class="summary-grid">
-    <div class="summary-card"><div class="label">Total Income</div><div class="value green">{sym}{total_income:,.2f}</div></div>
-    <div class="summary-card"><div class="label">Total Expenses</div><div class="value red">{sym}{total_expenses:,.2f}</div></div>
-    <div class="summary-card"><div class="label">Deductible</div><div class="value amber">{sym}{total_deductible:,.2f}</div></div>
-    <div class="summary-card"><div class="label">Net</div><div class="value {'green' if net >= 0 else 'red'}">{sym}{net:,.2f}</div></div>
-  </div>
-
-  <div class="summary-grid">
-    <div class="summary-card"><div class="label">Tax Rate</div><div class="value">{current_user.default_tax_rate*100:.0f}%</div></div>
-    <div class="summary-card"><div class="label">Tax Saving from Deductions</div><div class="value green">{sym}{tax_saving:,.2f}</div></div>
-  </div>
-
-  <h2>Transactions ({len(transactions)} records)</h2>
-  <table>
-    <thead><tr><th>Date</th><th>Description</th><th>Category</th><th style="text-align:right">Amount</th><th style="text-align:center">Deductible</th></tr></thead>
-    <tbody>"""
-
-    for tx in transactions:
-        cls = 'amount-pos' if tx.amount > 0 else 'amount-neg'
-        sign = '+' if tx.amount > 0 else '-'
-        ded_badge = '<span class="badge badge-ded">Yes</span>' if tx.is_tax_deductible else '<span class="badge badge-nd">No</span>'
-        html += f"""<tr>
-            <td>{tx.date.strftime('%b %d, %Y')}</td>
-            <td>{tx.description or '-'}</td>
-            <td>{tx.category or 'Other'}</td>
-            <td style="text-align:right" class="{cls}">{sign}{sym}{abs(tx.amount):,.2f}</td>
-            <td style="text-align:center">{ded_badge}</td>
-        </tr>"""
-
-    html += f"""
-    </tbody>
-  </table>
-  <div class="footer">GigLedger &middot; This report is for informational purposes only and does not constitute tax advice.</div>
-</body></html>"""
-
-    # Use weasyprint to convert HTML to PDF if available, else use a simpler approach
-    try:
-        from weasyprint import HTML as WeasyHTML
-        pdf_bytes = WeasyHTML(string=html).write_pdf()
-        return Response(pdf_bytes, mimetype='application/pdf',
-            headers={'Content-Disposition': f'attachment; filename=transactions_{datetime.now().strftime("%Y%m%d")}.pdf'})
-    except ImportError:
-        # Fallback: return the HTML as a downloadable file
-        return Response(html, mimetype='text/html',
-            headers={'Content-Disposition': f'attachment; filename=transactions_{datetime.now().strftime("%Y%m%d")}.html'})
+    return Response(html, mimetype='text/html',
+        headers={'Content-Disposition':
+                 f'attachment; filename=transactions_{generated_at.strftime("%Y%m%d")}.html'})

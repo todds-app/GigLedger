@@ -21,8 +21,8 @@
                         <div class="text-xs text-gray-400 mt-0.5">Spreadsheet format</div>
                     </a>
                     <a href="{{ url_port('transactions.export_pdf') }}{% if selected_type %}?type={{ selected_type }}{% endif %}{% if selected_category %}{% if not selected_type %}?{% else %}&{% endif %}category={{ selected_category }}{% endif %}{% if selected_month %}{% if not selected_type and not selected_category %}?{% else %}&{% endif %}month={{ selected_month }}{% endif %}{% if selected_year %}{% if not selected_type and not selected_category and not selected_month %}?{% else %}&{% endif %}year={{ selected_year }}{% endif %}" class="block px-4 py-3 text-sm text-gray-700 hover:bg-red-50/80 hover:text-red-700 rounded-xl transition-all">
-                        <div class="font-semibold">Export as PDF</div>
-                        <div class="text-xs text-gray-400 mt-0.5">Printable report</div>
+                        <div class="font-semibold">Export as HTML</div>
+                        <div class="text-xs text-gray-400 mt-0.5">Printable report (open and print to PDF)</div>
                     </a>
                 </div>
             </div>

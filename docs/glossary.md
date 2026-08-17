@@ -105,6 +105,17 @@ The rule for this context is `| tojson | forceescape`, enforced by
 `tests/test_template_escaping.py`. Distinct from a `<script>` body, where bare
 `| tojson` is correct. See [ADR-0004](adr/0004-template-escaping-in-event-handlers.md).
 
+### Export Document
+
+A self-contained HTML file the user downloads and opens from disk —
+`templates/invoices/export.html` and `templates/transactions/export.html`.
+Deliberately does not extend `base.html`: it carries its own styles and no
+navigation, because it is read outside the app.
+
+Rendered from a template rather than built in the route so that autoescape
+applies by default. `tests/test_no_handbuilt_html.py` keeps routes from drifting
+back to f-string HTML. See [ADR-0005](adr/0005-render-documents-from-templates.md).
+
 ### Constrained Column
 
 A column that only ever holds a value from a fixed set — `Project.rate_type`,

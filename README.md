@@ -54,7 +54,7 @@ No more setting aside random percentages. No more spreadsheet gymnastics. Just c
 - **Summary bar** — Total Income, Expenses, Deductible amount, Tax Saving, Net
 - **Add Transaction modal** — Dynamic categories, real-time tax savings preview
 - **Edit & Delete** — Full CRUD with inline actions
-- **Export to PDF or CSV** — Filtered reports with full detail and summary rows
+- **Export to CSV or printable HTML** — Filtered reports with full detail and summary rows
 - **Auto-Posted from Invoices** — Income and tax reserve transactions created automatically when invoices are paid
 
 ### 🧾 Invoicing
@@ -68,7 +68,7 @@ No more setting aside random percentages. No more spreadsheet gymnastics. Just c
   - An income transaction for the invoice total
   - A tax reserve expense transaction for the tax portion
 - **Revert support** — Un-paying an invoice removes the auto-posted transactions
-- **PDF download** — Professional invoice PDF via WeasyPrint (or HTML fallback)
+- **Printable download** — Self-contained, styled HTML invoice; open it and use your browser's Print to PDF
 - **Print-friendly** — Clean print layout for physical copies
 - **Invoice detail view** — Full preview with line items, totals, and client info
 
@@ -115,7 +115,7 @@ No more setting aside random percentages. No more spreadsheet gymnastics. Just c
 - **Yearly financial report** — Full income and expense breakdown by month
 - **Monthly bar chart** — Visual trend of income vs expenses
 - **Category breakdown** — Where your money goes
-- **Exportable data** — CSV and PDF exports from transactions
+- **Exportable data** — CSV and printable HTML exports from transactions
 
 ### ⚙️ Settings
 - **Tax Rate** — Custom percentage with quick presets (25%, 30%, 35%)
@@ -175,7 +175,7 @@ When you mark an invoice as paid, GigLedger automatically creates two transactio
 | **Templates** | Jinja2 | Server-rendered, fast, no build step |
 | **Styling** | TailwindCSS (CDN) | Utility-first, no CSS files to manage |
 | **Charts** | Chart.js 4.4 | Beautiful bar + doughnut charts |
-| **PDF Export** | WeasyPrint | Professional-quality PDF reports and invoices |
+| **Document Export** | Jinja2 | Self-contained styled HTML invoices and reports (print to PDF from the browser) |
 | **CSV Export** | Python csv + StringIO | Lightweight, no extra dependencies |
 
 ---
@@ -259,8 +259,8 @@ gigledger/                      # Repository root — may be named anything
 │   ├── routes/
 │   │   ├── auth.py             # Login / Signup / Logout
 │   │   ├── dashboard.py        # Main dashboard + Quick Add
-│   │   ├── transactions.py     # CRUD + CSV/PDF export
-│   │   ├── invoices.py         # Invoice CRUD + PDF + mark-as-paid + auto-post
+│   │   ├── transactions.py     # CRUD + CSV/HTML export
+│   │   ├── invoices.py         # Invoice CRUD + HTML export + mark-as-paid + auto-post
 │   │   ├── clients.py          # Client CRM with detail view
 │   │   ├── projects.py         # Project tracking + hours logging
 │   │   ├── goals.py            # Savings goals with progress
@@ -335,14 +335,14 @@ gigledger/                      # Repository root — may be named anything
 | `POST` | `/transactions/edit/<id>` | Edit existing transaction |
 | `POST` | `/transactions/delete/<id>` | Delete a transaction |
 | `GET` | `/transactions/export/csv` | Export filtered transactions as CSV |
-| `GET` | `/transactions/export/pdf` | Export filtered transactions as PDF |
+| `GET` | `/transactions/export/pdf` | Export filtered transactions as printable HTML |
 | `GET` | `/invoices` | Invoice list with status filter |
 | `GET` | `/invoices/create` | Invoice creation form |
 | `POST` | `/invoices/create` | Create invoice with line items |
 | `POST` | `/invoices/status/<id>` | Update invoice status (auto-posts transactions on paid) |
 | `POST` | `/invoices/delete/<id>` | Delete invoice + linked transactions |
 | `GET` | `/invoices/<id>` | Invoice detail view |
-| `GET` | `/invoices/<id>/pdf` | Download invoice as PDF |
+| `GET` | `/invoices/<id>/pdf` | Download invoice as printable HTML |
 | `GET` | `/clients` | Client list |
 | `POST` | `/clients/add` | Add new client |
 | `POST` | `/clients/edit/<id>` | Edit client |

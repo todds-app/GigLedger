@@ -289,116 +289,15 @@ def generate_pdf(id):
         'draft': '#6b7280', 'sent': '#3b82f6', 'paid': '#16a34a',
         'overdue': '#dc2626', 'cancelled': '#9ca3af'
     }
-    status_color = status_colors.get(invoice.status, '#6b7280')
 
-    # Build HTML for PDF
-    li_rows = ''
-    for li in line_items:
-        li_rows += f"""<tr>
-            <td style="padding: 10px 12px; border-bottom: 1px solid #f3f4f6; color: #1f2937; font-weight: 500;">{li.description}</td>
-            <td style="padding: 10px 12px; border-bottom: 1px solid #f3f4f6; text-align: center; color: #374151;">{li.quantity:.1f}</td>
-            <td style="padding: 10px 12px; border-bottom: 1px solid #f3f4f6; text-align: right; color: #374151;">{sym}{li.rate:,.2f}</td>
-            <td style="padding: 10px 12px; border-bottom: 1px solid #f3f4f6; text-align: right; font-weight: 600; color: #1f2937;">{sym}{li.amount:,.2f}</td>
-        </tr>"""
+    # Rendered from a template, not built as an f-string, so that autoescape
+    # applies to the client and business fields by default. See docs/adr/0005.
+    html = render_template('invoices/export.html',
+        invoice=invoice,
+        line_items=line_items,
+        sym=sym,
+        status_color=status_colors.get(invoice.status, '#6b7280'))
 
-    client_info = ''
-    if invoice.client:
-        c = invoice.client
-        client_info = f"""<div style="margin-bottom: 4px; font-weight: 600; color: #111827; font-size: 15px;">{c.name}</div>"""
-        if c.company:
-            client_info += f"""<div style="color: #374151; font-size: 13px;">{c.company}</div>"""
-        if c.email:
-            client_info += f"""<div style="color: #6b7280; font-size: 13px;">{c.email}</div>"""
-        if c.address:
-            client_info += f"""<div style="color: #6b7280; font-size: 13px; white-space: pre-line;">{c.address}</div>"""
-    else:
-        client_info = '<div style="color: #9ca3af;">No client assigned</div>'
-
-    html = f"""<!DOCTYPE html>
-<html><head><meta charset="UTF-8">
-<style>
-  body {{ font-family: 'Helvetica Neue', Arial, sans-serif; color: #1a1a1a; margin: 40px; font-size: 13px; }}
-  .invoice-header {{ display: flex; justify-content: space-between; margin-bottom: 40px; }}
-  .invoice-title {{ font-size: 32px; font-weight: 800; color: #111827; }}
-  .invoice-meta {{ text-align: right; }}
-  .invoice-meta .inv-num {{ font-size: 18px; font-weight: 700; color: #111827; }}
-  .invoice-meta .date {{ color: #6b7280; font-size: 13px; margin-top: 4px; }}
-  .status-badge {{ display: inline-block; padding: 4px 14px; border-radius: 99px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: white; background: {status_color}; margin-top: 8px; }}
-  .parties {{ display: flex; justify-content: space-between; margin-bottom: 36px; gap: 40px; }}
-  .party-section {{ flex: 1; }}
-  .party-label {{ font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #9ca3af; margin-bottom: 8px; font-weight: 600; }}
-  table {{ width: 100%; border-collapse: collapse; margin-bottom: 24px; }}
-  th {{ background: #f9fafb; text-align: left; padding: 10px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; border-bottom: 2px solid #e5e7eb; }}
-  th.num {{ text-align: right; }}
-  th.center {{ text-align: center; }}
-  .totals-section {{ display: flex; justify-content: flex-end; }}
-  .totals-table {{ width: 280px; }}
-  .totals-table td {{ padding: 8px 12px; }}
-  .totals-table .label {{ color: #6b7280; }}
-  .totals-table .value {{ text-align: right; font-weight: 600; color: #1f2937; }}
-  .totals-table .total-row {{ border-top: 2px solid #111827; font-size: 18px; }}
-  .totals-table .total-row .label {{ font-weight: 700; color: #111827; }}
-  .totals-table .total-row .value {{ font-weight: 800; color: #111827; }}
-  .notes {{ margin-top: 40px; padding-top: 16px; border-top: 1px solid #e5e7eb; }}
-  .notes .notes-label {{ font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #9ca3af; margin-bottom: 6px; font-weight: 600; }}
-  .notes .notes-text {{ color: #374151; font-size: 13px; }}
-  .footer {{ margin-top: 48px; text-align: center; color: #9ca3af; font-size: 11px; }}
-</style></head><body>
-  <div class="invoice-header">
-    <div>
-      <div class="invoice-title">INVOICE</div>
-    </div>
-    <div class="invoice-meta">
-      <div class="inv-num">{invoice.invoice_number}</div>
-      <div class="date">Issued: {invoice.issue_date.strftime('%B %d, %Y')}</div>
-      <div class="date">Due: {invoice.due_date.strftime('%B %d, %Y') if invoice.due_date else 'N/A'}</div>
-      <div class="status-badge">{invoice.status.upper()}</div>
-    </div>
-  </div>
-
-  <div class="parties">
-    <div class="party-section">
-      <div class="party-label">From</div>
-      <div style="font-weight: 600; color: #111827; font-size: 15px;">{current_user.business_name or current_user.email}</div>
-      {"<div style='color: #6b7280; font-size: 13px; white-space: pre-line;'>" + current_user.business_address + "</div>" if current_user.business_address else ""}
-      {"<div style='color: #6b7280; font-size: 13px;'>" + current_user.business_phone + "</div>" if current_user.business_phone else ""}
-    </div>
-    <div class="party-section">
-      <div class="party-label">Bill To</div>
-      {client_info}
-    </div>
-  </div>
-
-  <table>
-    <thead><tr>
-      <th>Description</th>
-      <th class="center">Qty</th>
-      <th class="num">Rate</th>
-      <th class="num">Amount</th>
-    </tr></thead>
-    <tbody>{li_rows}</tbody>
-  </table>
-
-  <div class="totals-section">
-    <div class="totals-table">
-      <table style="margin:0;">
-        <tr><td class="label">Subtotal</td><td class="value">{sym}{invoice.subtotal:,.2f}</td></tr>
-        <tr><td class="label">Tax ({current_user.default_tax_rate*100:.0f}%)</td><td class="value">{sym}{invoice.tax_amount:,.2f}</td></tr>
-        <tr class="total-row"><td class="label">Total</td><td class="value">{sym}{invoice.total:,.2f}</td></tr>
-      </table>
-    </div>
-  </div>
-
-  {"<div class='notes'><div class='notes-label'>Notes</div><div class='notes-text'>" + (invoice.notes or current_user.invoice_note or '') + "</div></div>" if (invoice.notes or current_user.invoice_note) else ""}
-
-  <div class="footer">Thank you for your business!</div>
-</body></html>"""
-
-    try:
-        from weasyprint import HTML as WeasyHTML
-        pdf_bytes = WeasyHTML(string=html).write_pdf()
-        return Response(pdf_bytes, mimetype='application/pdf',
-            headers={'Content-Disposition': f'attachment; filename=invoice_{invoice.invoice_number}.pdf'})
-    except ImportError:
-        return Response(html, mimetype='text/html',
-            headers={'Content-Disposition': f'attachment; filename=invoice_{invoice.invoice_number}.html'})
+    return Response(html, mimetype='text/html',
+        headers={'Content-Disposition':
+                 f'attachment; filename=invoice_{invoice.invoice_number}.html'})

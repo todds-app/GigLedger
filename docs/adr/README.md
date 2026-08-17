@@ -37,3 +37,4 @@ the failure modes the decision does *not* protect against.
 | [0002](0002-database-path.md) | Keep the database in the repository root, derived once | Accepted |
 | [0003](0003-csrf-protection.md) | Enforce CSRF protection app-wide with Flask-WTF | Accepted |
 | [0004](0004-template-escaping-in-event-handlers.md) | Escape event-handler interpolations with `tojson` + `forceescape` | Accepted |
+| [0005](0005-render-documents-from-templates.md) | Render export documents from templates; drop the WeasyPrint branch | Accepted |
