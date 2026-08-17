@@ -35,3 +35,4 @@ the failure modes the decision does *not* protect against.
 |---|---|---|
 | [0001](0001-declare-package-identity.md) | Declare package identity instead of deriving it from the filesystem | Accepted |
 | [0002](0002-database-path.md) | Keep the database in the repository root, derived once | Accepted |
+| [0003](0003-csrf-protection.md) | Enforce CSRF protection app-wide with Flask-WTF | Accepted |

@@ -105,6 +105,7 @@
         <div class="glass-card p-6 fade-up fade-up-delay-4">
             <h2 class="text-lg font-extrabold text-gray-900 mb-4">Quick Add &#x26A1;</h2>
             <form method="POST" action="{{ url_port('transactions.add') }}" id="quickAddForm" class="space-y-4">
+                {{ csrf_field() }}
                 <div>
                     <label class="block text-sm font-semibold text-gray-600 mb-1.5">Type</label>
                     <div class="flex gap-2">

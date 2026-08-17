@@ -59,7 +59,9 @@ def signup():
     return render_template('auth/signup.html')
 
 
-@auth_bp.route('/logout')
+# POST only: a GET that mutates session state is reachable by <img src="/logout">
+# and is not covered by CSRF protection, which only guards unsafe methods.
+@auth_bp.route('/logout', methods=['POST'])
 @login_required
 def logout():
     logout_user()

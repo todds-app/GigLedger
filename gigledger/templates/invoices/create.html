@@ -14,6 +14,7 @@
     </div>
 
     <form method="POST" action="{{ url_port('invoices.create_invoice') }}" id="invoiceForm" class="space-y-6">
+        {{ csrf_field() }}
         <!-- Invoice Details -->
         <div class="glass-card p-6 fade-up fade-up-delay-1">
             <h2 class="text-lg font-extrabold text-gray-800 mb-4">Invoice Details</h2>

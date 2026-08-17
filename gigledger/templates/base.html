@@ -651,6 +651,7 @@
                         Dark Mode
                     </span>
                     <form method="POST" action="{{ url_port('settings.toggle_dark_mode') }}" class="inline">
+                        {{ csrf_field() }}
                         <input type="hidden" name="dark_mode" value="{{ 'off' if current_user.dark_mode else 'on' }}">
                         <button type="submit" class="dark-toggle {% if current_user.dark_mode %}active{% endif %}">
                             <div class="toggle-knob">
@@ -663,10 +664,13 @@
                         </button>
                     </form>
                 </div>
-                <a href="{{ url_port('auth.logout') }}" class="flex items-center gap-2 px-2 py-2 mt-1 text-xs text-gray-400 hover:text-red-500 rounded-xl hover:bg-red-50/50 transition-all font-medium">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                    Sign Out
-                </a>
+                <form method="POST" action="{{ url_port('auth.logout') }}" style="display: contents;">
+                    {{ csrf_field() }}
+                    <button type="submit" class="w-full flex items-center gap-2 px-2 py-2 mt-1 text-xs text-gray-400 hover:text-red-500 rounded-xl hover:bg-red-50/50 transition-all font-medium">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                        Sign Out
+                    </button>
+                </form>
             </div>
         </aside>
 
@@ -683,6 +687,7 @@
                 <div class="flex items-center gap-3">
                     <!-- Mobile dark mode toggle -->
                     <form method="POST" action="{{ url_port('settings.toggle_dark_mode') }}" class="inline">
+                        {{ csrf_field() }}
                         <input type="hidden" name="dark_mode" value="{{ 'off' if current_user.dark_mode else 'on' }}">
                         <button type="submit" class="p-2 rounded-xl transition-all {% if current_user.dark_mode %}text-indigo-400 bg-indigo-900/30{% else %}text-amber-500 bg-amber-50{% endif %}">
                             {% if current_user.dark_mode %}
@@ -692,9 +697,12 @@
                             {% endif %}
                         </button>
                     </form>
-                    <a href="{{ url_port('auth.logout') }}" class="p-2 text-gray-400 hover:text-red-500 transition-colors">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                    </a>
+                    <form method="POST" action="{{ url_port('auth.logout') }}" style="display: contents;">
+                        {{ csrf_field() }}
+                        <button type="submit" class="p-2 text-gray-400 hover:text-red-500 transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                        </button>
+                    </form>
                 </div>
             </header>
 

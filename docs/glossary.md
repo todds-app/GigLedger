@@ -68,6 +68,42 @@ it is launched from. See [ADR-0002](adr/0002-database-path.md).
 
 ---
 
+## Security
+
+### Unsafe Method
+
+Any HTTP method that may change state — `POST`, `PUT`, `PATCH`, `DELETE`.
+CSRF protection covers exactly these, which is why a state-changing `GET` (as
+`/logout` was) is invisible to it. `tests/test_csrf.py` asserts no safe-method
+route mutates state.
+
+### CSRF Field
+
+`{{ csrf_field() }}` — a Jinja global registered in `create_app()` that renders
+the hidden token input. Called once inside every POST form. Exists so the markup
+has one source of truth rather than being duplicated 48 times. See
+[ADR-0003](adr/0003-csrf-protection.md).
+
+### Vacuity Check
+
+A test whose only job is to prove another test can fail. `test_the_probe_is_not_vacuous`
+runs the CSRF enforcement probe with protection *disabled* and asserts routes do
+act; if they don't, the probe has stopped reaching the handlers and the
+enforcement test proves nothing. Written because the first version of the
+enforcement test passed for the wrong reason — `@login_required` was refusing
+the requests before CSRF was ever consulted.
+
+### Secret Key
+
+`SECRET_KEY`, read from the environment in `create_app()`. Signs session cookies
+**and** derives CSRF tokens, so an ephemeral key logs everyone out *and*
+invalidates every open form on restart.
+
+Lives in `.env` — gitignored, sourced by `proj@.service`. Deliberately **not**
+[autostart.env](../autostart.env), which is committed.
+
+---
+
 ## Deployment
 
 ### Project Manifest

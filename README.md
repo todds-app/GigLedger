@@ -212,11 +212,18 @@ The app starts at **http://localhost:3030**
 > required a matching folder name or a symlink; that is no longer the case.
 > See [docs/adr/0001](docs/adr/0001-declare-package-identity.md).
 
-> **Optional:** set a persistent `SECRET_KEY` so login sessions survive restarts
-> (otherwise an ephemeral key is generated each launch):
+> **Set a persistent `SECRET_KEY`.** CSRF tokens are derived from it, so a key
+> that changes on every start invalidates open forms as well as login sessions —
+> users get "that form had expired" on an ordinary submit after a restart. Put it
+> in a gitignored `.env` alongside the app rather than in `autostart.env`, which
+> is committed:
 > ```bash
-> export SECRET_KEY="your-random-secret"
+> echo "SECRET_KEY=$(python -c 'import secrets;print(secrets.token_hex(32))')" >> .env
+> chmod 600 .env
 > ```
+>
+> If it is unset the app generates an ephemeral key at startup and warns on
+> stdout; it will run, but nothing signed survives a restart.
 
 ### Demo Account
 
@@ -321,7 +328,7 @@ gigledger/                      # Repository root — may be named anything
 |---|---|---|
 | `GET/POST` | `/auth/login` | User login |
 | `GET/POST` | `/auth/signup` | User registration |
-| `GET` | `/auth/logout` | User logout |
+| `POST` | `/logout` | User logout (POST so it is covered by CSRF protection) |
 | `GET/POST` | `/dashboard` | Dashboard view + Quick Add |
 | `GET` | `/transactions` | Transaction list with filters |
 | `POST` | `/transactions/add` | Add new transaction |

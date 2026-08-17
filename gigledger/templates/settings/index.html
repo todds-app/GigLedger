@@ -44,6 +44,7 @@
         <h2 class="text-lg font-extrabold text-gray-900 mb-2">Business Profile</h2>
         <p class="text-sm text-gray-400 mb-6 font-medium">This info appears on your invoices and PDF exports.</p>
         <form method="POST" action="{{ url_port('settings.update_business') }}" class="space-y-4">
+            {{ csrf_field() }}
             <div>
                 <label class="block text-sm font-semibold text-gray-600 mb-1.5">Business Name</label>
                 <input type="text" name="business_name" value="{{ user.business_name or '' }}" class="candy-input block w-full px-4 py-2.5 text-gray-900 focus:outline-none" placeholder="Your Business Name">
@@ -78,6 +79,7 @@
                 <p class="text-sm text-gray-400 font-medium mt-1">Easy on the eyes. Works with any theme.</p>
             </div>
             <form method="POST" action="{{ url_port('settings.toggle_dark_mode') }}">
+                {{ csrf_field() }}
                 <input type="hidden" name="dark_mode" value="{{ 'off' if dark_mode else 'on' }}">
                 <button type="submit" class="dark-toggle {% if dark_mode %}active{% endif %}" style="width:56px;height:30px;">
                     <div class="toggle-knob" style="width:24px;height:24px;{% if dark_mode %}transform:translateX(26px){% endif %}">
@@ -99,6 +101,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {% for theme_id, theme_info in available_themes.items() %}
             <form method="POST" action="{{ url_port('settings.update_theme') }}" class="group">
+                {{ csrf_field() }}
                 <input type="hidden" name="theme" value="{{ theme_id }}">
                 <button type="submit" class="w-full text-left p-4 rounded-2xl border-2 transition-all duration-300 {% if current_theme == theme_id %}border-brand-400 bg-brand-50/50 shadow-lg scale-[1.02] theme-card-active{% else %}border-gray-200/50 hover:border-gray-300 hover:shadow-md hover:scale-[1.01]{% endif %}">
                     <div class="flex items-center justify-between mb-3">
@@ -134,6 +137,7 @@
         <h2 class="text-lg font-extrabold text-gray-900 mb-2">Tax Rate</h2>
         <p class="text-sm text-gray-400 mb-6 font-medium">US freelancers typically set aside 25-35% for self-employment taxes.</p>
         <form method="POST" action="{{ url_port('settings.update_tax_rate') }}" class="flex items-end gap-4">
+            {{ csrf_field() }}
             <div class="flex-1">
                 <label for="tax_rate" class="block text-sm font-semibold text-gray-600 mb-1.5">Tax Rate (%)</label>
                 <input type="number" id="tax_rate" name="tax_rate" min="0" max="100" step="1" value="{{ tax_rate_percent }}" class="candy-input block w-full px-4 py-2.5 text-gray-900 focus:outline-none">
@@ -152,6 +156,7 @@
         <h2 class="text-lg font-extrabold text-gray-900 mb-2">Currency</h2>
         <p class="text-sm text-gray-400 mb-6 font-medium">Select your preferred display currency.</p>
         <form method="POST" action="{{ url_port('settings.update_currency') }}" class="flex items-end gap-4">
+            {{ csrf_field() }}
             <div class="flex-1">
                 <label for="currency" class="block text-sm font-semibold text-gray-600 mb-1.5">Display Currency</label>
                 <select id="currency" name="currency" class="candy-input block w-full px-4 py-2.5 text-gray-900 focus:outline-none">
@@ -176,6 +181,7 @@
         </div>
         <p class="text-sm text-gray-400 mb-4 font-medium">Add or remove categories for your income sources.</p>
         <form method="POST" action="{{ url_port('settings.add_income_category') }}" class="flex gap-2 mb-4">
+            {{ csrf_field() }}
             <input type="text" name="category_name" placeholder="New income category..." required class="candy-input flex-1 px-4 py-2.5 text-gray-900 focus:outline-none text-sm">
             <button type="submit" class="candy-btn px-4 py-2.5 text-sm">Add</button>
         </form>
@@ -186,6 +192,7 @@
                 {{ cat }}
                 {% if cat not in default_income_categories %}
                 <form method="POST" action="{{ url_port('settings.delete_income_category') }}" class="inline" onsubmit="return confirm('Remove {{ cat }}?')">
+                    {{ csrf_field() }}
                     <input type="hidden" name="category_name" value="{{ cat }}">
                     <button type="submit" class="text-green-300 hover:text-red-500 transition-colors ml-1">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -207,6 +214,7 @@
         </div>
         <p class="text-sm text-gray-400 mb-4 font-medium">Add or remove categories for your business expenses.</p>
         <form method="POST" action="{{ url_port('settings.add_expense_category') }}" class="flex gap-2 mb-4">
+            {{ csrf_field() }}
             <input type="text" name="category_name" placeholder="New expense category..." required class="candy-input flex-1 px-4 py-2.5 text-gray-900 focus:outline-none text-sm">
             <button type="submit" class="candy-btn px-4 py-2.5 text-sm">Add</button>
         </form>
@@ -217,6 +225,7 @@
                 {{ cat }}
                 {% if cat not in default_expense_categories %}
                 <form method="POST" action="{{ url_port('settings.delete_expense_category') }}" class="inline" onsubmit="return confirm('Remove {{ cat }}?')">
+                    {{ csrf_field() }}
                     <input type="hidden" name="category_name" value="{{ cat }}">
                     <button type="submit" class="text-red-300 hover:text-red-700 transition-colors ml-1">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -235,6 +244,7 @@
         <h2 class="text-lg font-extrabold text-gray-900 mb-2">Reset Categories</h2>
         <p class="text-sm text-gray-400 mb-4 font-medium">Reset all categories to defaults. Custom categories removed, existing transactions not affected.</p>
         <form method="POST" action="{{ url_port('settings.reset_categories') }}" onsubmit="return confirm('Reset all categories to defaults?')">
+            {{ csrf_field() }}
             <button type="submit" class="px-5 py-2.5 glass-card rounded-xl text-sm font-semibold text-gray-600 hover:scale-105 transition-all">Reset to Defaults</button>
         </form>
     </div>

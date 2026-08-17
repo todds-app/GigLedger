@@ -98,6 +98,7 @@
             </button>
         </div>
         <form method="POST" action="{{ url_port('clients.add') }}" class="space-y-4">
+            {{ csrf_field() }}
             <div>
                 <label class="block text-sm font-semibold text-gray-600 mb-1.5">Name <span class="text-red-400">*</span></label>
                 <input type="text" name="name" required class="candy-input block w-full px-3 py-2.5 text-gray-900 focus:outline-none" placeholder="Client name">

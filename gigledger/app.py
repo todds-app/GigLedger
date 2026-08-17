@@ -2,9 +2,11 @@
 GigLedger - Flask Application Factory
 """
 import os
-from flask import Flask, request as req, url_for as _url_for
-from flask_login import LoginManager
+from flask import Flask, request as req, url_for as _url_for, flash, redirect
+from flask_login import LoginManager, current_user
 from flask_bcrypt import Bcrypt
+from flask_wtf.csrf import CSRFProtect, CSRFError, generate_csrf
+from markupsafe import Markup
 from .models import db, User
 
 # The database lives in the repository root, one level above this package, so
@@ -18,6 +20,7 @@ DB_PATH = os.path.join(
 
 login_manager = LoginManager()
 bcrypt = Bcrypt()
+csrf = CSRFProtect()
 login_manager.login_view = 'auth.login'
 login_manager.login_message_category = 'info'
 
@@ -58,6 +61,35 @@ def create_app():
     db.init_app(app)
     login_manager.init_app(app)
     bcrypt.init_app(app)
+
+    # CSRF protection for every unsafe method, app-wide and on by default.
+    # Exemptions must be explicit (@csrf.exempt) so they are visible in review;
+    # tests/test_csrf.py walks the url_map and fails on any unguarded route.
+    #
+    # WTF_CSRF_SSL_STRICT is left at its default (on), which additionally checks
+    # the Referer against the host on HTTPS requests. If this app is ever put
+    # behind a TLS-terminating proxy that rewrites the host or port (see the
+    # XTransformPort handling below), legitimate submissions can start failing
+    # with no obvious cause. The fix is werkzeug's ProxyFix, not disabling this.
+    csrf.init_app(app)
+
+    @app.template_global()
+    def csrf_field():
+        """Hidden CSRF input. Defined once here so the markup has a single
+        source of truth rather than being pasted into ~46 form bodies."""
+        return Markup(
+            f'<input type="hidden" name="csrf_token" value="{generate_csrf()}">'
+        )
+
+    @app.errorhandler(CSRFError)
+    def handle_csrf_error(error):
+        # Overwhelmingly this is a stale tab, not an attack: the token expired
+        # or the session was reset. Redirect to a FIXED endpoint - never to
+        # request.referrer, which would turn this handler into an open redirect.
+        flash('That form had expired, so it was not submitted. Please try again.', 'error')
+        if current_user.is_authenticated:
+            return redirect(_url_for('dashboard.index')), 400
+        return redirect(_url_for('auth.login')), 400
 
     # Custom Jinja2 filters
     @app.template_filter('money')

@@ -163,6 +163,7 @@
                         Log
                     </button>
                     <form method="POST" action="{{ url_port('projects.update_status', id=project.id) }}" class="inline">
+                        {{ csrf_field() }}
                         <input type="hidden" name="status" value="completed">
                         <button type="submit" class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-green-600 hover:bg-green-50 transition-all" title="Mark Complete">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
@@ -171,6 +172,7 @@
                     </form>
                     {% elif project.status == 'on_hold' %}
                     <form method="POST" action="{{ url_port('projects.update_status', id=project.id) }}" class="inline">
+                        {{ csrf_field() }}
                         <input type="hidden" name="status" value="active">
                         <button type="submit" class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-green-600 hover:bg-green-50 transition-all" title="Resume">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /></svg>
@@ -183,6 +185,7 @@
                         Edit
                     </button>
                     <form method="POST" action="{{ url_port('projects.delete', id=project.id) }}" onsubmit="return confirm('Delete this project? This cannot be undone.')" class="inline ml-auto">
+                        {{ csrf_field() }}
                         <button type="submit" class="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all" title="Delete">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                         </button>
@@ -219,6 +222,7 @@
             </button>
         </div>
         <form method="POST" action="{{ url_port('projects.add') }}" id="addProjectForm" class="space-y-4">
+            {{ csrf_field() }}
             <div>
                 <label class="block text-sm font-semibold text-gray-600 mb-1.5">Project Name <span class="text-red-400">*</span></label>
                 <input type="text" name="name" required class="candy-input block w-full px-3 py-2.5 text-gray-900 focus:outline-none" placeholder="e.g. Website Redesign">
@@ -306,6 +310,7 @@
         </div>
         <p class="text-sm text-gray-400 mb-4 font-medium">Logging hours for: <span id="logProjectName" class="text-gray-700 font-bold"></span></p>
         <form method="POST" id="logHoursForm" class="space-y-4">
+            {{ csrf_field() }}
             <div>
                 <label class="block text-sm font-semibold text-gray-600 mb-1.5">Hours</label>
                 <div class="relative">
@@ -338,6 +343,7 @@
             </button>
         </div>
         <form method="POST" id="editProjectForm" class="space-y-4">
+            {{ csrf_field() }}
             <div>
                 <label class="block text-sm font-semibold text-gray-600 mb-1.5">Project Name <span class="text-red-400">*</span></label>
                 <input type="text" name="name" id="edit_name" required class="candy-input block w-full px-3 py-2.5 text-gray-900 focus:outline-none">
