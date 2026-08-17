@@ -40,7 +40,17 @@ def build_app(tmp_path, monkeypatch, **config):
 
 @pytest.fixture
 def app(tmp_path, monkeypatch):
-    return build_app(tmp_path, monkeypatch)
+    """Demo documents cleared away, as in tests/test_documents.py: every test
+    here is about a document the test itself created and shared, and the seeded
+    examples would only make the counts ambiguous."""
+    app = build_app(tmp_path, monkeypatch)
+    with app.app_context():
+        for doc in ProjectDocument.query.all():
+            if doc.stored_name:
+                gigledger.documents.delete(doc.stored_name)
+            db.session.delete(doc)
+        db.session.commit()
+    return app
 
 
 def freelancer(app, user_id=1):

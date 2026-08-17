@@ -2,6 +2,7 @@
 GigLedger - Flask Application Factory
 """
 import os
+import uuid
 from flask import Flask, request as req, url_for as _url_for, flash, redirect
 from flask_login import LoginManager, current_user
 from flask_bcrypt import Bcrypt
@@ -472,6 +473,43 @@ def _seed_demo_data():
 
     db.session.add_all(transactions)
     db.session.commit()
+
+    # ---- Create Project Documents ----
+    # Both kinds, so the difference between a stored file and a reference is
+    # visible without anyone having to create one. Deliberately no portal
+    # account: the demo password is public, and a seeded credential would be a
+    # second known password on an externally-facing login. Redeeming a real
+    # invite is also the part of the feature a new user most needs to see.
+    # See ADR-0009.
+    from . import documents as documents_module
+    from .models import ProjectDocument
+
+    seeded_projects = Project.query.filter_by(user_id=demo_user.id).all()
+    if seeded_projects:
+        brief = ('Statement of work\n\nPhase 1: discovery and wireframes.\n'
+                 'Phase 2: visual design and build.\n\nRates and schedule as agreed.\n')
+        stored_name = f"{uuid.uuid4().hex}.txt"
+        os.makedirs(documents_module.UPLOAD_ROOT, exist_ok=True)
+        with open(documents_module.path_for(stored_name), 'w') as handle:
+            handle.write(brief)
+
+        db.session.add(ProjectDocument(
+            user_id=demo_user.id, project_id=seeded_projects[0].id,
+            kind='upload', title='Statement of work',
+            stored_name=stored_name, original_name='statement-of-work.txt',
+            byte_size=len(brief)))
+        db.session.add(ProjectDocument(
+            user_id=demo_user.id, project_id=seeded_projects[0].id,
+            kind='link', title='Design review notes',
+            external_url='https://docs.google.com/document/d/EXAMPLE/edit',
+            provider='google_drive'))
+        if len(seeded_projects) > 1:
+            db.session.add(ProjectDocument(
+                user_id=demo_user.id, project_id=seeded_projects[1].id,
+                kind='link', title='Budget tracker',
+                external_url='https://docs.google.com/spreadsheets/d/EXAMPLE/edit',
+                provider='google_drive'))
+        db.session.commit()
 
     # ---- Create Goals ----
     goals_data = [

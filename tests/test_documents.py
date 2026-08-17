@@ -45,8 +45,32 @@ def build_app(tmp_path, monkeypatch, **config):
 
 
 @pytest.fixture
-def app(tmp_path, monkeypatch):
+def seeded_app(tmp_path, monkeypatch):
+    """The app exactly as it starts up, demo documents included."""
     return build_app(tmp_path, monkeypatch)
+
+
+def clear_documents(app):
+    with app.app_context():
+        for doc in ProjectDocument.query.all():
+            if doc.stored_name:
+                gigledger.documents.delete(doc.stored_name)
+            db.session.delete(doc)
+        db.session.commit()
+    return app
+
+
+@pytest.fixture
+def app(tmp_path, monkeypatch):
+    """The app with the demo documents cleared away.
+
+    The seed ships example documents so a new user sees both kinds without
+    creating one. Every test below is about what happens to a document a test
+    itself created, so starting from an empty table keeps assertions like
+    `count() == 0` meaning "nothing was created" rather than "nothing beyond the
+    fixtures". The seed is covered on its own, against `seeded_app`.
+    """
+    return clear_documents(build_app(tmp_path, monkeypatch))
 
 
 def login(app, user_id=1):
@@ -150,7 +174,7 @@ def test_an_oversized_upload_is_refused_before_it_reaches_disk(tmp_path, monkeyp
     which was never in doubt, while saying nothing about whether this app sets
     one. Patched before create_app so the real wiring is what carries it."""
     monkeypatch.setattr(gigledger.documents, 'MAX_UPLOAD_BYTES', 500)
-    app = build_app(tmp_path, monkeypatch)
+    app = clear_documents(build_app(tmp_path, monkeypatch))
     client = login(app)
     pid = a_project(app)
 
@@ -159,7 +183,7 @@ def test_an_oversized_upload_is_refused_before_it_reaches_disk(tmp_path, monkeyp
     assert response.status_code == 413
     with app.app_context():
         assert ProjectDocument.query.count() == 0
-    assert not os.path.exists(gigledger.documents.UPLOAD_ROOT)
+    assert os.listdir(gigledger.documents.UPLOAD_ROOT) == []
 
 
 # --- serving -------------------------------------------------------------
@@ -299,6 +323,34 @@ def test_delete_refuses_another_users_document(app):
 
     with app.app_context():
         assert ProjectDocument.query.count() == 1
+
+
+# --- demo data -----------------------------------------------------------
+
+def test_the_demo_seeds_both_kinds_of_document(seeded_app):
+    """Both kinds, so the difference between a stored file and a reference is
+    visible without anyone having to create one."""
+    with seeded_app.app_context():
+        kinds = {d.kind for d in ProjectDocument.query.all()}
+        assert kinds == {'upload', 'link'}
+
+
+def test_the_seeded_upload_has_bytes_on_disk(seeded_app):
+    with seeded_app.app_context():
+        doc = ProjectDocument.query.filter_by(kind='upload').first()
+        assert os.path.exists(gigledger.documents.path_for(doc.stored_name))
+        assert doc.byte_size > 0
+
+
+def test_the_demo_does_not_seed_a_working_portal_login(seeded_app):
+    """The demo password is public. A seeded portal credential would be a second
+    known password on an externally-facing login - and making the explorer
+    redeem an invite demonstrates the flow they most need to understand."""
+    from gigledger.models import Client, PortalAccount
+
+    with seeded_app.app_context():
+        assert PortalAccount.query.count() == 0
+        assert Client.query.filter(Client.portal_account_id.isnot(None)).count() == 0
 
 
 # --- the detail page -----------------------------------------------------
