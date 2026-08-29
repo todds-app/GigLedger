@@ -13,6 +13,55 @@ DEFAULT_INCOME_CATEGORIES = ['Client Payment', 'Consulting', 'Freelance Project'
 DEFAULT_EXPENSE_CATEGORIES = ['Software', 'Internet', 'Office Supplies', 'Marketing',
                                'Travel', 'Equipment', 'Meal', 'Entertainment', 'Tax Reserve']
 
+# Transaction kinds. The kind is stored, never derived from the sign of the
+# amount: a sign carries one bit, which is enough for two kinds and no more.
+# See docs/adr/0010.
+INCOME = 'income'
+EXPENSE = 'expense'
+INVENTORY = 'inventory'
+KINDS = {INCOME, EXPENSE, INVENTORY}
+
+# The kinds that reduce profit. An inventory purchase is cash out but not a
+# cost - the money bought an asset that is still owned - so it is absent here
+# and that absence is what keeps it out of every expense total.
+COST_KINDS = {EXPENSE}
+
+
+def clean_kind(value, fallback=EXPENSE):
+    """The kind if it is one we recognise, else the fallback.
+
+    A Constrained Column, the same treatment `clean_rate_type` and
+    `clean_color` give their columns in the route modules: the write decides,
+    so a reader never has to wonder whether the column holds something the
+    code has never heard of.
+    """
+    value = (value or '').strip().lower()
+    return value if value in KINDS else fallback
+
+
+class KindMixin:
+    """Classification shared by Transaction and RecurringTransaction.
+
+    Both answer the question the same way, and a recurring transaction hands
+    its kind to the transactions it generates, so the two must not drift.
+    """
+
+    @property
+    def is_income(self):
+        return self.kind == INCOME
+
+    @property
+    def is_expense(self):
+        return self.kind == EXPENSE
+
+    @property
+    def is_inventory(self):
+        return self.kind == INVENTORY
+
+    @property
+    def kind_label(self):
+        return (self.kind or '').title()
+
 
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
@@ -62,13 +111,14 @@ class User(UserMixin, db.Model):
         return f"{self.invoice_prefix}-{num:04d}"
 
 
-class Transaction(db.Model):
+class Transaction(KindMixin, db.Model):
     __tablename__ = 'transactions'
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     amount = db.Column(db.Float, nullable=False)
     date = db.Column(db.DateTime, nullable=False)
+    kind = db.Column(db.String(20), nullable=False, default=EXPENSE)
     category = db.Column(db.String(50))
     description = db.Column(db.String(200))
     is_tax_deductible = db.Column(db.Boolean, default=False)
@@ -383,13 +433,14 @@ class Goal(db.Model):
         return max(0, self.target_amount - self.current_amount)
 
 
-class RecurringTransaction(db.Model):
+class RecurringTransaction(KindMixin, db.Model):
     __tablename__ = 'recurring_transactions'
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     description = db.Column(db.String(200), nullable=False)
     amount = db.Column(db.Float, nullable=False)
+    kind = db.Column(db.String(20), nullable=False, default=EXPENSE)
     category = db.Column(db.String(50), default='')
     is_tax_deductible = db.Column(db.Boolean, default=False)
     frequency = db.Column(db.String(20), default='monthly')  # weekly, monthly, quarterly, yearly
