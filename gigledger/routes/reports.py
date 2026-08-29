@@ -7,7 +7,7 @@ top clients, expense categories, and key insights.
 from datetime import datetime
 from flask import Blueprint, render_template, request
 from flask_login import login_required, current_user
-from ..models import Transaction, Client, Invoice, db
+from ..models import Transaction, Client, Invoice, EXPENSE, db
 from ..finance import calculate_monthly_summary, get_quarter, get_quarter_date_range
 
 reports_bp = Blueprint('reports', __name__)
@@ -43,10 +43,10 @@ def index():
         Transaction.date < year_end,
     ).all()
 
-    yearly_income = sum(t.amount for t in year_txs if t.amount > 0)
-    yearly_expenses = sum(abs(t.amount) for t in year_txs if t.amount < 0)
+    yearly_income = sum(t.amount for t in year_txs if t.is_income)
+    yearly_expenses = sum(abs(t.amount) for t in year_txs if t.is_expense)
     yearly_net = yearly_income - yearly_expenses
-    yearly_deductible = sum(abs(t.amount) for t in year_txs if t.amount < 0 and t.is_tax_deductible)
+    yearly_deductible = sum(abs(t.amount) for t in year_txs if t.is_expense and t.is_tax_deductible)
     effective_tax_rate = (yearly_deductible / yearly_income * 100) if yearly_income > 0 else 0
 
     # ── Monthly breakdown (12 months) ──
@@ -99,7 +99,7 @@ def index():
         db.func.sum(Transaction.amount).label('total')
     ).filter(
         Transaction.user_id == uid,
-        Transaction.amount < 0,
+        Transaction.kind == EXPENSE,
         Transaction.date >= year_start,
         Transaction.date < year_end,
     ).group_by(Transaction.category).order_by(
@@ -120,8 +120,8 @@ def index():
             Transaction.date >= q_start,
             Transaction.date < q_end,
         ).all()
-        q_income = sum(t.amount for t in q_txs if t.amount > 0)
-        q_expenses = sum(abs(t.amount) for t in q_txs if t.amount < 0)
+        q_income = sum(t.amount for t in q_txs if t.is_income)
+        q_expenses = sum(abs(t.amount) for t in q_txs if t.is_expense)
         q_net = q_income - q_expenses
         quarterly_data.append({
             'quarter': q,

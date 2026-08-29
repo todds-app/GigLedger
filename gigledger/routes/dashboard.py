@@ -1,7 +1,7 @@
 from datetime import datetime
 from flask import Blueprint, render_template
 from flask_login import login_required, current_user
-from ..models import Goal, Project, Invoice, Client
+from ..models import Goal, Project, Invoice, Client, COST_KINDS
 from ..finance import (calculate_monthly_summary, calculate_safe_to_spend,
                        calculate_runway, get_6_month_chart_data, get_quarter,
                        get_recent_transactions, get_category_breakdown)
@@ -44,7 +44,8 @@ def index():
         end = datetime(now.year, now.month + 1, 1)
     start = datetime(now.year, now.month, 1)
     results = _get_tx_range(uid, start, end)
-    deductible_this_month = sum(abs(r[0]) for r in results if r[0] < 0 and r[1])
+    deductible_this_month = sum(abs(amount) for amount, deductible, kind in results
+                                if kind in COST_KINDS and deductible)
     tax_saving_this_month = deductible_this_month * tax_rate
 
     # New: Goals data
@@ -66,7 +67,7 @@ def index():
     # New: Recurring monthly commitment
     from ..models import RecurringTransaction
     recurring_active = RecurringTransaction.query.filter_by(user_id=uid, is_active=True, frequency='monthly').all()
-    monthly_commitment = sum(abs(r.amount) for r in recurring_active if r.amount < 0)
+    monthly_commitment = sum(abs(r.amount) for r in recurring_active if r.is_expense)
 
     return render_template('dashboard/index.html',
         month_income=month_income, month_expenses=month_expenses,
