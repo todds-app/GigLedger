@@ -5,8 +5,12 @@ sign carries one bit, so classifying by `amount > 0` supports two kinds and no
 more. `kind` is stored, and the sign of `amount` says only which direction the
 money moved.
 """
+import sqlite3
+
 import pytest
 
+import gigledger.app
+from gigledger.app import create_app
 from gigledger.models import (COST_KINDS, EXPENSE, INCOME, INVENTORY, KINDS,
                               RecurringTransaction, Transaction, clean_kind)
 
@@ -63,3 +67,96 @@ def test_kind_does_not_follow_the_sign_of_the_amount():
     """The whole point: an amount's sign no longer decides what it is."""
     assert Transaction(kind=INVENTORY, amount=-980.00).is_inventory
     assert not Transaction(kind=INVENTORY, amount=-980.00).is_expense
+
+
+def legacy_database(path):
+    """A database shaped the way it was before `kind` existed.
+
+    Only the columns the backfill reads are needed; create_all fills in the
+    rest of the schema on first startup.
+    """
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE transactions ("
+                 "id INTEGER PRIMARY KEY, user_id INTEGER, amount FLOAT, "
+                 "date DATETIME, category VARCHAR(50), description VARCHAR(200), "
+                 "is_tax_deductible BOOLEAN, source VARCHAR(20), "
+                 "invoice_id INTEGER, created_at DATETIME)")
+    conn.execute("CREATE TABLE recurring_transactions ("
+                 "id INTEGER PRIMARY KEY, user_id INTEGER, "
+                 "description VARCHAR(200), amount FLOAT, category VARCHAR(50), "
+                 "is_tax_deductible BOOLEAN, frequency VARCHAR(20), "
+                 "day_of_month INTEGER, is_active BOOLEAN, "
+                 "last_generated DATETIME, next_date DATETIME, "
+                 "created_at DATETIME)")
+    conn.executemany(
+        "INSERT INTO transactions (id, user_id, amount, date, category) "
+        "VALUES (?, 1, ?, '2026-03-01 12:00:00', 'fixture')",
+        [(1, 5000.00), (2, -1200.00), (3, 0.0)])
+    conn.executemany(
+        "INSERT INTO recurring_transactions (id, user_id, description, amount) "
+        "VALUES (?, 1, 'fixture', ?)",
+        [(1, 2000.00), (2, -49.00)])
+    conn.commit()
+    conn.close()
+
+
+def kinds_in(path, table, ids):
+    """The kind of each fixture row, keyed by id.
+
+    Restricted to `ids` because `legacy_database` leaves no `users` row, so
+    `_seed_demo_data()` fires on every `create_app()` call here and appends
+    its own rows to the same table. Filtering to the ids this fixture itself
+    inserted keeps the assertion about our rows, not about how much demo data
+    happens to exist.
+    """
+    conn = sqlite3.connect(path)
+    placeholders = ','.join('?' * len(ids))
+    rows = dict(conn.execute(
+        f"SELECT id, kind FROM {table} WHERE id IN ({placeholders})", ids))
+    conn.close()
+    return rows
+
+
+def test_an_existing_database_gains_the_column(tmp_path, monkeypatch):
+    """create_all() never alters an existing table, so the migration must."""
+    db_path = str(tmp_path / 'test.db')
+    legacy_database(db_path)
+    monkeypatch.setattr(gigledger.app, 'DB_PATH', db_path)
+
+    create_app()
+
+    assert kinds_in(db_path, 'transactions', [1, 2, 3]) == {
+        1: INCOME, 2: EXPENSE, 3: EXPENSE}
+    assert kinds_in(db_path, 'recurring_transactions', [1, 2]) == {
+        1: INCOME, 2: EXPENSE}
+
+
+def test_a_zero_amount_row_backfills_as_an_expense(tmp_path, monkeypatch):
+    """Row 3 above is zero. It counted as neither income nor expense before,
+    because both sign tests were strict, and it lands in `expense` now. No
+    displayed number moves: a zero contributes zero to an expense total."""
+    db_path = str(tmp_path / 'test.db')
+    legacy_database(db_path)
+    monkeypatch.setattr(gigledger.app, 'DB_PATH', db_path)
+
+    create_app()
+
+    assert kinds_in(db_path, 'transactions', [3])[3] == EXPENSE
+
+
+def test_the_migration_is_a_no_op_the_second_time(tmp_path, monkeypatch):
+    """It runs on every startup, so running twice must not disturb a kind that
+    has since been edited away from what the sign implies."""
+    db_path = str(tmp_path / 'test.db')
+    legacy_database(db_path)
+    monkeypatch.setattr(gigledger.app, 'DB_PATH', db_path)
+
+    create_app()
+    conn = sqlite3.connect(db_path)
+    conn.execute("UPDATE transactions SET kind = 'inventory' WHERE id = 2")
+    conn.commit()
+    conn.close()
+
+    create_app()
+
+    assert kinds_in(db_path, 'transactions', [2])[2] == INVENTORY

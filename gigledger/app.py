@@ -227,6 +227,21 @@ def _migrate_db(db):
     tx_columns = {row[1] for row in cursor.fetchall()}
     if 'invoice_id' not in tx_columns:
         cursor.execute("ALTER TABLE transactions ADD COLUMN invoice_id INTEGER REFERENCES invoices(id)")
+    if 'kind' not in tx_columns:
+        # Backfill from the sign, which is what classification meant until now.
+        # A zero-amount row lands in 'expense': it counted as neither before,
+        # and a zero contributes zero to an expense total, so no figure moves.
+        cursor.execute("ALTER TABLE transactions ADD COLUMN kind VARCHAR(20)")
+        cursor.execute("UPDATE transactions SET kind = "
+                       "CASE WHEN amount > 0 THEN 'income' ELSE 'expense' END")
+
+    # Migrate recurring_transactions table - kind, for the transactions it generates
+    cursor.execute("PRAGMA table_info(recurring_transactions)")
+    rt_columns = {row[1] for row in cursor.fetchall()}
+    if 'kind' not in rt_columns:
+        cursor.execute("ALTER TABLE recurring_transactions ADD COLUMN kind VARCHAR(20)")
+        cursor.execute("UPDATE recurring_transactions SET kind = "
+                       "CASE WHEN amount > 0 THEN 'income' ELSE 'expense' END")
 
     # Migrate clients table - Client Portal access
     cursor.execute("PRAGMA table_info(clients)")
