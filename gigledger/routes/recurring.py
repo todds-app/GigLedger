@@ -132,7 +132,7 @@ def edit(id):
     try:
         amount = float(request.form.get('amount', str(abs(rt.amount))))
         if amount > 0:
-            rt.amount = -amount if rt.is_expense else amount
+            rt.amount = amount if rt.is_income else -amount
     except ValueError:
         pass
 

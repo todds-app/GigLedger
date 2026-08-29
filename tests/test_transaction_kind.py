@@ -280,6 +280,28 @@ def test_editing_a_recurring_amount_keeps_its_kind(app):
         assert edited.amount == -120.00
 
 
+def test_editing_an_amount_takes_its_direction_from_the_kind_not_the_stored_sign(app):
+    """The old expression read `rt.amount > 0` to decide the new sign, so a row
+    whose stored sign disagreed with its kind kept the wrong direction forever.
+    The kind decides now."""
+    with app.app_context():
+        rt = RecurringTransaction(
+            user_id=demo_user_id(app), description='Mis-signed retainer',
+            amount=90.00, category='Insurance', kind=EXPENSE,
+            frequency='monthly', day_of_month=1, is_active=True)
+        db.session.add(rt)
+        db.session.commit()
+        rt_id = rt.id
+
+    authenticated_client(app).post(f'/recurring/edit/{rt_id}', data={
+        'amount': '120', 'description': 'Mis-signed retainer'})
+
+    with app.app_context():
+        edited = db.session.get(RecurringTransaction, rt_id)
+        assert edited.is_expense
+        assert edited.amount == -120.00
+
+
 def test_a_transaction_written_without_a_kind_is_refused(app):
     """The column has no default, so a forgotten kind is a loud failure
     rather than a plausible-looking expense. This is what makes the
