@@ -41,7 +41,8 @@ def index():
         RecurringTransaction.created_at.desc()).all()
 
     # Monthly commitments: sum of active monthly recurring expenses
-    monthly_commitments = sum(abs(r.amount) for r in recurring if r.is_active and r.amount < 0 and r.frequency == 'monthly')
+    monthly_commitments = sum(abs(r.amount) for r in recurring
+                              if r.is_active and r.is_expense and r.frequency == 'monthly')
     active_count = sum(1 for r in recurring if r.is_active)
 
     return render_template('recurring/index.html',
@@ -131,7 +132,7 @@ def edit(id):
     try:
         amount = float(request.form.get('amount', str(abs(rt.amount))))
         if amount > 0:
-            rt.amount = amount if rt.amount > 0 else -amount
+            rt.amount = -amount if rt.is_expense else amount
     except ValueError:
         pass
 

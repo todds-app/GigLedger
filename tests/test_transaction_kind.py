@@ -259,6 +259,27 @@ def test_marking_an_invoice_paid_writes_income_and_a_tax_expense(app):
         assert all(t.kind in KINDS for t in linked), number
 
 
+def test_editing_a_recurring_amount_keeps_its_kind(app):
+    """The sign follows the kind, not the reverse: editing the amount of an
+    expense must not turn it into income."""
+    with app.app_context():
+        rt = RecurringTransaction(
+            user_id=demo_user_id(app), description='Studio insurance',
+            amount=-90.00, category='Insurance', kind=EXPENSE,
+            frequency='monthly', day_of_month=1, is_active=True)
+        db.session.add(rt)
+        db.session.commit()
+        rt_id = rt.id
+
+    authenticated_client(app).post(f'/recurring/edit/{rt_id}',
+                                   data={'amount': '120', 'description': 'Studio insurance'})
+
+    with app.app_context():
+        edited = db.session.get(RecurringTransaction, rt_id)
+        assert edited.is_expense
+        assert edited.amount == -120.00
+
+
 def test_a_transaction_written_without_a_kind_is_refused(app):
     """The column has no default, so a forgotten kind is a loud failure
     rather than a plausible-looking expense. This is what makes the
