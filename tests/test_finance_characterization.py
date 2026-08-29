@@ -50,6 +50,7 @@ def ledger(tmp_path, monkeypatch):
             db.session.add(Transaction(
                 user_id=user.id, amount=amount,
                 date=datetime(2026, 3, day, 12, 0),
+                kind='income' if amount > 0 else 'expense',
                 category=category, description='fixture',
                 is_tax_deductible=deductible, source='manual'))
         db.session.commit()

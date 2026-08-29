@@ -118,7 +118,7 @@ class Transaction(KindMixin, db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     amount = db.Column(db.Float, nullable=False)
     date = db.Column(db.DateTime, nullable=False)
-    kind = db.Column(db.String(20), nullable=False, default=EXPENSE)
+    kind = db.Column(db.String(20), nullable=False)
     category = db.Column(db.String(50))
     description = db.Column(db.String(200))
     is_tax_deductible = db.Column(db.Boolean, default=False)
@@ -440,7 +440,7 @@ class RecurringTransaction(KindMixin, db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     description = db.Column(db.String(200), nullable=False)
     amount = db.Column(db.Float, nullable=False)
-    kind = db.Column(db.String(20), nullable=False, default=EXPENSE)
+    kind = db.Column(db.String(20), nullable=False)
     category = db.Column(db.String(50), default='')
     is_tax_deductible = db.Column(db.Boolean, default=False)
     frequency = db.Column(db.String(20), default='monthly')  # weekly, monthly, quarterly, yearly
