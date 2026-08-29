@@ -338,5 +338,25 @@ def test_the_edit_modal_receives_the_stored_kind(app):
     # The modal argument keeps its |tojson|forceescape per ADR-0004, so the
     # quotes reach the raw HTML as &#34; entities, not literal ". Unescape
     # before checking, the same way tests/test_template_escaping.py does.
+    # The row's kind (inventory) disagrees with its sign (negative, which the
+    # old code read as expense) - that disagreement is the whole point.
     assert '"inventory"' in html.unescape(body)
-    assert 'Inventory' in body
+
+
+def test_the_category_column_still_shows_the_category(app):
+    """Regression guard: the chip in the Category column is not a type badge.
+    Its colour is keyed off is_income (classification), but its text is the
+    row's actual category - converting the text to kind_label would silently
+    turn the Category column into an Income/Expense label under a header
+    that still says Category."""
+    with app.app_context():
+        db.session.add(Transaction(
+            user_id=demo_user_id(app), amount=250.00,
+            date=datetime(2026, 3, 5, 12, 0), kind=INCOME,
+            category='Workshop Registration', description='Q1 workshop',
+            is_tax_deductible=False, source='manual'))
+        db.session.commit()
+
+    body = authenticated_client(app).get('/transactions').get_data(as_text=True)
+
+    assert 'Workshop Registration' in body

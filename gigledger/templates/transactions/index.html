@@ -129,7 +129,7 @@
                         <td class="px-5 py-3.5 text-sm text-gray-800 font-semibold max-w-xs truncate">{{ tx.description or 'No description' }}</td>
                         <td class="px-5 py-3.5">
                             <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold {% if tx.is_income %}bg-green-50 text-green-600{% else %}bg-gray-100/80 text-gray-600{% endif %}">
-                                {{ tx.kind_label }}
+                                {{ tx.category or 'Other' }}
                             </span>
                         </td>
                         <td class="px-5 py-3.5 text-sm font-extrabold text-right whitespace-nowrap {% if tx.amount > 0 %}text-green-500{% else %}text-red-500{% endif %}">
