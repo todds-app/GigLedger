@@ -5,7 +5,9 @@ sign carries one bit, so classifying by `amount > 0` supports two kinds and no
 more. `kind` is stored, and the sign of `amount` says only which direction the
 money moved.
 """
+import html
 import sqlite3
+from datetime import datetime
 
 import pytest
 
@@ -317,3 +319,24 @@ def test_a_transaction_written_without_a_kind_is_refused(app):
         with pytest.raises(IntegrityError):
             db.session.commit()
         db.session.rollback()
+
+
+def test_the_edit_modal_receives_the_stored_kind(app):
+    """The modal's kind argument decides which radio button is pre-selected.
+    Derived from the sign, it would mislabel any row whose kind is not
+    implied by its sign - which is every inventory row, once they exist."""
+    with app.app_context():
+        db.session.add(Transaction(
+            user_id=demo_user_id(app), amount=-980.00,
+            date=datetime(2026, 3, 4, 12, 0), kind=INVENTORY,
+            category='Furniture', description='Sectional sofa',
+            is_tax_deductible=False, source='manual'))
+        db.session.commit()
+
+    body = authenticated_client(app).get('/transactions').get_data(as_text=True)
+
+    # The modal argument keeps its |tojson|forceescape per ADR-0004, so the
+    # quotes reach the raw HTML as &#34; entities, not literal ". Unescape
+    # before checking, the same way tests/test_template_escaping.py does.
+    assert '"inventory"' in html.unescape(body)
+    assert 'Inventory' in body
