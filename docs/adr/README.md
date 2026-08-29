@@ -42,3 +42,4 @@ the failure modes the decision does *not* protect against.
 | [0007](0007-google-drive-as-reference.md) | Reference Google Drive documents by link; do not integrate with Drive | Accepted |
 | [0008](0008-client-portal-authentication.md) | Authenticate portal clients outside Flask-Login, in their own session | Accepted |
 | [0009](0009-share-documents-by-explicit-grant.md) | Share documents by explicit grant to a client; private by default | Accepted |
+| [0010](0010-classify-transactions-by-kind.md) | Classify transactions by an explicit kind, not the sign of the amount | Accepted |

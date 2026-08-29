@@ -360,3 +360,103 @@ def test_the_category_column_still_shows_the_category(app):
     body = authenticated_client(app).get('/transactions').get_data(as_text=True)
 
     assert 'Workshop Registration' in body
+
+
+INVENTORY_PURCHASE = 980.00
+
+
+@pytest.fixture
+def with_inventory(tmp_path, monkeypatch):
+    """A ledger plus one inventory purchase, built by hand because no UI can
+    make one yet. That is the point: this fixture is piece 2's foundation
+    under test before piece 2 exists."""
+    from test_finance_characterization import LEDGER
+    app = build_app(tmp_path, monkeypatch)
+    with app.app_context():
+        user_id = User.query.filter_by(email='demo@gigledger.com').first().id
+        Transaction.query.delete()
+        for amount, category, deductible, day in LEDGER:
+            db.session.add(Transaction(
+                user_id=user_id, amount=amount,
+                date=datetime(2026, 3, day, 12, 0), kind=(
+                    INCOME if amount > 0 else EXPENSE),
+                category=category, description='fixture',
+                is_tax_deductible=deductible, source='manual'))
+        db.session.add(Transaction(
+            user_id=user_id, amount=-INVENTORY_PURCHASE,
+            date=datetime(2026, 3, 15, 12, 0), kind=INVENTORY,
+            category='Seating', description='Sectional sofa',
+            is_tax_deductible=False, source='manual'))
+        db.session.commit()
+    return app
+
+
+def test_an_inventory_purchase_is_not_an_expense(with_inventory):
+    """The whole reason for the kind column. Compare against the
+    characterization figures: expenses are unchanged by 980 of inventory."""
+    from gigledger.finance import calculate_monthly_summary
+    with with_inventory.app_context():
+        income, expenses = calculate_monthly_summary(
+            demo_user_id(with_inventory), 2026, 3)
+    assert income == 7500.00
+    assert expenses == 1950.00
+
+
+def test_an_inventory_purchase_does_not_reduce_taxable_income(with_inventory):
+    from gigledger.finance import calculate_quarterly_tax
+    with with_inventory.app_context():
+        income, deductions, net, _ = calculate_quarterly_tax(
+            demo_user_id(with_inventory), 1, 2026, 0.30)
+    assert (income, deductions, net) == (7500.00, 1500.00, 6000.00)
+
+
+def test_an_inventory_purchase_does_leave_the_bank(with_inventory):
+    """Cash is not profit. The money is gone even though the cost is not
+    recognised, so the balance falls by the full purchase price."""
+    from gigledger.finance import calculate_safe_to_spend
+    with with_inventory.app_context():
+        balance, _, _ = calculate_safe_to_spend(
+            demo_user_id(with_inventory), 0.30)
+    assert balance == pytest.approx(5550.00 - INVENTORY_PURCHASE)
+
+
+def test_an_inventory_purchase_is_absent_from_expense_categories(with_inventory):
+    from gigledger.finance import get_category_breakdown
+    with with_inventory.app_context():
+        categories, _ = get_category_breakdown(
+            demo_user_id(with_inventory), year=2026, month=3)
+    assert 'Seating' not in categories
+
+
+def test_an_inventory_purchase_survives_the_list_and_the_export(with_inventory):
+    """Excluded from cost totals, but not hidden: it is still a transaction."""
+    client = authenticated_client(with_inventory)
+    assert b'Sectional sofa' in client.get('/transactions').data
+    csv_body = client.get('/transactions/export/csv').get_data(as_text=True)
+    assert ',Inventory,' in csv_body
+    assert 'Total Expenses,,,,1950.00' in csv_body
+
+
+def test_editing_an_inventory_recurring_amount_stays_negative(app):
+    """Piece 1's edit() originally read `-amount if rt.is_expense else
+    amount`, which sends every non-expense kind through the income branch.
+    Inventory is cash out but is_expense is False for it, so that expression
+    would flip an inventory purchase positive on a plain amount edit. The
+    kind decides the sign directly - inventory takes the same negative
+    branch as expense - so this must come back negative, not positive."""
+    with app.app_context():
+        rt = RecurringTransaction(
+            user_id=demo_user_id(app), description='Studio furniture lease',
+            amount=-250.00, category='Seating', kind=INVENTORY,
+            frequency='monthly', day_of_month=1, is_active=True)
+        db.session.add(rt)
+        db.session.commit()
+        rt_id = rt.id
+
+    authenticated_client(app).post(f'/recurring/edit/{rt_id}', data={
+        'amount': '300', 'description': 'Studio furniture lease'})
+
+    with app.app_context():
+        edited = db.session.get(RecurringTransaction, rt_id)
+        assert edited.is_inventory
+        assert edited.amount == -300.00
