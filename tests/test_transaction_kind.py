@@ -202,6 +202,28 @@ def test_an_unrecognised_type_does_not_reach_the_column(app):
         assert tx.kind in KINDS
 
 
+def test_editing_with_a_missing_type_keeps_the_stored_kind(app):
+    """edit() used to default a missing/unrecognised `type` to INCOME, so an
+    edit that omitted the field silently reclassified the row. It must now
+    fall back to the transaction's own stored kind instead."""
+    with app.app_context():
+        tx = Transaction(
+            user_id=demo_user_id(app), amount=-59.99, kind=EXPENSE,
+            date=datetime(2026, 3, 4, 12, 0), category='Software',
+            description='Adobe CC', is_tax_deductible=False, source='manual')
+        db.session.add(tx)
+        db.session.commit()
+        tx_id = tx.id
+
+    authenticated_client(app).post(f'/transactions/edit/{tx_id}', data={
+        'amount': '59.99', 'date': '2026-03-04', 'category': 'Software',
+        'description': 'Adobe CC'})
+
+    with app.app_context():
+        edited = db.session.get(Transaction, tx_id)
+        assert edited.is_expense
+
+
 def test_every_seeded_transaction_has_a_kind(app):
     """The seed writes through five separate blocks; a miss in any of them
     leaves rows that later aggregations cannot classify."""
@@ -431,10 +453,18 @@ def test_an_inventory_purchase_is_absent_from_expense_categories(with_inventory)
 def test_an_inventory_purchase_survives_the_list_and_the_export(with_inventory):
     """Excluded from cost totals, but not hidden: it is still a transaction."""
     client = authenticated_client(with_inventory)
-    assert b'Sectional sofa' in client.get('/transactions').data
+    page_body = client.get('/transactions').get_data(as_text=True)
+    assert 'Sectional sofa' in page_body
     csv_body = client.get('/transactions/export/csv').get_data(as_text=True)
     assert ',Inventory,' in csv_body
     assert 'Total Expenses,,,,1950.00' in csv_body
+
+    # The summary bar used to recompute its own totals by the sign of
+    # `amount`, which counted the inventory purchase as an expense right
+    # alongside it (980 too high: $2,930.00 instead of $1,950.00). The page
+    # must agree with its own CSV export of the same list.
+    assert '$1,950.00' in page_body
+    assert '$2,930.00' not in page_body
 
 
 def test_editing_an_inventory_recurring_amount_stays_negative(app):
@@ -460,3 +490,20 @@ def test_editing_an_inventory_recurring_amount_stays_negative(app):
         edited = db.session.get(RecurringTransaction, rt_id)
         assert edited.is_inventory
         assert edited.amount == -300.00
+
+
+def test_creating_a_recurring_inventory_row_stores_it_negative(app):
+    """add() originally coerced the sign only for EXPENSE, leaving a fresh
+    inventory row positive - the mirror image of the edit() bug above, and
+    on the opposite route. add() now follows the same rule as edit(): every
+    non-income kind is cash out and is stored negative."""
+    authenticated_client(app).post('/recurring/add', data={
+        'type': 'inventory', 'description': 'Showroom sectional',
+        'amount': '300', 'category': 'Seating', 'frequency': 'monthly',
+        'day_of_month': '1'})
+
+    with app.app_context():
+        rt = RecurringTransaction.query.filter_by(
+            description='Showroom sectional').one()
+        assert rt.is_inventory
+        assert rt.amount == -300.00

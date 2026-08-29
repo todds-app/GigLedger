@@ -52,3 +52,15 @@ zero contributes zero to an expense total.
 This does not protect against a kind written outside `clean_kind` - a direct
 `db.session.add` with a typo'd string still lands in the column. The seeded and
 route-level writes are covered by tests; a future writer is not.
+
+Nor does it protect against a null kind on a database that predates the
+column. SQLite's `ALTER TABLE ADD COLUMN` cannot add a `NOT NULL` constraint,
+so on any database that gained `kind` through `_migrate_db` the column is
+nullable in the actual schema, even though the model declares
+`nullable=False`. `test_a_transaction_written_without_a_kind_is_refused`
+passes only because its fixture database is built fresh by `db.create_all()`,
+which does apply the constraint; against a migrated database the identical
+write commits silently with `kind = NULL`. A NULL-kind row is absent from
+every income and expense total while its cash still counts in the balance -
+the same silent-absorption failure this ADR exists to prevent, reopened by
+the one path that never runs `clean_kind` at all.

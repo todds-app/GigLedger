@@ -60,6 +60,10 @@ class KindMixin:
 
     @property
     def kind_label(self):
+        # The `or ''` guard is load-bearing, not defensive dead code: SQLite
+        # cannot add a NOT NULL constraint via ALTER TABLE, so `kind` is
+        # nullable on any database migrated by _migrate_db regardless of what
+        # the model declares. See ADR-0010's closing paragraph.
         return (self.kind or '').title()
 
 

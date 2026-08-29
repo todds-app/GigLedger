@@ -65,12 +65,17 @@ def list_transactions():
     categories = current_user.get_all_categories()
     categories.sort()
 
+    total_income, total_expenses, total_deductible, net, tax_saving = _totals(
+        transactions, current_user.default_tax_rate)
+
     return render_template('transactions/index.html',
         transactions=transactions, categories=categories,
         selected_category=category, selected_type=tx_type,
         selected_month=month, selected_year=year,
         currency=current_user.currency,
-        user_categories=current_user.get_all_categories())
+        user_categories=current_user.get_all_categories(),
+        total_income=total_income, total_expenses=total_expenses,
+        total_deductible=total_deductible, net=net, tax_saving=tax_saving)
 
 
 @transactions_bp.route('/transactions/add', methods=['POST'])
@@ -99,7 +104,7 @@ def add():
     db.session.commit()
 
     # Calculate the tax impact of this transaction and give feedback
-    if tx.is_tax_deductible and tx.amount < 0:
+    if tx.is_expense and tx.is_tax_deductible:
         deduction = abs(tx.amount)
         tax_saving = deduction * current_user.default_tax_rate
         sym = {'USD':'$','EUR':'€','GBP':'£','CAD':'C$','AUD':'A$','INR':'₹','JPY':'¥'}.get(current_user.currency, '$')
@@ -123,7 +128,7 @@ def edit(id):
         flash('Invalid amount.', 'error')
         return redirect(url_for('transactions.list_transactions'))
 
-    kind = clean_kind(request.form.get('type', 'income'), fallback=INCOME)
+    kind = clean_kind(request.form.get('type', tx.kind), fallback=tx.kind)
     if kind == EXPENSE and amount > 0: amount = -amount
     elif kind == INCOME and amount < 0: amount = abs(amount)
     tx.kind = kind
@@ -166,8 +171,6 @@ def export_csv():
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(['Date', 'Type', 'Category', 'Description', 'Amount', 'Tax Deductible'])
-
-    sym = {'USD':'$','EUR':'€','GBP':'£','CAD':'C$','AUD':'A$','INR':'₹','JPY':'¥'}.get(current_user.currency, '$')
 
     for tx in transactions:
         writer.writerow([

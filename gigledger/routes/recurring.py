@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
-from ..models import RecurringTransaction, Transaction, db, clean_kind, EXPENSE
+from ..models import RecurringTransaction, Transaction, db, clean_kind, EXPENSE, INCOME
 
 recurring_bp = Blueprint('recurring', __name__, url_prefix='/recurring')
 
@@ -73,10 +73,10 @@ def add():
         flash('Amount must be greater than zero.', 'error')
         return redirect(url_for('recurring.index'))
 
-    # Make expense amounts negative
+    # Non-income kinds are cash out, so they are stored negative - the same
+    # rule edit() uses, so a row's sign does not flip between the two paths.
     kind = clean_kind(tx_type, fallback=EXPENSE)
-    if kind == EXPENSE and amount > 0:
-        amount = -amount
+    amount = amount if kind == INCOME else -amount
 
     category = request.form.get('category', '')
     frequency = request.form.get('frequency', 'monthly')

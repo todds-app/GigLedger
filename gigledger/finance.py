@@ -7,7 +7,7 @@ Implements:
   C. Runway Calculator
 """
 from datetime import datetime
-from .models import COST_KINDS, EXPENSE, INCOME, Transaction, db
+from .models import COST_KINDS, INCOME, Transaction, db
 
 
 def get_quarter(month):
@@ -190,7 +190,7 @@ def get_category_breakdown(user_id, year=None, month=None):
         Transaction.user_id == user_id,
         Transaction.date >= start,
         Transaction.date < end,
-        Transaction.kind == EXPENSE,
+        Transaction.kind.in_(COST_KINDS),
     ).group_by(Transaction.category).all()
 
     categories = []

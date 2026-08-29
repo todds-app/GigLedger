@@ -7,7 +7,7 @@ top clients, expense categories, and key insights.
 from datetime import datetime
 from flask import Blueprint, render_template, request
 from flask_login import login_required, current_user
-from ..models import Transaction, Client, Invoice, EXPENSE, db
+from ..models import Transaction, Client, Invoice, COST_KINDS, db
 from ..finance import calculate_monthly_summary, get_quarter, get_quarter_date_range
 
 reports_bp = Blueprint('reports', __name__)
@@ -99,7 +99,7 @@ def index():
         db.func.sum(Transaction.amount).label('total')
     ).filter(
         Transaction.user_id == uid,
-        Transaction.kind == EXPENSE,
+        Transaction.kind.in_(COST_KINDS),
         Transaction.date >= year_start,
         Transaction.date < year_end,
     ).group_by(Transaction.category).order_by(
