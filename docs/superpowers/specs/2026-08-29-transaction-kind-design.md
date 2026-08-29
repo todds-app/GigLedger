@@ -77,16 +77,21 @@ deductible figure, so widening it converts three aggregations at their source.
 ## Migration
 
 `db.create_all()` at `app.py:184` creates missing *tables*. It never alters an
-existing one, and this project has no migration tooling. A `transactions` table
-already exists in `gigledger.db`, so the column will not appear on its own.
+existing one, so a `transactions` table that predates the column will not gain
+it. This project has no migration tooling, but it does already have
+`_migrate_db` at `app.py:190` — a `PRAGMA table_info` → `ALTER TABLE` helper
+that already migrates the transactions table for `invoice_id`, and commits at
+the end. The backfill joins it there rather than arriving as a second
+mechanism.
 
-An idempotent step runs inside the same `app_context` block, before any query:
+Added to the existing transactions block:
 
 1. `PRAGMA table_info(transactions)`; if `kind` is present, do nothing.
 2. `ALTER TABLE transactions ADD COLUMN kind VARCHAR(20)`
 3. `UPDATE transactions SET kind = CASE WHEN amount > 0 THEN 'income' ELSE 'expense' END`
 
-Then the same three steps for `recurring_transactions`.
+Then the same three steps for `recurring_transactions`, which `_migrate_db`
+does not touch today.
 
 Running it on every startup is a no-op after the first, which is the property to
 test rather than assert.
@@ -140,6 +145,21 @@ transaction, and stays as it is.
 
 - `:44` — monthly commitments sum
 - `:59`, `:76`, `:131-132` — sign coercion on add and edit
+
+**Templates** — these classify by sign too, which the checklist first missed.
+Only the *type labels* convert; `+`/`-` and red/green describe the amount and
+stay sign tests.
+
+- `templates/transactions/index.html:131` — the type badge
+- `templates/transactions/index.html:152` — the deductible/income branch
+- `templates/transactions/index.html:161` — the kind argument passed to
+  `openEditModal`, which decides the pre-selected radio button
+- `templates/recurring/index.html:72`, `:112` — the same badge and modal argument
+
+Left alone as direction rather than classification:
+`templates/transactions/index.html:127`, `:135-136`, `:139`, `:149`;
+`templates/recurring/index.html:60`, `:68-69`;
+`templates/dashboard/index.html:330-343`; `templates/transactions/export.html:56`.
 
 **Creation sites — eight, each sets `kind` explicitly**
 
