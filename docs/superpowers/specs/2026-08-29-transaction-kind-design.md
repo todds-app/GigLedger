@@ -263,3 +263,51 @@ Storage: `DEFAULT_INVENTORY_CATEGORIES` alongside the two existing lists at
 the Settings UI. `get_all_categories()` currently merges income and expense for
 the transactions filter dropdown; it becomes kind-aware so seven more entries do
 not land in that filter unasked.
+
+---
+
+## Appendix: what piece 1 left for piece 2
+
+Found during implementation and review of piece 1, recorded here because the
+execution workspace does not survive. Piece 1 is complete and correct on its own
+terms — none of these affect income or expense behaviour, and no inventory row
+can be created yet. All of them bite the moment one can.
+
+**Blockers — piece 2 cannot ship without these.**
+
+*The edit modal destroys an inventory row.* `openEditModal` receives the row's
+real kind, but the JavaScript branches `if (type === 'income') … else` and checks
+the expense radio for anything else. Editing an inventory transaction — changing
+only its date — posts `type=expense` and permanently moves it into every cost
+total. `edit()` falls back to the stored kind when `type` is absent or
+unrecognised, but the modal sends `expense` explicitly, so that guard never
+fires. The fix is the third radio button.
+
+*Inventory has no input path.* `transactions.py`'s `add()` and `edit()` coerce
+the sign for `income` and `expense` only, so an inventory row keeps whatever sign
+was submitted. `recurring.py` was fixed to the rule "non-income is cash out";
+these two were left because the UI cannot reach them. Piece 2 should apply the
+same rule when it adds the input path.
+
+*The Type filter offers only Income and Expense.* `_filtered_transactions`
+accepts any member of `KINDS`, so the backend is ready; the dropdown is not.
+Inventory rows cannot be filtered for.
+
+**Undecided — needs a deliberate call.**
+
+*Is "monthly commitment" cash or cost?* `dashboard.py` and `recurring.py` filter
+it on `is_expense`, so a recurring inventory purchase is excluded from a figure
+labelled as a cash commitment. ADR-0010 exempts only the two balance sums from
+the cost rule; this third cash-flavoured figure was resolved the other way
+without anyone deciding it. Choose, and record the choice.
+
+**Known limitations, accepted.**
+
+*The HTML/PDF export has no Type column.* CSV has one. An inventory row in the
+HTML export is indistinguishable from an expense while being excluded from that
+report's own totals, so its rows will not sum to its summary.
+
+*A NULL kind is representable on a migrated database.* See ADR-0010's closing
+paragraph. `edit()` now preserves a NULL rather than inventing `income` for it,
+which means the edit path is not a repair path either. Repair, if ever needed, is
+a deliberate migration.
