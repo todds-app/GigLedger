@@ -1,9 +1,54 @@
 from datetime import datetime
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
-from ..models import Transaction, db, clean_kind, EXPENSE, INCOME
+from ..models import Transaction, db, clean_kind, EXPENSE, INCOME, KINDS
 
 transactions_bp = Blueprint('transactions', __name__)
+
+
+def _filtered_transactions(uid, args):
+    """The transaction list the index and both exports share.
+
+    Extracted while converting to kind because the filter existed in three
+    copies. A fourth kind should be a change in one place, not three.
+    """
+    transactions = Transaction.query.filter_by(user_id=uid)\
+        .order_by(Transaction.date.desc()).all()
+
+    category = args.get('category', '')
+    if category:
+        transactions = [t for t in transactions if t.category == category]
+
+    kind = args.get('type', '')
+    if kind in KINDS:
+        transactions = [t for t in transactions if t.kind == kind]
+
+    month = args.get('month', '')
+    if month:
+        try:
+            m = int(month)
+            transactions = [t for t in transactions if t.date.month == m]
+        except ValueError:
+            pass
+
+    year = args.get('year', '')
+    if year:
+        try:
+            y = int(year)
+            transactions = [t for t in transactions if t.date.year == y]
+        except ValueError:
+            pass
+
+    return transactions
+
+
+def _totals(transactions, tax_rate):
+    """(income, expenses, deductible, net, tax_saving) for a filtered list."""
+    income = sum(t.amount for t in transactions if t.is_income)
+    expenses = sum(abs(t.amount) for t in transactions if t.is_expense)
+    deductible = sum(abs(t.amount) for t in transactions
+                     if t.is_expense and t.is_tax_deductible)
+    return income, expenses, deductible, income - expenses, deductible * tax_rate
 
 
 @transactions_bp.route('/transactions')
@@ -15,25 +60,7 @@ def list_transactions():
     month = request.args.get('month', '')
     year = request.args.get('year', '')
 
-    all_tx = Transaction.query.filter_by(user_id=uid).order_by(Transaction.date.desc()).all()
-
-    transactions = all_tx
-    if category:
-        transactions = [t for t in transactions if t.category == category]
-    if tx_type == 'income':
-        transactions = [t for t in transactions if t.amount > 0]
-    elif tx_type == 'expense':
-        transactions = [t for t in transactions if t.amount < 0]
-    if month:
-        try:
-            m = int(month)
-            transactions = [t for t in transactions if t.date.month == m]
-        except: pass
-    if year:
-        try:
-            y = int(year)
-            transactions = [t for t in transactions if t.date.year == y]
-        except: pass
+    transactions = _filtered_transactions(uid, request.args)
 
     categories = current_user.get_all_categories()
     categories.sort()
@@ -134,31 +161,7 @@ def export_csv():
     import csv, io
     uid = current_user.id
 
-    # Apply same filters as list view
-    category = request.args.get('category', '')
-    tx_type = request.args.get('type', '')
-    month = request.args.get('month', '')
-    year = request.args.get('year', '')
-
-    all_tx = Transaction.query.filter_by(user_id=uid).order_by(Transaction.date.desc()).all()
-
-    transactions = all_tx
-    if category:
-        transactions = [t for t in transactions if t.category == category]
-    if tx_type == 'income':
-        transactions = [t for t in transactions if t.amount > 0]
-    elif tx_type == 'expense':
-        transactions = [t for t in transactions if t.amount < 0]
-    if month:
-        try:
-            m = int(month)
-            transactions = [t for t in transactions if t.date.month == m]
-        except: pass
-    if year:
-        try:
-            y = int(year)
-            transactions = [t for t in transactions if t.date.year == y]
-        except: pass
+    transactions = _filtered_transactions(uid, request.args)
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -169,7 +172,7 @@ def export_csv():
     for tx in transactions:
         writer.writerow([
             tx.date.strftime('%Y-%m-%d'),
-            'Income' if tx.amount > 0 else 'Expense',
+            tx.kind_label,
             tx.category or 'Other',
             tx.description or '',
             f"{abs(tx.amount):.2f}",
@@ -177,11 +180,8 @@ def export_csv():
         ])
 
     # Add summary rows
-    total_income = sum(t.amount for t in transactions if t.amount > 0)
-    total_expenses = sum(abs(t.amount) for t in transactions if t.amount < 0)
-    total_deductible = sum(abs(t.amount) for t in transactions if t.amount < 0 and t.is_tax_deductible)
-    net = total_income - total_expenses
-    tax_saving = total_deductible * current_user.default_tax_rate
+    total_income, total_expenses, total_deductible, net, tax_saving = _totals(
+        transactions, current_user.default_tax_rate)
 
     writer.writerow([])
     writer.writerow(['--- SUMMARY ---'])
@@ -206,39 +206,13 @@ def export_pdf():
     from flask import Response
     uid = current_user.id
 
-    # Apply same filters
-    category = request.args.get('category', '')
-    tx_type = request.args.get('type', '')
-    month = request.args.get('month', '')
-    year = request.args.get('year', '')
-
-    all_tx = Transaction.query.filter_by(user_id=uid).order_by(Transaction.date.desc()).all()
-    transactions = all_tx
-    if category:
-        transactions = [t for t in transactions if t.category == category]
-    if tx_type == 'income':
-        transactions = [t for t in transactions if t.amount > 0]
-    elif tx_type == 'expense':
-        transactions = [t for t in transactions if t.amount < 0]
-    if month:
-        try:
-            m = int(month)
-            transactions = [t for t in transactions if t.date.month == m]
-        except: pass
-    if year:
-        try:
-            y = int(year)
-            transactions = [t for t in transactions if t.date.year == y]
-        except: pass
+    transactions = _filtered_transactions(uid, request.args)
 
     # Build HTML for PDF
     sym = {'USD':'$','EUR':'€','GBP':'£','CAD':'C$','AUD':'A$','INR':'₹','JPY':'¥'}.get(current_user.currency, '$')
 
-    total_income = sum(t.amount for t in transactions if t.amount > 0)
-    total_expenses = sum(abs(t.amount) for t in transactions if t.amount < 0)
-    total_deductible = sum(abs(t.amount) for t in transactions if t.amount < 0 and t.is_tax_deductible)
-    net = total_income - total_expenses
-    tax_saving = total_deductible * current_user.default_tax_rate
+    total_income, total_expenses, total_deductible, net, tax_saving = _totals(
+        transactions, current_user.default_tax_rate)
 
     # Rendered from a template, not built as an f-string, so that autoescape
     # applies to the description and category fields by default. See docs/adr/0005.
