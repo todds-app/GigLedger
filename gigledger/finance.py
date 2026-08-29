@@ -7,7 +7,7 @@ Implements:
   C. Runway Calculator
 """
 from datetime import datetime
-from .models import Transaction, db
+from .models import COST_KINDS, EXPENSE, INCOME, Transaction, db
 
 
 def get_quarter(month):
@@ -29,9 +29,14 @@ def get_quarter_date_range(quarter, year):
 
 
 def _get_tx_range(user_id, start_date, end_date):
-    """Fetch transaction amounts and deductible flags for a date range."""
+    """Fetch amounts, deductible flags and kinds for a date range.
+
+    The kind comes along because classification is this tuple's job: every
+    caller needs to know what a row *is*, and the sign of the amount only
+    says which way the money moved. See docs/adr/0010.
+    """
     return db.session.query(
-        Transaction.amount, Transaction.is_tax_deductible
+        Transaction.amount, Transaction.is_tax_deductible, Transaction.kind
     ).filter(
         Transaction.user_id == user_id,
         Transaction.date >= start_date,
@@ -47,8 +52,8 @@ def calculate_monthly_summary(user_id, year, month):
         end = datetime(year, month + 1, 1)
     start = datetime(year, month, 1)
     results = _get_tx_range(user_id, start, end)
-    income = sum(r[0] for r in results if r[0] > 0)
-    expenses = abs(sum(r[0] for r in results if r[0] < 0))
+    income = sum(amount for amount, _, kind in results if kind == INCOME)
+    expenses = abs(sum(amount for amount, _, kind in results if kind in COST_KINDS))
     return float(income), float(expenses)
 
 
@@ -60,6 +65,8 @@ def calculate_safe_to_spend(user_id, tax_rate):
     Returns (balance, tax_obligation, safe_balance)
     """
     # Bank Balance = sum of all transactions (income - expenses)
+    # Every kind, deliberately. This is cash, not profit: an inventory
+    # purchase is money that has left the bank. See docs/adr/0010.
     result = db.session.query(db.func.sum(Transaction.amount)).filter(
         Transaction.user_id == user_id,
     ).scalar()
@@ -85,8 +92,9 @@ def calculate_quarterly_income_deductions(user_id, quarter, year):
     """
     start_date, end_date = get_quarter_date_range(quarter, year)
     results = _get_tx_range(user_id, start_date, end_date)
-    income = sum(r[0] for r in results if r[0] > 0)
-    deductions = sum(abs(r[0]) for r in results if r[0] < 0 and r[1])
+    income = sum(amount for amount, _, kind in results if kind == INCOME)
+    deductions = sum(abs(amount) for amount, deductible, kind in results
+                     if kind in COST_KINDS and deductible)
     return float(income), float(deductions)
 
 
@@ -182,7 +190,7 @@ def get_category_breakdown(user_id, year=None, month=None):
         Transaction.user_id == user_id,
         Transaction.date >= start,
         Transaction.date < end,
-        Transaction.amount < 0,
+        Transaction.kind == EXPENSE,
     ).group_by(Transaction.category).all()
 
     categories = []
