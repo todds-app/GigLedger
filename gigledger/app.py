@@ -401,12 +401,14 @@ def _seed_demo_data():
             client_name = next((c.name for c in client_objects if c.id == inv.client_id), 'Unknown Client')
             # Income transaction
             tx = Transaction(user_id=demo_user.id, amount=inv.total, date=inv.paid_date or inv.issue_date,
+                           kind='income',
                            category='Client Payment', description=f'Payment for Invoice {inv.invoice_number} - {client_name}',
                            is_tax_deductible=False, source='invoice', invoice_id=inv.id)
             db.session.add(tx)
             # Tax reserve expense transaction (auto-set-aside)
             if inv.tax_amount and inv.tax_amount > 0:
                 tax_tx = Transaction(user_id=demo_user.id, amount=-inv.tax_amount, date=inv.paid_date or inv.issue_date,
+                                   kind='expense',
                                    category='Tax Reserve', description=f'Tax reserve for Invoice {inv.invoice_number} - {client_name} ({tax_rate*100:.0f}%)',
                                    is_tax_deductible=False, source='invoice', invoice_id=inv.id)
                 db.session.add(tax_tx)
@@ -452,6 +454,7 @@ def _seed_demo_data():
                 user_id=demo_user.id,
                 amount=round(random.uniform(800, 4500), 2),
                 date=tx_date,
+                kind='income',
                 category=random.choice(cat_income),
                 description=random.choice(desc_income),
                 is_tax_deductible=False,
@@ -466,6 +469,7 @@ def _seed_demo_data():
                 user_id=demo_user.id,
                 amount=-round(random.uniform(15, 250), 2),
                 date=tx_date,
+                kind='expense',
                 category=random.choice(cat_expense_deductible),
                 description=random.choice(desc_expense_ded),
                 is_tax_deductible=True,
@@ -480,6 +484,7 @@ def _seed_demo_data():
                 user_id=demo_user.id,
                 amount=-round(random.uniform(10, 150), 2),
                 date=tx_date,
+                kind='expense',
                 category=random.choice(cat_expense_nondeduct),
                 description=random.choice(desc_expense_non),
                 is_tax_deductible=False,
@@ -551,25 +556,25 @@ def _seed_demo_data():
 
     # ---- Create Recurring Transactions ----
     recurring_data = [
-        {'description': 'Figma Subscription', 'amount': -15.00, 'category': 'Software',
+        {'description': 'Figma Subscription', 'amount': -15.00, 'kind': 'expense', 'category': 'Software',
          'is_tax_deductible': True, 'frequency': 'monthly', 'day_of_month': 1,
          'is_active': True, 'next_date': datetime(now.year, now.month, 1) if now.day < 1 else datetime(now.year, now.month + 1 if now.month < 12 else 1, 1)},
-        {'description': 'AWS Hosting', 'amount': -52.00, 'category': 'Software',
+        {'description': 'AWS Hosting', 'amount': -52.00, 'kind': 'expense', 'category': 'Software',
          'is_tax_deductible': True, 'frequency': 'monthly', 'day_of_month': 5,
          'is_active': True, 'next_date': datetime(now.year, now.month, 5) if now.day < 5 else datetime(now.year, now.month + 1 if now.month < 12 else 1, 5)},
-        {'description': 'Co-working Space', 'amount': -250.00, 'category': 'Office Supplies',
+        {'description': 'Co-working Space', 'amount': -250.00, 'kind': 'expense', 'category': 'Office Supplies',
          'is_tax_deductible': True, 'frequency': 'monthly', 'day_of_month': 1,
          'is_active': True, 'next_date': datetime(now.year, now.month, 1) if now.day < 1 else datetime(now.year, now.month + 1 if now.month < 12 else 1, 1)},
-        {'description': 'Internet Bill', 'amount': -79.99, 'category': 'Internet',
+        {'description': 'Internet Bill', 'amount': -79.99, 'kind': 'expense', 'category': 'Internet',
          'is_tax_deductible': True, 'frequency': 'monthly', 'day_of_month': 15,
          'is_active': True, 'next_date': datetime(now.year, now.month, 15) if now.day < 15 else datetime(now.year, now.month + 1 if now.month < 12 else 1, 15)},
-        {'description': 'Adobe Creative Cloud', 'amount': -54.99, 'category': 'Software',
+        {'description': 'Adobe Creative Cloud', 'amount': -54.99, 'kind': 'expense', 'category': 'Software',
          'is_tax_deductible': True, 'frequency': 'monthly', 'day_of_month': 10,
          'is_active': True, 'next_date': datetime(now.year, now.month, 10) if now.day < 10 else datetime(now.year, now.month + 1 if now.month < 12 else 1, 10)},
-        {'description': 'Domain Renewal', 'amount': -12.99, 'category': 'Software',
+        {'description': 'Domain Renewal', 'amount': -12.99, 'kind': 'expense', 'category': 'Software',
          'is_tax_deductible': True, 'frequency': 'yearly', 'day_of_month': 1,
          'is_active': True, 'next_date': datetime(now.year + 1, 1, 1)},
-        {'description': 'LinkedIn Premium', 'amount': -29.99, 'category': 'Marketing',
+        {'description': 'LinkedIn Premium', 'amount': -29.99, 'kind': 'expense', 'category': 'Marketing',
          'is_tax_deductible': False, 'frequency': 'monthly', 'day_of_month': 20,
          'is_active': False, 'next_date': None},
     ]

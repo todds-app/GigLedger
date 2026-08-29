@@ -9,7 +9,7 @@ from flask import (Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
 from .. import documents
 from ..models import (Project, Client, ProjectDocument, DocumentShare,
-                      Transaction, db)
+                      Transaction, db, INCOME)
 
 projects_bp = Blueprint('projects', __name__, url_prefix='/projects')
 
@@ -198,6 +198,7 @@ def log_hours(id):
             user_id=current_user.id,
             amount=earned,
             date=datetime.now(),
+            kind=INCOME,
             category='Freelance Project',
             description=f'Hours logged on project: {project.name}',
             is_tax_deductible=False,

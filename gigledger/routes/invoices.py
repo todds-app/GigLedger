@@ -4,7 +4,7 @@ GigLedger - Invoices Blueprint
 from datetime import datetime, timedelta
 from flask import Blueprint, render_template, redirect, url_for, request, flash, Response
 from flask_login import login_required, current_user
-from ..models import db, Invoice, InvoiceLineItem, Client, Transaction
+from ..models import db, Invoice, InvoiceLineItem, Client, Transaction, INCOME, EXPENSE
 
 invoices_bp = Blueprint('invoices', __name__)
 
@@ -186,6 +186,7 @@ def update_status(id):
             user_id=current_user.id,
             amount=invoice.total,
             date=datetime.now(),
+            kind=INCOME,
             category='Client Payment',
             description=f'Payment for Invoice {invoice.invoice_number} - {client_name}',
             is_tax_deductible=False,
@@ -200,6 +201,7 @@ def update_status(id):
                 user_id=current_user.id,
                 amount=-invoice.tax_amount,
                 date=datetime.now(),
+                kind=EXPENSE,
                 category='Tax Reserve',
                 description=f'Tax reserve for Invoice {invoice.invoice_number} - {client_name} ({current_user.default_tax_rate*100:.0f}%)',
                 is_tax_deductible=False,

@@ -1,7 +1,7 @@
 from datetime import datetime
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
-from ..models import Transaction, db
+from ..models import Transaction, db, clean_kind, EXPENSE, INCOME
 
 transactions_bp = Blueprint('transactions', __name__)
 
@@ -54,16 +54,16 @@ def add():
         flash('Invalid amount.', 'error')
         return redirect(request.referrer or url_for('transactions.list_transactions'))
 
-    tx_type = request.form.get('type', 'income')
-    if tx_type == 'expense' and amount > 0: amount = -amount
-    elif tx_type == 'income' and amount < 0: amount = abs(amount)
+    kind = clean_kind(request.form.get('type', 'income'), fallback=INCOME)
+    if kind == EXPENSE and amount > 0: amount = -amount
+    elif kind == INCOME and amount < 0: amount = abs(amount)
 
     date_str = request.form.get('date', '')
     try: date = datetime.strptime(date_str, '%Y-%m-%d')
     except: date = datetime.now()
 
     tx = Transaction(
-        user_id=current_user.id, amount=amount, date=date,
+        user_id=current_user.id, amount=amount, date=date, kind=kind,
         category=request.form.get('category', 'Uncategorized'),
         description=request.form.get('description', ''),
         is_tax_deductible=request.form.get('is_tax_deductible') == 'on',
@@ -96,9 +96,10 @@ def edit(id):
         flash('Invalid amount.', 'error')
         return redirect(url_for('transactions.list_transactions'))
 
-    tx_type = request.form.get('type', 'income')
-    if tx_type == 'expense' and amount > 0: amount = -amount
-    elif tx_type == 'income' and amount < 0: amount = abs(amount)
+    kind = clean_kind(request.form.get('type', 'income'), fallback=INCOME)
+    if kind == EXPENSE and amount > 0: amount = -amount
+    elif kind == INCOME and amount < 0: amount = abs(amount)
+    tx.kind = kind
 
     date_str = request.form.get('date', '')
     try: tx.date = datetime.strptime(date_str, '%Y-%m-%d')

@@ -160,3 +160,100 @@ def test_the_migration_is_a_no_op_the_second_time(tmp_path, monkeypatch):
     create_app()
 
     assert kinds_in(db_path, 'transactions', [2])[2] == INVENTORY
+
+
+from gigledger.models import User, db
+from test_finance_characterization import (authenticated_client,
+                                            build_app, demo_user_id)
+
+
+@pytest.fixture
+def app(tmp_path, monkeypatch):
+    return build_app(tmp_path, monkeypatch)
+
+
+def test_adding_an_expense_stores_the_expense_kind(app):
+    authenticated_client(app).post('/transactions/add', data={
+        'type': 'expense', 'amount': '59.99', 'date': '2026-03-04',
+        'category': 'Software', 'description': 'Adobe CC'})
+    with app.app_context():
+        tx = Transaction.query.filter_by(description='Adobe CC').one()
+        assert tx.is_expense
+        assert tx.amount == -59.99
+
+
+def test_adding_income_stores_the_income_kind(app):
+    authenticated_client(app).post('/transactions/add', data={
+        'type': 'income', 'amount': '2400', 'date': '2026-03-04',
+        'category': 'Client Payment', 'description': 'Retainer'})
+    with app.app_context():
+        assert Transaction.query.filter_by(description='Retainer').one().is_income
+
+
+def test_an_unrecognised_type_does_not_reach_the_column(app):
+    """The form is client-controlled. clean_kind decides at the write."""
+    authenticated_client(app).post('/transactions/add', data={
+        'type': 'asset', 'amount': '100', 'date': '2026-03-04',
+        'category': 'Software', 'description': 'Bogus type'})
+    with app.app_context():
+        tx = Transaction.query.filter_by(description='Bogus type').one()
+        assert tx.kind in KINDS
+
+
+def test_every_seeded_transaction_has_a_kind(app):
+    """The seed writes through five separate blocks; a miss in any of them
+    leaves rows that later aggregations cannot classify."""
+    with app.app_context():
+        assert Transaction.query.count() > 0
+        assert Transaction.query.filter(
+            Transaction.kind.notin_(list(KINDS))).count() == 0
+        assert Transaction.query.filter(Transaction.kind.is_(None)).count() == 0
+        assert RecurringTransaction.query.filter(
+            RecurringTransaction.kind.is_(None)).count() == 0
+
+
+def test_seeded_kinds_agree_with_their_amounts(app):
+    """Nothing in this piece creates inventory, so kind and sign still line up.
+    When that stops being true in piece 2, this test is the one to change."""
+    with app.app_context():
+        for tx in Transaction.query.all():
+            if tx.amount > 0:
+                assert tx.is_income, f'{tx.description} is positive but {tx.kind}'
+            elif tx.amount < 0:
+                assert tx.is_expense, f'{tx.description} is negative but {tx.kind}'
+
+
+def test_a_generated_recurring_transaction_inherits_its_kind(app):
+    from datetime import datetime, timedelta
+    with app.app_context():
+        rt = RecurringTransaction(
+            user_id=demo_user_id(app), description='Studio rent',
+            amount=-1500.00, category='Rent', kind=EXPENSE, frequency='monthly',
+            day_of_month=1, is_active=True,
+            next_date=datetime.now() - timedelta(days=1))
+        db.session.add(rt)
+        db.session.commit()
+
+    authenticated_client(app).post('/recurring/generate')
+
+    with app.app_context():
+        generated = Transaction.query.filter_by(
+            description='Studio rent', source='recurring').one()
+        assert generated.is_expense
+
+
+def test_marking_an_invoice_paid_writes_income_and_a_tax_expense(app):
+    from gigledger.models import Invoice
+    with app.app_context():
+        invoice = Invoice.query.filter(Invoice.tax_amount > 0).first()
+        invoice_id, number = invoice.id, invoice.invoice_number
+        invoice.status = 'sent'
+        db.session.commit()
+
+    authenticated_client(app).post(f'/invoices/status/{invoice_id}',
+                                   data={'status': 'paid'})
+
+    with app.app_context():
+        linked = Transaction.query.filter_by(invoice_id=invoice_id).all()
+        assert {t.kind for t in linked} == {INCOME, EXPENSE}
+        assert all(t.kind in KINDS for t in linked), number

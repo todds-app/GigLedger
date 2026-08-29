@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
-from ..models import RecurringTransaction, Transaction, db
+from ..models import RecurringTransaction, Transaction, db, clean_kind, EXPENSE
 
 recurring_bp = Blueprint('recurring', __name__, url_prefix='/recurring')
 
@@ -73,7 +73,8 @@ def add():
         return redirect(url_for('recurring.index'))
 
     # Make expense amounts negative
-    if tx_type == 'expense' and amount > 0:
+    kind = clean_kind(tx_type, fallback=EXPENSE)
+    if kind == EXPENSE and amount > 0:
         amount = -amount
 
     category = request.form.get('category', '')
@@ -101,6 +102,7 @@ def add():
         user_id=current_user.id,
         description=description,
         amount=amount,
+        kind=kind,
         category=category,
         is_tax_deductible=is_tax_deductible,
         frequency=frequency,
@@ -220,6 +222,7 @@ def generate():
                 user_id=current_user.id,
                 amount=rt.amount,
                 date=rt.next_date,
+                kind=rt.kind,
                 category=rt.category or 'Recurring',
                 description=rt.description,
                 is_tax_deductible=rt.is_tax_deductible,
