@@ -159,3 +159,90 @@ def test_an_existing_users_table_gains_the_inventory_categories_column(tmp_path,
     columns = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
     conn.close()
     assert 'custom_inventory_categories' in columns
+
+
+# --- add(): the input path ---------------------------------------------------
+
+def add_purchase(client, **overrides):
+    data = {'type': 'inventory', 'date': '2026-03-15', 'category': 'Seating',
+            'description': 'Sectional sofa', 'quantity': '2',
+            'unit_cost': '490', 'project_id': ''}
+    data.update(overrides)
+    return client.post('/transactions/add', data=data, follow_redirects=True)
+
+
+def test_adding_an_inventory_purchase_writes_the_transaction_and_the_item(app):
+    add_purchase(authenticated_client(app))
+    with app.app_context():
+        tx = Transaction.query.filter_by(description='Sectional sofa').one()
+        assert tx.is_inventory
+        assert tx.amount == -980.0
+        assert tx.inventory_item.quantity == 2
+        assert tx.inventory_item.unit_cost == 490
+        assert tx.inventory_item.is_consumable is False
+        assert tx.inventory_item.project_id is None
+
+
+def test_the_posted_amount_is_ignored_for_inventory(app):
+    """The modal hides the amount field, but the form is client-controlled."""
+    add_purchase(authenticated_client(app), amount='5')
+    with app.app_context():
+        assert Transaction.query.filter_by(
+            description='Sectional sofa').one().amount == -980.0
+
+
+def test_inventory_is_never_tax_deductible(app):
+    add_purchase(authenticated_client(app), is_tax_deductible='on')
+    with app.app_context():
+        assert Transaction.query.filter_by(
+            description='Sectional sofa').one().is_tax_deductible is False
+
+
+def test_an_inventory_purchase_can_be_bought_for_a_project(app):
+    with app.app_context():
+        pid = Project.query.filter_by(user_id=demo_user_id(app)).first().id
+    add_purchase(authenticated_client(app), project_id=str(pid),
+                 is_consumable='on')
+    with app.app_context():
+        item = Transaction.query.filter_by(
+            description='Sectional sofa').one().inventory_item
+        assert item.project_id == pid
+        assert item.is_consumable is True
+
+
+@pytest.mark.parametrize('bad', [
+    {'quantity': '0'}, {'unit_cost': '-3'}, {'quantity': 'six'},
+    {'quantity': ''}, {'unit_cost': ''}])
+def test_a_non_positive_or_missing_quantity_or_unit_cost_is_refused(app, bad):
+    body = add_purchase(authenticated_client(app), **bad).get_data(as_text=True)
+    # Not the bare word 'required': every form input carries that attribute.
+    assert ('must be greater than zero' in body
+            or 'are required for an inventory purchase' in body)
+    with app.app_context():
+        assert Transaction.query.filter_by(description='Sectional sofa').count() == 0
+
+
+def test_another_users_project_is_refused(app):
+    with app.app_context():
+        other = User(email='other@example.com', password_hash='x')
+        db.session.add(other)
+        db.session.flush()
+        theirs = Project(user_id=other.id, name='Not yours')
+        db.session.add(theirs)
+        db.session.commit()
+        pid = theirs.id
+    add_purchase(authenticated_client(app), project_id=str(pid))
+    with app.app_context():
+        assert Transaction.query.filter_by(description='Sectional sofa').count() == 0
+
+
+@pytest.mark.parametrize('kind,posted,stored', [
+    ('income', '100', 100.0), ('income', '-100', 100.0),
+    ('expense', '100', -100.0), ('expense', '-100', -100.0)])
+def test_one_sign_rule_for_income_and_expense(app, kind, posted, stored):
+    authenticated_client(app).post('/transactions/add', data={
+        'type': kind, 'amount': posted, 'date': '2026-03-04',
+        'category': 'x', 'description': 'sign probe'})
+    with app.app_context():
+        assert Transaction.query.filter_by(
+            description='sign probe').one().amount == stored

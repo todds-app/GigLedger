@@ -1,7 +1,8 @@
 from datetime import datetime
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
-from ..models import Transaction, db, clean_kind, EXPENSE, INCOME, KINDS
+from ..models import (Transaction, InventoryItem, Project, db, clean_kind,
+                      EXPENSE, INCOME, INVENTORY, KINDS)
 
 transactions_bp = Blueprint('transactions', __name__)
 
@@ -51,6 +52,52 @@ def _totals(transactions, tax_rate):
     return income, expenses, deductible, income - expenses, deductible * tax_rate
 
 
+def _signed(amount, kind):
+    """Income is cash in; every other kind is cash out.
+
+    The same rule recurring.py applies, so a row's sign cannot depend on which
+    file wrote it. A kind outside the vocabulary - NULL on a migrated
+    database, see ADR-0010 - leaves the sign alone rather than inventing one.
+    """
+    if kind not in KINDS:
+        return amount
+    return abs(amount) if kind == INCOME else -abs(amount)
+
+
+class InvalidInventory(ValueError):
+    """An inventory form the route will not write. str() is the flash text."""
+
+
+def _inventory_fields(form, uid):
+    """(quantity, unit_cost, is_consumable, project_id) from the form.
+
+    Raises InvalidInventory rather than writing something that does not add
+    up: the amount is derived from these two numbers, so a zero or a blank
+    here is a zero-amount ledger line with an asset row behind it.
+    """
+    try:
+        quantity = float(form.get('quantity', ''))
+        unit_cost = float(form.get('unit_cost', ''))
+    except ValueError:
+        raise InvalidInventory(
+            'Quantity and unit cost are required for an inventory purchase.')
+    if quantity <= 0 or unit_cost <= 0:
+        raise InvalidInventory('Quantity and unit cost must be greater than zero.')
+
+    project_id = None
+    raw = (form.get('project_id') or '').strip()
+    if raw:
+        try:
+            candidate = int(raw)
+        except ValueError:
+            raise InvalidInventory('Choose a project or General Inventory.')
+        if not Project.query.filter_by(id=candidate, user_id=uid).first():
+            raise InvalidInventory('Choose a project or General Inventory.')
+        project_id = candidate
+
+    return quantity, unit_cost, form.get('is_consumable') == 'on', project_id
+
+
 @transactions_bp.route('/transactions')
 @login_required
 def list_transactions():
@@ -81,14 +128,25 @@ def list_transactions():
 @transactions_bp.route('/transactions/add', methods=['POST'])
 @login_required
 def add():
-    try: amount = float(request.form.get('amount', '0'))
-    except ValueError:
-        flash('Invalid amount.', 'error')
-        return redirect(request.referrer or url_for('transactions.list_transactions'))
-
+    back = request.referrer or url_for('transactions.list_transactions')
     kind = clean_kind(request.form.get('type', 'income'), fallback=INCOME)
-    if kind == EXPENSE and amount > 0: amount = -amount
-    elif kind == INCOME and amount < 0: amount = abs(amount)
+
+    item_fields = None
+    if kind == INVENTORY:
+        try:
+            item_fields = _inventory_fields(request.form, current_user.id)
+        except InvalidInventory as why:
+            flash(str(why), 'error')
+            return redirect(back)
+        quantity, unit_cost, _, _ = item_fields
+        amount = quantity * unit_cost
+    else:
+        try:
+            amount = float(request.form.get('amount', '0'))
+        except ValueError:
+            flash('Invalid amount.', 'error')
+            return redirect(back)
+    amount = _signed(amount, kind)
 
     date_str = request.form.get('date', '')
     try: date = datetime.strptime(date_str, '%Y-%m-%d')
@@ -98,8 +156,16 @@ def add():
         user_id=current_user.id, amount=amount, date=date, kind=kind,
         category=request.form.get('category', 'Uncategorized'),
         description=request.form.get('description', ''),
-        is_tax_deductible=request.form.get('is_tax_deductible') == 'on',
+        # Inventory is an asset, not a cost, so it is never deductible
+        # whatever a stray checkbox posts.
+        is_tax_deductible=(kind != INVENTORY
+                           and request.form.get('is_tax_deductible') == 'on'),
         source='manual')
+    if item_fields:
+        quantity, unit_cost, is_consumable, project_id = item_fields
+        tx.inventory_item = InventoryItem(
+            user_id=current_user.id, project_id=project_id,
+            quantity=quantity, unit_cost=unit_cost, is_consumable=is_consumable)
     db.session.add(tx)
     db.session.commit()
 
