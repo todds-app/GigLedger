@@ -17,7 +17,7 @@ from flask import (Blueprint, render_template, redirect, url_for, request, flash
 from .. import documents as documents_module
 from .. import portal_auth
 from ..portal_auth import client_required
-from ..models import PortalAccount, Project, ProjectDocument, User, db
+from ..models import Business, PortalAccount, Project, ProjectDocument, db
 
 portal_bp = Blueprint('portal', __name__, url_prefix='/portal')
 
@@ -103,22 +103,15 @@ def index():
     # a client cannot add to a project they cannot see. A project reached only
     # through a share grant is listed too, but nothing can be added to it -
     # the grant gave access to one document, not to the project (ADR-0009).
-    # Grouped by freelancer, because a portal account is global (ADR-0008)
-    # and one page can carry two tenants' material.
-    by_owner = {}
+    # One business per install (ADR-0014): the page is headed once with its
+    # name and grouped by project.
     projects = {}
 
     def project_entry(project, can_add):
-        owner = db.session.get(User, project.user_id)
-        group = by_owner.setdefault(project.user_id, {
-            'name': owner.business_name or owner.email,
-            'projects': [],
-        })
         entry = projects.get(project.id)
         if entry is None:
             entry = {'id': project.id, 'name': project.name, 'docs': [], 'can_add': can_add}
             projects[project.id] = entry
-            group['projects'].append(entry)
         return entry
 
     for project in documents_module.projects_of(clients):
@@ -128,7 +121,8 @@ def index():
 
     return render_template('portal/index.html',
                            account=g.portal_account,
-                           groups=list(by_owner.values()),
+                           business_name=Business.get().name,
+                           projects=list(projects.values()),
                            new_ids=new_ids,
                            new_count=len(new_ids),
                            max_upload_mb=documents_module.MAX_UPLOAD_BYTES // (1024 * 1024))

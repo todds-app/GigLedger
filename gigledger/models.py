@@ -296,17 +296,16 @@ class Client(db.Model):
 class PortalAccount(db.Model):
     """A client's login for the Client Portal.
 
-    Deliberately **not** a User, and deliberately not loaded by Flask-Login. If
-    a portal account could become `current_user`, every existing
-    `filter_by(user_id=current_user.id)` in the app would match on its id and
-    serve another tenant's rows. See docs/adr/0008.
+    Deliberately **not** a User, and deliberately not loaded by Flask-Login.
+    `current_user` means *admin* everywhere in this app, and an admin sees
+    every row (ADR-0014); if a portal account could become `current_user`, it
+    would be an admin. See docs/adr/0008.
 
     Also deliberately **global**, keyed by email rather than scoped to one
-    freelancer: the same person is routinely a client of several freelancers,
-    and one row per (freelancer, email) makes the login form ambiguous. This is
-    the only cross-tenant object in the schema, and it holds credentials only -
-    never documents, never project data. Everything a portal session can see is
-    reached through the tenant-scoped Client rows linked to it.
+    project: the same person is routinely a client on several projects, and
+    one row per (project, email) makes the login form ambiguous. It holds
+    credentials only - never documents, never project data. Everything a
+    portal session can see is reached through the Client rows linked to it.
     """
     __tablename__ = 'portal_accounts'
 

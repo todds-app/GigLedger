@@ -2,12 +2,11 @@
 GigLedger - Client Portal authentication.
 
 The portal deliberately does not use Flask-Login. See docs/adr/0008 for the
-full argument; the short version is that `current_user` is assumed to be a
-freelancer by roughly forty existing routes, all of which filter rows with
-`user_id=current_user.id`. If a client could become `current_user`, a portal
-account with id 3 would be served freelancer #3's data. That is not a missing
-check to add - it is a type confusion, and the fix is to make the two principals
-incapable of being mistaken for one another.
+full argument; the short version is that `current_user` means *admin*
+everywhere in this app, and an admin sees every row (ADR-0014). If a client
+could become `current_user`, a portal account would be an admin. A Portal
+Session and an admin session are therefore mutually exclusive, so no request
+has two principals.
 
 So: freelancers live in Flask-Login's session keys and clients live in
 `portal_account_id`, and the two are mutually exclusive. `@login_required` keeps
@@ -207,9 +206,9 @@ def current_account():
 def visible_clients(account):
     """The Client rows this account may act through.
 
-    Every portal query starts here. PortalAccount is the schema's one
-    cross-tenant object; this function is the seam where a request drops back
-    into tenant-scoped data, and nothing in the portal should reach around it.
+    Every portal query starts here: this function is the seam between a login
+    and the Client rows it may act through, and nothing in the portal should
+    reach around it.
     """
     return Client.query.filter_by(portal_account_id=account.id).all()
 

@@ -25,7 +25,7 @@ import gigledger.app
 import gigledger.documents
 import gigledger.portal_auth as portal_auth
 from gigledger.app import create_app
-from gigledger.models import (Client, DocumentAccess, DocumentShare, PortalAccount,
+from gigledger.models import (Business, Client, DocumentAccess, DocumentShare, PortalAccount,
                               Project, ProjectDocument, User, db)
 
 
@@ -257,44 +257,37 @@ def test_the_portal_shows_the_project_name_but_not_its_commercials(app):
     assert '4321' not in body
 
 
-def test_documents_from_two_freelancers_are_labelled_separately(app):
-    """PortalAccount is global, so one page can carry two tenants' material.
-    They must not render as one undifferentiated list (ADR-0008)."""
+def test_the_portal_names_the_business_once_and_groups_by_project(app):
+    """One business per install (ADR-0014): the heading is the business name,
+    then projects, then documents. Nothing is grouped by who uploaded it."""
     first_client = a_client_id(app)
     doc_id = a_document(app)
     share(app, doc_id, [first_client])
     http = portal_for(app, first_client, email='shared@example.com')
 
     with app.app_context():
-        other_user = User(email='other@example.com', password_hash='x',
-                          business_name='Second Studio')
-        db.session.add(other_user)
+        Business.get().name = 'Dani Smith Design'
         db.session.commit()
-        other_client = Client(user_id=other_user.id, name='Same Person',
-                              email='shared@example.com')
-        db.session.add(other_client)
-        db.session.commit()
-        other_project = Project(user_id=other_user.id, client_id=other_client.id,
-                                name='Other Project')
+        other_project = Project(user_id=1, client_id=first_client, name='Other Project')
         db.session.add(other_project)
         db.session.commit()
-        other_doc = ProjectDocument(user_id=other_user.id, project_id=other_project.id,
+        other_doc = ProjectDocument(user_id=1, project_id=other_project.id,
                                     kind='link', title='Other Brief',
                                     external_url='https://example.com/brief',
                                     provider='other')
         db.session.add(other_doc)
         db.session.commit()
-        account = PortalAccount.query.filter_by(email='shared@example.com').one()
-        other_client.portal_account_id = account.id
-        db.session.add(DocumentShare(document_id=other_doc.id, client_id=other_client.id))
+        db.session.add(DocumentShare(document_id=other_doc.id, client_id=first_client))
         db.session.commit()
 
     body = http.get('/portal/').get_data(as_text=True)
 
+    # One <h2> heading. The name also appears inside each project's upload
+    # modal copy ("… will see it straight away"), so count the heading markup.
+    assert body.count('<h2 class="text-sm font-bold text-gray-700">Dani Smith Design</h2>') == 1
     assert 'Signed contract' in body
     assert 'Other Brief' in body
-    assert 'Second Studio' in body
-    assert 'Demo Freelance Studio' in body
+    assert 'Other Project' in body
 
 
 def test_a_shared_link_document_is_shown_as_a_link(app):
