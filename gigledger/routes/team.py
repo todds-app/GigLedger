@@ -36,6 +36,8 @@ def setup():
             db.session.commit()
             portal_auth.forget_portal_session()
             login_user(user, remember=True)
+            user.last_login_at = datetime.utcnow()
+            db.session.commit()
             flash(f'Welcome to {business_name}.', 'success')
             return redirect(url_for('dashboard.index'))
 

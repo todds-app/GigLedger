@@ -141,6 +141,7 @@ def test_the_seed_creates_the_business_row(app):
     with app.app_context():
         assert Business.query.count() == 1
         assert Business.query.one().name == 'Demo Freelance Studio'
+        assert Business.query.one().next_invoice_number == 9
 
 
 def test_every_template_sees_the_business(admin_client, app):

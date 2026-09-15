@@ -116,7 +116,7 @@ No more setting aside random percentages. No more spreadsheet gymnastics. Just c
 - **Invite-based access** — Enable portal access per client; GigLedger generates a single-use link that expires in 7 days
 - **You deliver the invite** — GigLedger sends no email, so the link is shown once for you to copy and send however you already talk to your client
 - **Immediate revocation** — Revoking signs the client out on their next request, not whenever their cookie happens to expire
-- **One login per person** — A client working with several freelancers uses one account
+- **One login per person** — A client on several projects uses one account
 - **Login throttling** — Repeated failures lock an address out for 15 minutes, on the client login *and* yours
 - **Documents grouped by project under the business name** — One login shows every document it's been granted, organized by the project it belongs to
 - **Project name only** — Clients see the project a document belongs to, never its rate, hours or internal description

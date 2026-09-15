@@ -97,9 +97,10 @@ def an_account(app, client_id=None, email='billing@acmecorp.com'):
 # --- the boundary --------------------------------------------------------
 
 def test_a_portal_session_cannot_reach_the_freelancer_app(app):
-    """The whole reason the portal does not use Flask-Login. A portal account
-    holds an id from a different table; if it satisfied @login_required, every
-    `filter_by(user_id=current_user.id)` in the app would match on it."""
+    """The whole reason the portal does not use Flask-Login. An admin sees
+    every row (ADR-0014), so a portal account must never be `current_user`:
+    it holds an id from a different table, and satisfying @login_required
+    with it would hand a client every business's books."""
     account_id = an_account(app)
     http = portal_session(app, account_id)
 
@@ -113,8 +114,9 @@ def test_a_portal_session_cannot_reach_the_freelancer_app(app):
 
 
 def test_a_freelancer_session_cannot_reach_the_portal(app):
-    """The mirror image, and not symmetric by accident: the freelancer session
-    key is the one an attacker would already hold if they had signed up."""
+    """The mirror image, and not symmetric by accident: a portal session and
+    an admin session are mutually exclusive, so the freelancer session key
+    must never double as portal access either."""
     an_account(app)
     http = app.test_client()
     with http.session_transaction() as session:

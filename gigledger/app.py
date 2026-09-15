@@ -301,7 +301,12 @@ def _seed_demo_data():
                           Project, Goal, RecurringTransaction)
     from flask_bcrypt import generate_password_hash
 
-    if User.query.filter_by(email='demo@gigledger.com').first():
+    # The seed only ever populates an empty database: any pre-existing user or
+    # business row (from a real /setup, or a previous seed) means this is a
+    # working install, and SEED_DEMO must be a no-op on it. See ADR-0014 -
+    # checking for the demo user alone would let a restart with the flag set
+    # insert a second Business row and a known-password admin into real books.
+    if User.query.count() or Business.query.count():
         return
 
     password_hash = generate_password_hash('demo1234').decode('utf-8')

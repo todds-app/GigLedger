@@ -33,6 +33,12 @@ def test_the_login_page_does_not_link_to_signup(app):
     assert '/signup' not in body
 
 
+def test_the_login_page_does_not_advertise_demo_credentials(app):
+    body = app.test_client().get('/login').get_data(as_text=True)
+    assert 'demo1234' not in body
+    assert 'demo@gigledger.com' not in body
+
+
 def test_the_demo_seed_does_not_run_without_the_flag(empty_app):
     with empty_app.app_context():
         assert User.query.count() == 0
@@ -42,6 +48,29 @@ def test_the_demo_seed_does_not_run_without_the_flag(empty_app):
 def test_the_demo_seed_runs_with_the_flag(app):
     with app.app_context():
         assert User.query.filter_by(email='demo@gigledger.com').count() == 1
+
+
+def test_the_seed_is_a_no_op_on_a_database_that_went_through_setup(tmp_path, monkeypatch):
+    """SEED_DEMO on a working install must never write demo books into the
+    real ledger or add a known-password admin (ADR-0014)."""
+    monkeypatch.delenv('SEED_DEMO', raising=False)
+    app = build_app(tmp_path, monkeypatch)
+    app.test_client().post('/setup', data={
+        'business_name': 'Dani Smith Design', 'email': 'dani@example.com',
+        'password': 'correct-horse-battery', 'confirm_password': 'correct-horse-battery'})
+    with app.app_context():
+        Business.get().next_invoice_number = 40
+        db.session.commit()
+
+    monkeypatch.setenv('SEED_DEMO', '1')
+    app = build_app(tmp_path, monkeypatch)   # same tmp_path → same database file
+
+    with app.app_context():
+        assert User.query.count() == 1
+        assert User.query.filter_by(email='demo@gigledger.com').count() == 0
+        assert Business.query.count() == 1
+        assert Business.get().name == 'Dani Smith Design'
+        assert Business.get().next_invoice_number == 40
 
 
 # --- first run -----------------------------------------------------------
@@ -65,6 +94,7 @@ def test_setup_creates_the_business_and_the_first_admin(empty_app):
         assert Business.get().name == 'Dani Smith Design'
         user = User.query.one()
         assert user.email == 'dani@example.com'
+        assert user.last_login_at is not None
     # Signed in: the dashboard renders rather than bouncing to /login.
     assert http.get('/').status_code == 200
 

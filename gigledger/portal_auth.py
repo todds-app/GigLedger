@@ -97,7 +97,7 @@ def redeem_invite(invite, password):
 
     * No account for this email yet - create one with the given password.
     * An account already exists - the given password must be **that account's**,
-      because linking is granting the account access to another freelancer's
+      because linking is granting the account access to another client's
       documents. Whoever holds the invite must prove they control the account,
       or an invite would be enough to claim someone else's identity.
     """

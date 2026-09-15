@@ -109,7 +109,7 @@ class Business(db.Model):
 
     @classmethod
     def get(cls):
-        business = cls.query.first()
+        business = cls.query.order_by(cls.id).first()
         if business is None:
             business = cls()
             db.session.add(business)
