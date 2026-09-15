@@ -50,9 +50,9 @@
   <div class="parties">
     <div class="party-section">
       <div class="party-label">From</div>
-      <div style="font-weight: 600; color: #111827; font-size: 15px;">{{ current_user.business_name or current_user.email }}</div>
-      {% if current_user.business_address %}<div style='color: #6b7280; font-size: 13px; white-space: pre-line;'>{{ current_user.business_address }}</div>{% endif %}
-      {% if current_user.business_phone %}<div style='color: #6b7280; font-size: 13px;'>{{ current_user.business_phone }}</div>{% endif %}
+      <div style="font-weight: 600; color: #111827; font-size: 15px;">{{ business.name or current_user.email }}</div>
+      {% if business.address %}<div style='color: #6b7280; font-size: 13px; white-space: pre-line;'>{{ business.address }}</div>{% endif %}
+      {% if business.phone %}<div style='color: #6b7280; font-size: 13px;'>{{ business.phone }}</div>{% endif %}
     </div>
     <div class="party-section">
       <div class="party-label">Bill To</div>
@@ -79,13 +79,13 @@
     <div class="totals-table">
       <table style="margin:0;">
         <tr><td class="label">Subtotal</td><td class="value">{{ sym }}{{ '{:,.2f}'.format(invoice.subtotal) }}</td></tr>
-        <tr><td class="label">Tax ({{ '%.0f'|format(current_user.default_tax_rate * 100) }}%)</td><td class="value">{{ sym }}{{ '{:,.2f}'.format(invoice.tax_amount) }}</td></tr>
+        <tr><td class="label">Tax ({{ '%.0f'|format(business.default_tax_rate * 100) }}%)</td><td class="value">{{ sym }}{{ '{:,.2f}'.format(invoice.tax_amount) }}</td></tr>
         <tr class="total-row"><td class="label">Total</td><td class="value">{{ sym }}{{ '{:,.2f}'.format(invoice.total) }}</td></tr>
       </table>
     </div>
   </div>
 
-  {% if invoice.notes or current_user.invoice_note %}<div class='notes'><div class='notes-label'>Notes</div><div class='notes-text'>{{ invoice.notes or current_user.invoice_note or '' }}</div></div>{% endif %}
+  {% if invoice.notes or business.invoice_note %}<div class='notes'><div class='notes-label'>Notes</div><div class='notes-text'>{{ invoice.notes or business.invoice_note or '' }}</div></div>{% endif %}
 
   <div class="footer">Thank you for your business!</div>
 </body></html>

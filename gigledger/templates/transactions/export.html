@@ -42,7 +42,7 @@
   </div>
 
   <div class="summary-grid">
-    <div class="summary-card"><div class="label">Tax Rate</div><div class="value">{{ '%.0f'|format(current_user.default_tax_rate * 100) }}%</div></div>
+    <div class="summary-card"><div class="label">Tax Rate</div><div class="value">{{ '%.0f'|format(business.default_tax_rate * 100) }}%</div></div>
     <div class="summary-card"><div class="label">Tax Saving from Deductions</div><div class="value green">{{ sym }}{{ '{:,.2f}'.format(tax_saving) }}</div></div>
   </div>
 

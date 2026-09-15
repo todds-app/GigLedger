@@ -79,9 +79,9 @@
     // an income/else branch: the else is what used to turn inventory into
     // expense (see the piece 2 spec).
     var kindCategories = {
-        income: {{ current_user.get_income_categories() | tojson }},
-        expense: {{ current_user.get_expense_categories() | tojson }},
-        inventory: {{ current_user.get_inventory_categories() | tojson }}
+        income: {{ business.get_income_categories() | tojson }},
+        expense: {{ business.get_expense_categories() | tojson }},
+        inventory: {{ business.get_inventory_categories() | tojson }}
     };
     var inventoryGuidance = {{ inventory_guidance | tojson }};
 

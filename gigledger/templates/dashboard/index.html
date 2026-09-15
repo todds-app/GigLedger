@@ -370,8 +370,8 @@
     var qaDate = document.getElementById('qa_date');
     if (qaDate) qaDate.value = new Date().toISOString().split('T')[0];
 
-    var incomeCategories = {{ current_user.get_income_categories() | tojson }};
-    var expenseCategories = {{ current_user.get_expense_categories() | tojson }};
+    var incomeCategories = {{ business.get_income_categories() | tojson }};
+    var expenseCategories = {{ business.get_expense_categories() | tojson }};
     var taxRate = {{ tax_rate }};
     var currencySymbol = '{{ currency | currency_symbol }}';
 

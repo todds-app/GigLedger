@@ -95,7 +95,7 @@
         <div class="glass-card rounded-2xl px-4 py-3 text-center border border-green-200/50">
             <p class="text-xs text-green-500 font-semibold">Tax Saving</p>
             <p class="text-lg font-extrabold text-green-600">{{ currency | currency_symbol }}{{ tax_saving | money }}</p>
-            <p class="text-[10px] text-green-400 font-medium">at {{ (current_user.default_tax_rate * 100) | int }}%</p>
+            <p class="text-[10px] text-green-400 font-medium">at {{ (business.default_tax_rate * 100) | int }}%</p>
         </div>
         <div class="glass-card rounded-2xl px-4 py-3 text-center">
             <p class="text-xs text-gray-400 font-semibold">Net</p>
@@ -145,10 +145,10 @@
                         </td>
                         <td class="px-5 py-3.5 text-right whitespace-nowrap">
                             {% if tx.is_expense and tx.is_tax_deductible %}
-                            <span class="text-xs font-bold text-green-500">-{{ currency | currency_symbol }}{{ (tx.amount|abs * current_user.default_tax_rate) | money }}</span>
+                            <span class="text-xs font-bold text-green-500">-{{ currency | currency_symbol }}{{ (tx.amount|abs * business.default_tax_rate) | money }}</span>
                             <p class="text-[10px] text-gray-300">reduces tax</p>
                             {% elif tx.is_income %}
-                            <span class="text-xs font-bold text-amber-500">+{{ currency | currency_symbol }}{{ (tx.amount * current_user.default_tax_rate) | money }}</span>
+                            <span class="text-xs font-bold text-amber-500">+{{ currency | currency_symbol }}{{ (tx.amount * business.default_tax_rate) | money }}</span>
                             <p class="text-[10px] text-gray-300">adds to tax</p>
                             {% else %}
                             <span class="text-xs text-gray-300">-</span>
@@ -246,7 +246,7 @@
                 </div>
                 <div id="modal_tax_impact" class="hidden mt-2 p-3 bg-green-50/80 backdrop-blur border border-green-200 rounded-xl">
                     <p class="text-xs text-green-700 font-semibold">Tax savings: <span id="modal_tax_saving" class="font-extrabold">{{ currency | currency_symbol }}0.00</span></p>
-                    <p class="text-xs text-green-600 mt-1">Reduces your taxable income by <span id="modal_tax_pct">{{ (current_user.default_tax_rate * 100) | int }}</span>%</p>
+                    <p class="text-xs text-green-600 mt-1">Reduces your taxable income by <span id="modal_tax_pct">{{ (business.default_tax_rate * 100) | int }}</span>%</p>
                 </div>
             </div>
             <div class="flex gap-3 pt-2">
@@ -287,7 +287,7 @@
     var modalDate = document.getElementById('modal_date');
     if (modalDate) modalDate.value = new Date().toISOString().split('T')[0];
 
-    var taxRate = {{ current_user.default_tax_rate }};
+    var taxRate = {{ business.default_tax_rate }};
     var currencySymbol = '{{ currency | currency_symbol }}';
 
     function updateModalCategories() {

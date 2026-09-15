@@ -9,7 +9,7 @@ import pytest
 import gigledger.app
 from gigledger.app import create_app
 from gigledger.models import Business, User, db
-from tests.conftest import build_app
+from tests.conftest import build_app, login_as
 
 
 def test_business_get_returns_the_seeded_row(app):
@@ -141,3 +141,52 @@ def test_the_seed_creates_the_business_row(app):
     with app.app_context():
         assert Business.query.count() == 1
         assert Business.query.one().name == 'Demo Freelance Studio'
+
+
+def test_every_template_sees_the_business(admin_client, app):
+    with app.app_context():
+        Business.get().name = 'Dani Smith Design'
+        db.session.commit()
+    body = admin_client.get('/settings').get_data(as_text=True)
+    assert 'Dani Smith Design' in body
+
+
+def test_settings_edit_the_shared_business_row(admin_client, app):
+    admin_client.post('/settings/business', data={
+        'business_name': 'Dani Smith Design', 'business_address': 'Denver, CO',
+        'business_phone': '303', 'invoice_note': 'Thanks', 'invoice_prefix': 'DSD'})
+    admin_client.post('/settings/tax-rate', data={'tax_rate': '25'})
+    admin_client.post('/settings/currency', data={'currency': 'GBP'})
+    admin_client.post('/settings/categories/income/add', data={'category_name': 'Design Fee'})
+
+    with app.app_context():
+        business = Business.get()
+        assert business.name == 'Dani Smith Design'
+        assert business.invoice_prefix == 'DSD'
+        assert business.default_tax_rate == 0.25
+        assert business.currency == 'GBP'
+        assert 'Design Fee' in business.get_income_categories()
+
+
+def test_a_second_admin_sees_the_same_business_settings(admin_client, app):
+    admin_client.post('/settings/business', data={
+        'business_name': 'Shared Name', 'business_address': '', 'business_phone': '',
+        'invoice_note': '', 'invoice_prefix': 'INV'})
+    with app.app_context():
+        other = User(email='assistant@example.com', password_hash='x')
+        db.session.add(other)
+        db.session.commit()
+        other_id = other.id
+
+    body = login_as(app, other_id).get('/settings').get_data(as_text=True)
+    assert 'Shared Name' in body
+
+
+def test_theme_and_dark_mode_stay_personal(admin_client, app):
+    admin_client.post('/settings/dark-mode', data={'dark_mode': 'on'})
+    with app.app_context():
+        other = User(email='assistant@example.com', password_hash='x')
+        db.session.add(other)
+        db.session.commit()
+        assert User.query.get(1).dark_mode is True
+        assert bool(other.dark_mode) is False

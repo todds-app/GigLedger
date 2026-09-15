@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
-from ..models import (db, DEFAULT_INCOME_CATEGORIES, DEFAULT_EXPENSE_CATEGORIES,
+from ..models import (db, Business, DEFAULT_INCOME_CATEGORIES, DEFAULT_EXPENSE_CATEGORIES,
                       DEFAULT_INVENTORY_CATEGORIES)
 
 settings_bp = Blueprint('settings', __name__)
@@ -17,13 +17,14 @@ AVAILABLE_THEMES = {
 @settings_bp.route('/settings')
 @login_required
 def index():
+    business = Business.get()
     return render_template('settings/index.html', user=current_user,
-        tax_rate_percent=int(current_user.default_tax_rate * 100),
-        income_categories=current_user.get_income_categories(),
-        expense_categories=current_user.get_expense_categories(),
+        tax_rate_percent=int(business.default_tax_rate * 100),
+        income_categories=business.get_income_categories(),
+        expense_categories=business.get_expense_categories(),
         default_income_categories=DEFAULT_INCOME_CATEGORIES,
         default_expense_categories=DEFAULT_EXPENSE_CATEGORIES,
-        inventory_categories=current_user.get_inventory_categories(),
+        inventory_categories=business.get_inventory_categories(),
         default_inventory_categories=DEFAULT_INVENTORY_CATEGORIES,
         available_themes=AVAILABLE_THEMES,
         current_theme=current_user.theme or 'emerald',
@@ -36,7 +37,7 @@ def update_tax_rate():
     try:
         tax_rate = float(request.form.get('tax_rate', '30'))
         if tax_rate < 0 or tax_rate > 100: raise ValueError
-        current_user.default_tax_rate = tax_rate / 100.0
+        Business.get().default_tax_rate = tax_rate / 100.0
         db.session.commit()
         flash(f'Tax rate updated to {tax_rate}%. All calculations now use this rate.', 'success')
     except ValueError:
@@ -49,7 +50,7 @@ def update_tax_rate():
 def update_currency():
     currency = request.form.get('currency', 'USD')
     if currency in ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'INR', 'JPY']:
-        current_user.currency = currency
+        Business.get().currency = currency
         db.session.commit()
         flash(f'Currency updated to {currency}.', 'success')
     else:
@@ -67,9 +68,10 @@ CATEGORY_LISTS = {
 
 
 def _current(kind):
-    return {'income': current_user.get_income_categories,
-            'expense': current_user.get_expense_categories,
-            'inventory': current_user.get_inventory_categories}[kind]()
+    business = Business.get()
+    return {'income': business.get_income_categories,
+            'expense': business.get_expense_categories,
+            'inventory': business.get_inventory_categories}[kind]()
 
 
 def _add_category(kind):
@@ -80,7 +82,7 @@ def _add_category(kind):
     elif name in _current(kind):
         flash(f'Category "{name}" already exists.', 'error')
     else:
-        setattr(current_user, column, ','.join(_current(kind) + [name]))
+        setattr(Business.get(), column, ','.join(_current(kind) + [name]))
         db.session.commit()
         flash(f'{label} category "{name}" added!', 'success')
     return redirect(url_for('settings.index'))
@@ -95,7 +97,7 @@ def _delete_category(kind):
         flash('Default categories cannot be removed.', 'error')
     elif name in cats:
         cats.remove(name)
-        setattr(current_user, column, ','.join(cats) if cats else '')
+        setattr(Business.get(), column, ','.join(cats) if cats else '')
         db.session.commit()
         flash(f'{label} category "{name}" removed.', 'success')
     else:
@@ -165,9 +167,10 @@ def toggle_dark_mode():
 @settings_bp.route('/settings/categories/reset', methods=['POST'])
 @login_required
 def reset_categories():
-    current_user.custom_income_categories = ''
-    current_user.custom_expense_categories = ''
-    current_user.custom_inventory_categories = ''
+    business = Business.get()
+    business.custom_income_categories = ''
+    business.custom_expense_categories = ''
+    business.custom_inventory_categories = ''
     db.session.commit()
     flash('Categories reset to defaults.', 'success')
     return redirect(url_for('settings.index'))
@@ -176,11 +179,12 @@ def reset_categories():
 @settings_bp.route('/settings/business', methods=['POST'])
 @login_required
 def update_business():
-    current_user.business_name = request.form.get('business_name', '').strip()
-    current_user.business_address = request.form.get('business_address', '').strip()
-    current_user.business_phone = request.form.get('business_phone', '').strip()
-    current_user.invoice_note = request.form.get('invoice_note', '').strip()
-    current_user.invoice_prefix = request.form.get('invoice_prefix', 'INV').strip()
+    business = Business.get()
+    business.name = request.form.get('business_name', '').strip()
+    business.address = request.form.get('business_address', '').strip()
+    business.phone = request.form.get('business_phone', '').strip()
+    business.invoice_note = request.form.get('invoice_note', '').strip()
+    business.invoice_prefix = request.form.get('invoice_prefix', 'INV').strip()
     db.session.commit()
     flash('Business profile updated!', 'success')
     return redirect(url_for('settings.index'))
