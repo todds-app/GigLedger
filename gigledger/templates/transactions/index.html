@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Transactions - GigLedger{% endblock %}
 {% block content %}
+{% from 'transactions/_inventory_fields.html' import inventory_fields with context %}
 <div class="space-y-6">
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 fade-up relative z-50">
         <div>
@@ -42,6 +43,7 @@
                     <option value="">All</option>
                     <option value="income" {% if selected_type == 'income' %}selected{% endif %}>Income</option>
                     <option value="expense" {% if selected_type == 'expense' %}selected{% endif %}>Expense</option>
+                    <option value="inventory" {% if selected_type == 'inventory' %}selected{% endif %}>Inventory</option>
                 </select>
             </div>
             <div>
@@ -124,7 +126,7 @@
                         <td class="px-5 py-3.5 text-sm text-gray-500 whitespace-nowrap font-medium">{{ tx.date.strftime('%b %d, %Y') }}</td>
                         <td class="px-5 py-3.5 text-sm text-gray-800 font-semibold max-w-xs truncate">{{ tx.description or 'No description' }}</td>
                         <td class="px-5 py-3.5">
-                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold {% if tx.is_income %}bg-green-50 text-green-600{% else %}bg-gray-100/80 text-gray-600{% endif %}">
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold {% if tx.is_income %}bg-green-50 text-green-600{% elif tx.is_inventory %}bg-amber-50 text-amber-700{% else %}bg-gray-100/80 text-gray-600{% endif %}">
                                 {{ tx.category or 'Other' }}
                             </span>
                         </td>
@@ -154,7 +156,7 @@
                         </td>
                         <td class="px-5 py-3.5 text-center">
                             <div class="flex items-center justify-center gap-1">
-                                <button onclick="openEditModal({{ tx.id|tojson|forceescape }}, {{ (tx.amount|abs)|tojson|forceescape }}, {{ tx.kind|tojson|forceescape }}, {{ tx.date.strftime('%Y-%m-%d')|tojson|forceescape }}, {{ (tx.category or '')|tojson|forceescape }}, {{ (tx.description or '')|tojson|forceescape }}, {{ tx.is_tax_deductible|tojson|forceescape }})" class="text-gray-300 hover:text-brand-500 transition-all p-1 hover:scale-110" title="Edit">
+                                <button onclick="openEditModal({{ tx.id|tojson|forceescape }}, {{ (tx.amount|abs)|tojson|forceescape }}, {{ tx.kind|tojson|forceescape }}, {{ tx.date.strftime('%Y-%m-%d')|tojson|forceescape }}, {{ (tx.category or '')|tojson|forceescape }}, {{ (tx.description or '')|tojson|forceescape }}, {{ tx.is_tax_deductible|tojson|forceescape }}, {{ (tx.inventory_item.form_values if tx.inventory_item else none)|tojson|forceescape }})" class="text-gray-300 hover:text-brand-500 transition-all p-1 hover:scale-110" title="Edit">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                 </button>
                                 <form method="POST" action="{{ url_port('transactions.delete', id=tx.id) }}" onsubmit="return confirm('Delete this transaction?')" class="inline">
@@ -209,23 +211,29 @@
                         <input type="radio" name="type" value="expense" class="peer sr-only" onchange="updateModalCategories()">
                         <div class="text-center py-2.5 rounded-xl border-2 border-gray-200/80 peer-checked:border-red-400 peer-checked:bg-red-50/80 peer-checked:text-red-700 text-sm font-semibold transition-all">Expense</div>
                     </label>
+                    <label class="flex-1 cursor-pointer">
+                        <input type="radio" name="type" value="inventory" class="peer sr-only" onchange="updateModalCategories()">
+                        <div class="text-center py-2.5 rounded-xl border-2 border-gray-200/80 peer-checked:border-amber-400 peer-checked:bg-amber-50/80 peer-checked:text-amber-700 text-sm font-semibold transition-all">Inventory</div>
+                    </label>
                 </div>
             </div>
-            <div>
+            <div id="modal_amount_section">
                 <label class="block text-sm font-semibold text-gray-600 mb-1.5">Amount ({{ currency }})</label>
                 <div class="relative">
                     <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 font-medium">{{ currency | currency_symbol }}</span>
                     <input type="number" name="amount" id="modal_amount" step="0.01" min="0.01" required class="candy-input block w-full pl-7 pr-3 py-2.5 text-gray-900 focus:outline-none" placeholder="0.00">
                 </div>
             </div>
+            {{ inventory_fields('modal') }}
             <div>
                 <label class="block text-sm font-semibold text-gray-600 mb-1.5">Date</label>
                 <input type="date" name="date" id="modal_date" required class="candy-input block w-full px-3 py-2.5 text-gray-900 focus:outline-none">
             </div>
             <div>
                 <label class="block text-sm font-semibold text-gray-600 mb-1.5">Category</label>
-                <select name="category" id="modal_category" class="candy-input block w-full px-3 py-2.5 text-gray-900 focus:outline-none">
+                <select name="category" id="modal_category" class="candy-input block w-full px-3 py-2.5 text-gray-900 focus:outline-none" onchange="showGuidance('modal')">
                 </select>
+                <p id="modal_category_guidance" class="hidden text-xs text-gray-400 mt-1.5 leading-relaxed"></p>
             </div>
             <div>
                 <label class="block text-sm font-semibold text-gray-600 mb-1.5">Description</label>
@@ -233,8 +241,8 @@
             </div>
             <div id="modal_deductible_section" class="hidden">
                 <div class="flex items-center gap-2">
-                    <input type="checkbox" name="is_tax_deductible" id="m_ded" class="h-4 w-4 text-brand-600 border-gray-300 rounded focus:ring-brand-500" onchange="updateModalTaxImpact()">
-                    <label for="m_ded" class="text-sm font-medium text-gray-600">Tax deductible &#x1F4B0;</label>
+                    <input type="checkbox" name="is_tax_deductible" id="modal_ded" class="h-4 w-4 text-brand-600 border-gray-300 rounded focus:ring-brand-500" onchange="updateModalTaxImpact()">
+                    <label for="modal_ded" class="text-sm font-medium text-gray-600">Tax deductible &#x1F4B0;</label>
                 </div>
                 <div id="modal_tax_impact" class="hidden mt-2 p-3 bg-green-50/80 backdrop-blur border border-green-200 rounded-xl">
                     <p class="text-xs text-green-700 font-semibold">Tax savings: <span id="modal_tax_saving" class="font-extrabold">{{ currency | currency_symbol }}0.00</span></p>
@@ -249,65 +257,7 @@
     </div>
 </div>
 
-<!-- Edit Transaction Modal -->
-<div id="editModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
-    <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" onclick="document.getElementById('editModal').classList.add('hidden')"></div>
-    <div class="relative glass-card rounded-3xl p-7 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto" style="background:rgba(255,255,255,0.9)">
-        <div class="flex items-center justify-between mb-6">
-            <h2 class="text-lg font-extrabold text-gray-900">Edit Transaction &#x270F;&#xFE0F;</h2>
-            <button onclick="document.getElementById('editModal').classList.add('hidden')" class="text-gray-300 hover:text-gray-600 transition-colors p-1">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-        </div>
-        <form method="POST" id="editForm" class="space-y-4">
-            {{ csrf_field() }}
-            <input type="hidden" name="tx_id" id="edit_tx_id">
-            <div>
-                <label class="block text-sm font-semibold text-gray-600 mb-1.5">Type</label>
-                <div class="flex gap-2">
-                    <label class="flex-1 cursor-pointer">
-                        <input type="radio" name="type" value="income" class="peer sr-only" id="edit_type_income" onchange="updateEditCategories()">
-                        <div class="text-center py-2.5 rounded-xl border-2 border-gray-200/80 peer-checked:border-green-400 peer-checked:bg-green-50/80 peer-checked:text-green-700 text-sm font-semibold transition-all">Income</div>
-                    </label>
-                    <label class="flex-1 cursor-pointer">
-                        <input type="radio" name="type" value="expense" class="peer sr-only" id="edit_type_expense" onchange="updateEditCategories()">
-                        <div class="text-center py-2.5 rounded-xl border-2 border-gray-200/80 peer-checked:border-red-400 peer-checked:bg-red-50/80 peer-checked:text-red-700 text-sm font-semibold transition-all">Expense</div>
-                    </label>
-                </div>
-            </div>
-            <div>
-                <label class="block text-sm font-semibold text-gray-600 mb-1.5">Amount ({{ currency }})</label>
-                <div class="relative">
-                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 font-medium">{{ currency | currency_symbol }}</span>
-                    <input type="number" name="amount" id="edit_amount" step="0.01" min="0.01" required class="candy-input block w-full pl-7 pr-3 py-2.5 text-gray-900 focus:outline-none">
-                </div>
-            </div>
-            <div>
-                <label class="block text-sm font-semibold text-gray-600 mb-1.5">Date</label>
-                <input type="date" name="date" id="edit_date" required class="candy-input block w-full px-3 py-2.5 text-gray-900 focus:outline-none">
-            </div>
-            <div>
-                <label class="block text-sm font-semibold text-gray-600 mb-1.5">Category</label>
-                <select name="category" id="edit_category" class="candy-input block w-full px-3 py-2.5 text-gray-900 focus:outline-none">
-                </select>
-            </div>
-            <div>
-                <label class="block text-sm font-semibold text-gray-600 mb-1.5">Description</label>
-                <input type="text" name="description" id="edit_description" class="candy-input block w-full px-3 py-2.5 text-gray-900 focus:outline-none">
-            </div>
-            <div id="edit_deductible_section" class="hidden">
-                <div class="flex items-center gap-2">
-                    <input type="checkbox" name="is_tax_deductible" id="edit_ded" class="h-4 w-4 text-brand-600 border-gray-300 rounded focus:ring-brand-500">
-                    <label for="edit_ded" class="text-sm font-medium text-gray-600">Tax deductible &#x1F4B0;</label>
-                </div>
-            </div>
-            <div class="flex gap-3 pt-2">
-                <button type="button" onclick="document.getElementById('editModal').classList.add('hidden')" class="flex-1 py-3 px-4 glass-card rounded-xl text-sm font-semibold text-gray-600 hover:bg-white/80 transition-all">Cancel</button>
-                <button type="submit" class="candy-btn flex-1 py-3 px-4 text-sm">Save Changes</button>
-            </div>
-        </form>
-    </div>
-</div>
+{% include 'transactions/_edit_modal.html' %}
 {% endblock %}
 
 {% block scripts %}
@@ -337,25 +287,17 @@
     var modalDate = document.getElementById('modal_date');
     if (modalDate) modalDate.value = new Date().toISOString().split('T')[0];
 
-    var incomeCategories = {{ current_user.get_income_categories() | tojson }};
-    var expenseCategories = {{ current_user.get_expense_categories() | tojson }};
     var taxRate = {{ current_user.default_tax_rate }};
     var currencySymbol = '{{ currency | currency_symbol }}';
 
     function updateModalCategories() {
-        var type = document.querySelector('#modalForm input[name="type"]:checked').value;
-        var select = document.getElementById('modal_category');
-        var dedSection = document.getElementById('modal_deductible_section');
-        var cats = type === 'income' ? incomeCategories : expenseCategories;
-        select.innerHTML = '';
-        cats.forEach(function(cat) { var opt = document.createElement('option'); opt.value = cat; opt.textContent = cat; select.appendChild(opt); });
-        if (type === 'expense') { dedSection.classList.remove('hidden'); }
-        else { dedSection.classList.add('hidden'); document.getElementById('m_ded').checked = false; document.getElementById('modal_tax_impact').classList.add('hidden'); }
+        applyKind('modal', checkedKind('modal'));
+        document.getElementById('modal_tax_impact').classList.add('hidden');
         updateModalTaxImpact();
     }
 
     function updateModalTaxImpact() {
-        var dedChecked = document.getElementById('m_ded').checked;
+        var dedChecked = document.getElementById('modal_ded').checked;
         var amountInput = document.getElementById('modal_amount');
         var impactDiv = document.getElementById('modal_tax_impact');
         var savingSpan = document.getElementById('modal_tax_saving');
@@ -369,54 +311,5 @@
 
     document.getElementById('modal_amount').addEventListener('input', updateModalTaxImpact);
     updateModalCategories();
-
-    // Edit modal functions
-    function openEditModal(id, amount, type, date, category, description, deductible) {
-        document.getElementById('edit_tx_id').value = id;
-        document.getElementById('edit_amount').value = amount;
-        document.getElementById('edit_date').value = date;
-        document.getElementById('edit_description').value = description;
-
-        // Set type
-        if (type === 'income') {
-            document.getElementById('edit_type_income').checked = true;
-        } else {
-            document.getElementById('edit_type_expense').checked = true;
-        }
-
-        // Update categories and set selected
-        updateEditCategories(category);
-
-        // Deductible
-        if (type === 'expense') {
-            document.getElementById('edit_deductible_section').classList.remove('hidden');
-            document.getElementById('edit_ded').checked = deductible;
-        } else {
-            document.getElementById('edit_deductible_section').classList.add('hidden');
-            document.getElementById('edit_ded').checked = false;
-        }
-
-        // Set form action
-        document.getElementById('editForm').action = '{{ url_port("transactions.edit", id=0) }}'.replace('/0', '/' + id);
-
-        document.getElementById('editModal').classList.remove('hidden');
-    }
-
-    function updateEditCategories(selectedCat) {
-        var type = document.querySelector('#editForm input[name="type"]:checked').value;
-        var select = document.getElementById('edit_category');
-        var dedSection = document.getElementById('edit_deductible_section');
-        var cats = type === 'income' ? incomeCategories : expenseCategories;
-        select.innerHTML = '';
-        cats.forEach(function(cat) {
-            var opt = document.createElement('option');
-            opt.value = cat;
-            opt.textContent = cat;
-            if (cat === selectedCat) opt.selected = true;
-            select.appendChild(opt);
-        });
-        if (type === 'expense') { dedSection.classList.remove('hidden'); }
-        else { dedSection.classList.add('hidden'); document.getElementById('edit_ded').checked = false; }
-    }
 </script>
 {% endblock %}

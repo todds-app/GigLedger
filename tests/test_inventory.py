@@ -363,6 +363,45 @@ def test_deleting_an_inventory_purchase_through_the_route_removes_the_item(app):
 
 # --- Monthly commitment ------------------------------------------------------
 
+# --- The transactions page ---------------------------------------------------
+
+def test_the_type_filter_offers_inventory_and_filters_by_it(app):
+    purchase(app)
+    client = authenticated_client(app)
+    page = client.get('/transactions').get_data(as_text=True)
+    assert 'value="inventory"' in page  # the filter option and the radios
+    filtered = client.get('/transactions?type=inventory').get_data(as_text=True)
+    assert 'Sectional sofa' in filtered
+    assert '1 transaction found' in filtered
+
+
+def test_the_add_modal_offers_inventory_with_the_item_fields(app):
+    page = authenticated_client(app).get('/transactions').get_data(as_text=True)
+    for field in ('name="quantity"', 'name="unit_cost"', 'name="is_consumable"',
+                  'name="project_id"', 'General Inventory'):
+        assert field in page
+    # The filter dropdown (autoescaped HTML) and the modal's JS (Flask's
+    # tojson escapes & as &) both carry the inventory categories.
+    assert 'Casegoods &amp; Storage' in page
+    assert 'Casegoods \\u0026 Storage' in page
+
+
+def test_the_edit_button_carries_the_item_for_an_inventory_row(app):
+    purchase(app, quantity=2, unit_cost=490.0)
+    page = authenticated_client(app).get('/transactions').get_data(as_text=True)
+    # tojson|forceescape turns the quotes into &#34;
+    assert '&#34;quantity&#34;: 2' in page
+    assert '&#34;unit_cost&#34;: 490' in page
+
+
+def test_the_html_export_shows_the_type_column(app):
+    purchase(app)
+    body = authenticated_client(app).get(
+        '/transactions/export/pdf').get_data(as_text=True)
+    assert '<th>Type</th>' in body
+    assert '<td>Inventory</td>' in body
+
+
 def test_monthly_commitment_counts_a_recurring_inventory_order(app):
     """A commitment is an obligation to pay, not a P&L category. Decided in
     the piece 2 spec; ADR-0010 lists it as the third kind-blind figure."""

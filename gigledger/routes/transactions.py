@@ -122,7 +122,8 @@ def list_transactions():
         currency=current_user.currency,
         user_categories=current_user.get_all_categories(),
         total_income=total_income, total_expenses=total_expenses,
-        total_deductible=total_deductible, net=net, tax_saving=tax_saving)
+        total_deductible=total_deductible, net=net, tax_saving=tax_saving,
+        projects=Project.query.filter_by(user_id=uid).order_by(Project.name).all())
 
 
 @transactions_bp.route('/transactions/add', methods=['POST'])

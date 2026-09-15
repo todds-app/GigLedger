@@ -145,7 +145,9 @@ def create_app():
                 return f"{url}{sep}XTransformPort={port}"
             return url
 
-        return {'xport': port, 'url_port': url_port, 'currency_symbols': CURRENCY_SYMBOLS}
+        from .models import INVENTORY_CATEGORY_GUIDANCE
+        return {'xport': port, 'url_port': url_port, 'currency_symbols': CURRENCY_SYMBOLS,
+                'inventory_guidance': INVENTORY_CATEGORY_GUIDANCE}
 
     # Register blueprints
     from .routes.auth import auth_bp
