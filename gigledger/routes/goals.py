@@ -2,7 +2,7 @@ import re
 from datetime import datetime
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
-from ..models import Goal, db
+from ..models import Goal, Business, db
 
 goals_bp = Blueprint('goals', __name__, url_prefix='/goals')
 
@@ -27,7 +27,7 @@ def clean_color(value, fallback=DEFAULT_COLOR):
 @goals_bp.route('/')
 @login_required
 def index():
-    goals = Goal.query.filter_by(user_id=current_user.id).order_by(Goal.is_completed, Goal.deadline.asc().nullslast(), Goal.created_at.desc()).all()
+    goals = Goal.query.order_by(Goal.is_completed, Goal.deadline.asc().nullslast(), Goal.created_at.desc()).all()
 
     total_saved = sum(g.current_amount for g in goals if not g.is_completed)
     completed_count = sum(1 for g in goals if g.is_completed)
@@ -36,7 +36,7 @@ def index():
         goals=goals,
         total_saved=total_saved,
         completed_count=completed_count,
-        currency=current_user.currency,
+        currency=Business.get().currency,
         now=datetime.now())
 
 
@@ -87,7 +87,7 @@ def add():
 @goals_bp.route('/update/<int:id>', methods=['POST'])
 @login_required
 def update(id):
-    goal = Goal.query.filter_by(id=id, user_id=current_user.id).first()
+    goal = Goal.query.filter_by(id=id).first()
     if not goal:
         flash('Goal not found.', 'error')
         return redirect(url_for('goals.index'))
@@ -107,7 +107,7 @@ def update(id):
         goal.is_completed = True
         flash(f'Goal "{goal.name}" completed! Congratulations!', 'success')
     else:
-        flash(f'Added {currency_symbol(current_user.currency)}{amount:,.2f} to "{goal.name}".', 'success')
+        flash(f'Added {currency_symbol(Business.get().currency)}{amount:,.2f} to "{goal.name}".', 'success')
 
     db.session.commit()
     return redirect(url_for('goals.index'))
@@ -116,7 +116,7 @@ def update(id):
 @goals_bp.route('/edit/<int:id>', methods=['POST'])
 @login_required
 def edit(id):
-    goal = Goal.query.filter_by(id=id, user_id=current_user.id).first()
+    goal = Goal.query.filter_by(id=id).first()
     if not goal:
         flash('Goal not found.', 'error')
         return redirect(url_for('goals.index'))
@@ -159,7 +159,7 @@ def edit(id):
 @goals_bp.route('/delete/<int:id>', methods=['POST'])
 @login_required
 def delete(id):
-    goal = Goal.query.filter_by(id=id, user_id=current_user.id).first()
+    goal = Goal.query.filter_by(id=id).first()
     if goal:
         name = goal.name
         db.session.delete(goal)
@@ -173,7 +173,7 @@ def delete(id):
 @goals_bp.route('/complete/<int:id>', methods=['POST'])
 @login_required
 def complete(id):
-    goal = Goal.query.filter_by(id=id, user_id=current_user.id).first()
+    goal = Goal.query.filter_by(id=id).first()
     if not goal:
         flash('Goal not found.', 'error')
         return redirect(url_for('goals.index'))

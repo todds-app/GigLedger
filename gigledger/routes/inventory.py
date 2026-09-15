@@ -5,8 +5,8 @@ authorisation path and this page cannot drift from the ledger. Movements,
 quantity remaining and cost recognition are piece 3.
 """
 from flask import Blueprint, render_template, request
-from flask_login import login_required, current_user
-from ..models import InventoryItem, Transaction, Project
+from flask_login import login_required
+from ..models import InventoryItem, Transaction, Project, Business
 
 inventory_bp = Blueprint('inventory', __name__, url_prefix='/inventory')
 
@@ -31,8 +31,8 @@ def _filtered(items, args):
 @inventory_bp.route('/')
 @login_required
 def index():
-    uid = current_user.id
-    everything = (InventoryItem.query.filter_by(user_id=uid)
+    business = Business.get()
+    everything = (InventoryItem.query
                   .join(InventoryItem.transaction)
                   .order_by(Transaction.date.desc()).all())
 
@@ -44,8 +44,8 @@ def index():
         items=_filtered(everything, request.args),
         asset_value=asset_value, on_hand=on_hand,
         on_projects=asset_value - on_hand,
-        projects=Project.query.filter_by(user_id=uid).order_by(Project.name).all(),
-        categories=sorted(current_user.get_inventory_categories()),
+        projects=Project.query.order_by(Project.name).all(),
+        categories=sorted(business.get_inventory_categories()),
         selected_project=request.args.get('project', ''),
         selected_category=request.args.get('category', ''),
-        currency=current_user.currency)
+        currency=business.currency)

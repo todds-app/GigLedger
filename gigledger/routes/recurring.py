@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
-from ..models import (RecurringTransaction, Transaction, db, clean_kind,
+from ..models import (RecurringTransaction, Transaction, Business, db, clean_kind,
                       EXPENSE, INCOME, INVENTORY)
 
 recurring_bp = Blueprint('recurring', __name__, url_prefix='/recurring')
@@ -37,7 +37,8 @@ def _calculate_next_date(from_date, frequency, day_of_month=1):
 @recurring_bp.route('/')
 @login_required
 def index():
-    recurring = RecurringTransaction.query.filter_by(user_id=current_user.id).order_by(
+    business = Business.get()
+    recurring = RecurringTransaction.query.order_by(
         RecurringTransaction.is_active.desc(), RecurringTransaction.next_date.asc().nullslast(),
         RecurringTransaction.created_at.desc()).all()
 
@@ -51,8 +52,8 @@ def index():
         recurring=recurring,
         monthly_commitments=monthly_commitments,
         active_count=active_count,
-        currency=current_user.currency,
-        user_categories=current_user.get_all_categories(kinds={INCOME, EXPENSE}),
+        currency=business.currency,
+        user_categories=business.get_all_categories(kinds={INCOME, EXPENSE}),
         now=datetime.now())
 
 
@@ -128,7 +129,7 @@ def add():
 @recurring_bp.route('/edit/<int:id>', methods=['POST'])
 @login_required
 def edit(id):
-    rt = RecurringTransaction.query.filter_by(id=id, user_id=current_user.id).first()
+    rt = RecurringTransaction.query.filter_by(id=id).first()
     if not rt:
         flash('Recurring transaction not found.', 'error')
         return redirect(url_for('recurring.index'))
@@ -176,7 +177,7 @@ def edit(id):
 @recurring_bp.route('/toggle/<int:id>', methods=['POST'])
 @login_required
 def toggle(id):
-    rt = RecurringTransaction.query.filter_by(id=id, user_id=current_user.id).first()
+    rt = RecurringTransaction.query.filter_by(id=id).first()
     if not rt:
         flash('Recurring transaction not found.', 'error')
         return redirect(url_for('recurring.index'))
@@ -204,7 +205,7 @@ def toggle(id):
 @recurring_bp.route('/delete/<int:id>', methods=['POST'])
 @login_required
 def delete(id):
-    rt = RecurringTransaction.query.filter_by(id=id, user_id=current_user.id).first()
+    rt = RecurringTransaction.query.filter_by(id=id).first()
     if rt:
         name = rt.description
         db.session.delete(rt)
@@ -220,8 +221,7 @@ def delete(id):
 def generate():
     """Manually generate pending recurring transactions."""
     now = datetime.now()
-    active_recurring = RecurringTransaction.query.filter_by(
-        user_id=current_user.id, is_active=True).all()
+    active_recurring = RecurringTransaction.query.filter_by(is_active=True).all()
 
     generated = 0
     for rt in active_recurring:

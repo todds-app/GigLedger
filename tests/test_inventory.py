@@ -223,7 +223,9 @@ def test_a_non_positive_or_missing_quantity_or_unit_cost_is_refused(app, bad):
         assert Transaction.query.filter_by(description='Sectional sofa').count() == 0
 
 
-def test_another_users_project_is_refused(app):
+def test_a_project_created_by_another_admin_is_accepted(app):
+    """Every admin works the same books (ADR-0014): a project one of them
+    created is available to all of them."""
     with app.app_context():
         other = User(email='other@example.com', password_hash='x')
         db.session.add(other)
@@ -234,7 +236,8 @@ def test_another_users_project_is_refused(app):
         pid = theirs.id
     add_purchase(authenticated_client(app), project_id=str(pid))
     with app.app_context():
-        assert Transaction.query.filter_by(description='Sectional sofa').count() == 0
+        tx = Transaction.query.filter_by(description='Sectional sofa').one()
+        assert tx.inventory_item.project_id == pid
 
 
 @pytest.mark.parametrize('kind,posted,stored', [
@@ -476,7 +479,7 @@ def test_the_inventory_page_filters_by_project_and_category(pool):
     assert '$1,350.00' in lighting
 
 
-def test_the_inventory_page_shows_only_the_current_users_items(pool):
+def test_the_inventory_page_shows_items_entered_by_every_admin(pool):
     app, _, _ = pool
     with app.app_context():
         other = User(email='other@example.com', password_hash='x')
@@ -490,8 +493,10 @@ def test_the_inventory_page_shows_only_the_current_users_items(pool):
         db.session.add(tx)
         db.session.commit()
     page = authenticated_client(app).get('/inventory/').get_data(as_text=True)
-    assert 'Theirs' not in page
-    assert '$1,350.00' in page
+    assert 'Theirs' in page
+    # The pool's own $1,350 (980 + 220 + 150) plus their $999 item: the total
+    # now counts every admin's purchases, not just the signed-in one's.
+    assert '$2,349.00' in page
 
 
 def test_the_inventory_page_has_an_empty_state_and_the_edit_modal(app):
