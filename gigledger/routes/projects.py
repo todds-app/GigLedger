@@ -9,7 +9,7 @@ from flask import (Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
 from .. import documents
 from ..models import (Project, Client, ProjectDocument, DocumentShare,
-                      Transaction, db, INCOME)
+                      Transaction, InventoryItem, db, INCOME)
 
 projects_bp = Blueprint('projects', __name__, url_prefix='/projects')
 
@@ -279,8 +279,13 @@ def _owned_document(doc_id):
 @login_required
 def detail(id):
     project = _owned_project(id)
+    inventory_items = (InventoryItem.query.filter_by(project_id=project.id)
+                       .join(InventoryItem.transaction)
+                       .order_by(Transaction.date.desc()).all())
     return render_template('projects/detail.html',
         project=project,
+        inventory_items=inventory_items,
+        inventory_total=sum(i.total_cost for i in inventory_items),
         documents=ProjectDocument.query.filter_by(project_id=project.id)
                                        .order_by(ProjectDocument.created_at.desc()).all(),
         clients=Client.query.filter_by(user_id=current_user.id, is_active=True)

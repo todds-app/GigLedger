@@ -495,3 +495,20 @@ def test_the_inventory_page_has_an_empty_state_and_the_edit_modal(app):
 def test_the_nav_links_to_inventory(app):
     page = authenticated_client(app).get('/transactions').get_data(as_text=True)
     assert 'href="/inventory/"' in page
+
+
+# --- Project detail ----------------------------------------------------------
+
+def test_project_detail_lists_the_items_bought_for_it(pool):
+    app, pid, _ = pool
+    page = authenticated_client(app).get(f'/projects/{pid}').get_data(as_text=True)
+    assert 'Throw pillows' in page
+    assert 'Sectional sofa' not in page
+    assert '$150.00' in page
+
+
+def test_project_detail_without_items_says_so_in_one_line(app):
+    with app.app_context():
+        pid = Project.query.filter_by(user_id=demo_user_id(app)).first().id
+    page = authenticated_client(app).get(f'/projects/{pid}').get_data(as_text=True)
+    assert 'No inventory bought for this project' in page

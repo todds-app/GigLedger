@@ -136,6 +136,33 @@
         </div>
         {% endif %}
     </div>
+
+    <!-- Inventory -->
+    <div class="glass-card p-5 fade-up fade-up-delay-4">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm font-bold text-gray-400 uppercase tracking-wider">Inventory</h2>
+            {% if inventory_items %}<span class="text-sm font-extrabold text-amber-600">{{ currency | currency_symbol }}{{ inventory_total | money }}</span>{% endif %}
+        </div>
+        {% if inventory_items %}
+        <div class="divide-y divide-gray-100/50">
+            {% for item in inventory_items %}
+            <div class="flex items-center justify-between py-2.5 gap-3">
+                <div class="min-w-0">
+                    <p class="text-sm font-semibold text-gray-800 truncate">{{ item.transaction.description or 'No description' }}</p>
+                    <p class="text-xs text-gray-400">{{ item.transaction.date.strftime('%b %d, %Y') }} &middot; {{ item.transaction.category or 'Other' }} &middot; {{ item.usage_label }}</p>
+                </div>
+                <div class="text-right whitespace-nowrap">
+                    <p class="text-sm font-bold text-gray-800">{{ currency | currency_symbol }}{{ item.total_cost | money }}</p>
+                    <p class="text-xs text-gray-400">{{ item.quantity | decimal1 }} &times; {{ currency | currency_symbol }}{{ item.unit_cost | money }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <p class="text-[11px] text-gray-400 mt-3">Assets bought for this project. Not yet a project cost - that arrives when items are used.</p>
+        {% else %}
+        <p class="text-sm text-gray-400">No inventory bought for this project.</p>
+        {% endif %}
+    </div>
 </div>
 
 <!-- Upload modal -->
