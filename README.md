@@ -121,6 +121,7 @@ No more setting aside random percentages. No more spreadsheet gymnastics. Just c
 - **Documents grouped by who shared them** — One login shows every freelancer's documents, never as one undifferentiated list
 - **Project name only** — Clients see the project a document belongs to, never its rate, hours or internal description
 - **Off switch** — `PORTAL_ENABLED=0` removes the portal routes entirely
+- **Demo seed is opt-in** — `SEED_DEMO=1` seeds the demo business and `demo@gigledger.com` on an empty database; without it a fresh install starts at `/setup`
 
 > **Clients are not users.** Portal sessions live outside Flask-Login on purpose:
 > `current_user` means *freelancer* everywhere in this app, and ~40 routes filter

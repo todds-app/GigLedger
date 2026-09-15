@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign Up - GigLedger</title>
+    <title>Set up - GigLedger</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script>
+        // Read theme from localStorage (set by the main app)
         var savedTheme = localStorage.getItem('fc_theme') || 'emerald';
         var isDark = localStorage.getItem('fc_dark') === 'true';
         var THEMES = {
@@ -66,9 +67,9 @@
             100% { background-position: 0% 50%; }
         }
         .blob { position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.3; pointer-events: none; animation: blobFloat 8s ease-in-out infinite; }
-        .blob-1 { width: 300px; height: 300px; background: var(--brand-200); top: -80px; left: -50px; clip-path: inset(0); }
-        .blob-2 { width: 250px; height: 250px; background: #fde68a; bottom: -60px; right: -40px; animation-delay: -3s; clip-path: inset(0); }
-        .blob-3 { width: 200px; height: 200px; background: #fda4af; top: 40%; right: 20%; animation-delay: -5s; }
+        .blob-1 { width: 300px; height: 300px; background: var(--brand-200); top: -80px; right: -50px; clip-path: inset(0); }
+        .blob-2 { width: 250px; height: 250px; background: #fde68a; bottom: -60px; left: -40px; animation-delay: -3s; clip-path: inset(0); }
+        .blob-3 { width: 200px; height: 200px; background: #c4b5fd; top: 50%; left: 50%; animation-delay: -5s; }
         [data-dark="true"] .blob { opacity: 0.15; }
         @keyframes blobFloat {
             0%, 100% { transform: translate(0, 0) scale(1); }
@@ -132,7 +133,6 @@
         [data-dark="true"] body { color: var(--text-primary); }
         [data-dark="true"] .text-gray-500 { color: #94a3b8 !important; }
         [data-dark="true"] .text-gray-700 { color: #cbd5e1 !important; }
-        [data-dark="true"] .text-gray-400 { color: #64748b !important; }
         [data-dark="true"] .bg-green-50\/80 { background: rgba(6,78,59,0.4) !important; }
         [data-dark="true"] .bg-red-50\/80 { background: rgba(127,29,29,0.4) !important; }
         [data-dark="true"] .bg-blue-50\/80 { background: rgba(30,58,138,0.4) !important; }
@@ -142,8 +142,9 @@
         [data-dark="true"] .border-green-200 { border-color: rgba(22,163,74,0.3) !important; }
         [data-dark="true"] .border-red-200 { border-color: rgba(220,38,38,0.3) !important; }
         [data-dark="true"] .border-blue-200 { border-color: rgba(59,130,246,0.3) !important; }
-        [data-dark="true"] .border-gray-200\/50 { border-color: rgba(51,65,85,0.3) !important; }
-        [data-dark="true"] .bg-white\/50 { background: rgba(30,41,59,0.5) !important; }
+        [data-dark="true"] .bg-brand-50 { background: rgba(139,92,246,0.15) !important; }
+        [data-dark="true"] .text-brand-700 { color: var(--brand-300) !important; }
+        [data-dark="true"] .text-brand-600 { color: var(--brand-400) !important; }
     </style>
 </head>
 <body class="h-full candy-bg">
@@ -153,12 +154,13 @@
         <div class="blob blob-3"></div>
 
         <div class="max-w-md w-full space-y-8 relative z-10">
+            <!-- Logo -->
             <div class="text-center fade-up">
                 <div class="mx-auto w-16 h-16 bg-gradient-to-br from-brand-400 to-brand-600 rounded-3xl flex items-center justify-center shadow-xl shadow-brand-200/50 logo-float">
                     <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 </div>
-                <h2 class="mt-6 text-3xl font-extrabold bg-gradient-to-r from-brand-600 to-brand-800 bg-clip-text text-transparent">Join the crew</h2>
-                <p class="mt-2 text-sm text-gray-500 font-medium">Start tracking your freelance finances &#x1f680;</p>
+                <h2 class="mt-6 text-3xl font-extrabold bg-gradient-to-r from-brand-600 to-brand-800 bg-clip-text text-transparent">GigLedger</h2>
+                <p class="mt-2 text-sm text-gray-500 font-medium">Your money, your rules &#x2728;</p>
             </div>
 
             {% with messages = get_flashed_messages(with_categories=true) %}
@@ -171,31 +173,36 @@
                 {% endif %}
             {% endwith %}
 
+            <!-- Setup Form Card -->
             <div class="glass-card rounded-3xl p-8 shadow-xl fade-up" style="animation-delay: 0.1s">
-                <form class="space-y-5" method="POST" action="{{ url_port('auth.signup') }}">
+                <h1 class="text-xl font-bold text-gray-900 mb-1">Set up your business</h1>
+                <p class="text-sm text-gray-500 mb-6">This creates the first admin account. More admins can be invited from Settings.</p>
+                <form class="space-y-5" method="POST" action="{{ url_port('team.setup') }}">
                     {{ csrf_field() }}
+                    <div>
+                        <label for="business_name" class="block text-sm font-semibold text-gray-700 mb-1.5">Business name</label>
+                        <input id="business_name" name="business_name" type="text" required class="candy-input block w-full px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none" placeholder="Your business name">
+                    </div>
                     <div>
                         <label for="email" class="block text-sm font-semibold text-gray-700 mb-1.5">Email address</label>
                         <input id="email" name="email" type="email" required class="candy-input block w-full px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none" placeholder="you@example.com">
                     </div>
                     <div>
                         <label for="password" class="block text-sm font-semibold text-gray-700 mb-1.5">Password</label>
-                        <input id="password" name="password" type="password" required minlength="6" class="candy-input block w-full px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none" placeholder="At least 6 characters">
+                        <input id="password" name="password" type="password" required minlength="12" class="candy-input block w-full px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none" placeholder="At least 12 characters">
                     </div>
                     <div>
-                        <label for="confirm_password" class="block text-sm font-semibold text-gray-700 mb-1.5">Confirm Password</label>
-                        <input id="confirm_password" name="confirm_password" type="password" required minlength="6" class="candy-input block w-full px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none" placeholder="Repeat your password">
+                        <label for="confirm_password" class="block text-sm font-semibold text-gray-700 mb-1.5">Confirm password</label>
+                        <input id="confirm_password" name="confirm_password" type="password" required class="candy-input block w-full px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none" placeholder="Type it again">
                     </div>
-                    <div>
-                        <label for="tax_rate" class="block text-sm font-semibold text-gray-700 mb-1.5">Default Tax Rate (%) <span class="text-gray-400 font-normal ml-1">optional, default 30%</span></label>
-                        <input id="tax_rate" name="tax_rate" type="number" min="0" max="100" value="30" class="candy-input block w-full px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none">
-                    </div>
-                    <button type="submit" class="candy-btn w-full py-3.5 px-4 text-sm">Create Account &#x2192;</button>
+                    <button type="submit" class="candy-btn w-full py-3.5 px-4 text-sm">Create account &#x2192;</button>
                 </form>
             </div>
-
-            <p class="text-center text-sm text-gray-500 fade-up" style="animation-delay: 0.2s">Already have an account? <a href="{{ url_port('auth.login') }}" class="font-semibold text-brand-600 hover:text-brand-500 transition-colors">Sign in</a></p>
         </div>
     </div>
+    <script>
+        // Save theme preferences when user is in the app
+        // The main app will set these; auth pages just read them
+    </script>
 </body>
 </html>

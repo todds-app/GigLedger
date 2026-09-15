@@ -163,8 +163,10 @@ def create_app():
     from .routes.goals import goals_bp
     from .routes.recurring import recurring_bp
     from .routes.inventory import inventory_bp
+    from .routes.team import team_bp
 
     app.register_blueprint(auth_bp)
+    app.register_blueprint(team_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(transactions_bp)
     app.register_blueprint(taxes_bp)
