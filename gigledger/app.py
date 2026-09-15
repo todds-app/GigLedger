@@ -181,8 +181,8 @@ def create_app():
         app.register_blueprint(portal_bp)
 
     with app.app_context():
-        _migrate_db(db)
         db.create_all()
+        _migrate_db(db)
         _seed_demo_data()
 
     return app
@@ -197,78 +197,66 @@ def _migrate_db(db):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    # Check existing columns in users table (only if table exists)
+    # Check existing columns in users table
     cursor.execute("PRAGMA table_info(users)")
     existing_columns = {row[1] for row in cursor.fetchall()}
 
-    # Migrate users table only if it exists
-    if existing_columns:
-        if 'default_tax_rate' not in existing_columns:
-            cursor.execute("ALTER TABLE users ADD COLUMN default_tax_rate FLOAT DEFAULT 0.30")
-        if 'currency' not in existing_columns:
-            cursor.execute("ALTER TABLE users ADD COLUMN currency VARCHAR(3) DEFAULT 'USD'")
-        if 'custom_income_categories' not in existing_columns:
-            cursor.execute("ALTER TABLE users ADD COLUMN custom_income_categories TEXT DEFAULT ''")
-        if 'custom_expense_categories' not in existing_columns:
-            cursor.execute("ALTER TABLE users ADD COLUMN custom_expense_categories TEXT DEFAULT ''")
-        if 'custom_inventory_categories' not in existing_columns:
-            cursor.execute("ALTER TABLE users ADD COLUMN custom_inventory_categories TEXT DEFAULT ''")
-        if 'theme' not in existing_columns:
-            cursor.execute("ALTER TABLE users ADD COLUMN theme VARCHAR(20) DEFAULT 'emerald'")
-        if 'dark_mode' not in existing_columns:
-            cursor.execute("ALTER TABLE users ADD COLUMN dark_mode BOOLEAN DEFAULT 0")
-        if 'business_name' not in existing_columns:
-            cursor.execute("ALTER TABLE users ADD COLUMN business_name VARCHAR(200) DEFAULT ''")
-        if 'business_address' not in existing_columns:
-            cursor.execute("ALTER TABLE users ADD COLUMN business_address TEXT DEFAULT ''")
-        if 'business_phone' not in existing_columns:
-            cursor.execute("ALTER TABLE users ADD COLUMN business_phone VARCHAR(50) DEFAULT ''")
-        if 'invoice_note' not in existing_columns:
-            cursor.execute("ALTER TABLE users ADD COLUMN invoice_note TEXT DEFAULT 'Thank you for your business!'")
-        if 'invoice_prefix' not in existing_columns:
-            cursor.execute("ALTER TABLE users ADD COLUMN invoice_prefix VARCHAR(10) DEFAULT 'INV'")
-        if 'next_invoice_number' not in existing_columns:
-            cursor.execute("ALTER TABLE users ADD COLUMN next_invoice_number INTEGER DEFAULT 1")
-        if 'created_at' not in existing_columns:
-            cursor.execute("ALTER TABLE users ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP")
+    if 'custom_income_categories' not in existing_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN custom_income_categories TEXT DEFAULT ''")
+    if 'custom_expense_categories' not in existing_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN custom_expense_categories TEXT DEFAULT ''")
+    if 'custom_inventory_categories' not in existing_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN custom_inventory_categories TEXT DEFAULT ''")
+    if 'theme' not in existing_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN theme VARCHAR(20) DEFAULT 'emerald'")
+    if 'dark_mode' not in existing_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN dark_mode BOOLEAN DEFAULT 0")
+    if 'business_name' not in existing_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN business_name VARCHAR(200) DEFAULT ''")
+    if 'business_address' not in existing_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN business_address TEXT DEFAULT ''")
+    if 'business_phone' not in existing_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN business_phone VARCHAR(50) DEFAULT ''")
+    if 'invoice_note' not in existing_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN invoice_note TEXT DEFAULT 'Thank you for your business!'")
+    if 'invoice_prefix' not in existing_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN invoice_prefix VARCHAR(10) DEFAULT 'INV'")
+    if 'next_invoice_number' not in existing_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN next_invoice_number INTEGER DEFAULT 1")
 
-    # Migrate transactions table (only if it exists)
+    # Migrate transactions table
     cursor.execute("PRAGMA table_info(transactions)")
     tx_columns = {row[1] for row in cursor.fetchall()}
-    if tx_columns:  # Only migrate if table exists
-        if 'invoice_id' not in tx_columns:
-            cursor.execute("ALTER TABLE transactions ADD COLUMN invoice_id INTEGER REFERENCES invoices(id)")
-        if 'kind' not in tx_columns:
-            # Backfill from the sign, which is what classification meant until now.
-            # A zero-amount row lands in 'expense': it counted as neither before,
-            # and a zero contributes zero to an expense total, so no figure moves.
-            cursor.execute("ALTER TABLE transactions ADD COLUMN kind VARCHAR(20)")
-            cursor.execute("UPDATE transactions SET kind = "
-                           "CASE WHEN amount > 0 THEN 'income' ELSE 'expense' END")
+    if 'invoice_id' not in tx_columns:
+        cursor.execute("ALTER TABLE transactions ADD COLUMN invoice_id INTEGER REFERENCES invoices(id)")
+    if 'kind' not in tx_columns:
+        # Backfill from the sign, which is what classification meant until now.
+        # A zero-amount row lands in 'expense': it counted as neither before,
+        # and a zero contributes zero to an expense total, so no figure moves.
+        cursor.execute("ALTER TABLE transactions ADD COLUMN kind VARCHAR(20)")
+        cursor.execute("UPDATE transactions SET kind = "
+                       "CASE WHEN amount > 0 THEN 'income' ELSE 'expense' END")
 
-    # Migrate recurring_transactions table - kind, for the transactions it generates (only if it exists)
+    # Migrate recurring_transactions table - kind, for the transactions it generates
     cursor.execute("PRAGMA table_info(recurring_transactions)")
     rt_columns = {row[1] for row in cursor.fetchall()}
-    if rt_columns:  # Only migrate if table exists
-        if 'kind' not in rt_columns:
-            cursor.execute("ALTER TABLE recurring_transactions ADD COLUMN kind VARCHAR(20)")
-            cursor.execute("UPDATE recurring_transactions SET kind = "
-                           "CASE WHEN amount > 0 THEN 'income' ELSE 'expense' END")
+    if 'kind' not in rt_columns:
+        cursor.execute("ALTER TABLE recurring_transactions ADD COLUMN kind VARCHAR(20)")
+        cursor.execute("UPDATE recurring_transactions SET kind = "
+                       "CASE WHEN amount > 0 THEN 'income' ELSE 'expense' END")
 
-    # Migrate clients table - Client Portal access (only if it exists)
+    # Migrate clients table - Client Portal access
     cursor.execute("PRAGMA table_info(clients)")
     client_columns = {row[1] for row in cursor.fetchall()}
-    if client_columns:  # Only migrate if table exists
-        if 'portal_account_id' not in client_columns:
-            cursor.execute("ALTER TABLE clients ADD COLUMN portal_account_id "
-                           "INTEGER REFERENCES portal_accounts(id)")
+    if 'portal_account_id' not in client_columns:
+        cursor.execute("ALTER TABLE clients ADD COLUMN portal_account_id "
+                       "INTEGER REFERENCES portal_accounts(id)")
 
-    # Migrate tax_estimates table - fix foreign key (only if it exists)
+    # Migrate tax_estimates table - fix foreign key
     cursor.execute("PRAGMA table_info(tax_estimates)")
     te_columns = {row[1] for row in cursor.fetchall()}
-    if te_columns:  # Only migrate if table exists
-        if 'user_id' not in te_columns:
-            cursor.execute("ALTER TABLE tax_estimates ADD COLUMN user_id INTEGER REFERENCES users(id)")
+    if 'user_id' not in te_columns:
+        cursor.execute("ALTER TABLE tax_estimates ADD COLUMN user_id INTEGER REFERENCES users(id)")
 
     conn.commit()
     conn.close()

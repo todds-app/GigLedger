@@ -128,10 +128,26 @@ def test_deleting_a_project_returns_its_items_to_general_inventory(app):
 # --- Migration -------------------------------------------------------------
 
 def test_an_existing_users_table_gains_the_inventory_categories_column(tmp_path, monkeypatch):
+    # Database schema from before custom_inventory_categories existed
     db_path = str(tmp_path / 'test.db')
     conn = sqlite3.connect(db_path)
-    conn.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, "
-                 "email VARCHAR(120), password_hash VARCHAR(128))")
+    conn.execute("CREATE TABLE users ("
+                 "id INTEGER PRIMARY KEY, "
+                 "email VARCHAR(120) UNIQUE NOT NULL, "
+                 "password_hash VARCHAR(128) NOT NULL, "
+                 "default_tax_rate FLOAT DEFAULT 0.3, "
+                 "currency VARCHAR(3) DEFAULT 'USD', "
+                 "custom_income_categories TEXT DEFAULT '', "
+                 "custom_expense_categories TEXT DEFAULT '', "
+                 "theme VARCHAR(20) DEFAULT 'emerald', "
+                 "dark_mode BOOLEAN DEFAULT 0, "
+                 "business_name VARCHAR(200) DEFAULT '', "
+                 "business_address TEXT DEFAULT '', "
+                 "business_phone VARCHAR(50) DEFAULT '', "
+                 "invoice_note TEXT DEFAULT 'Thank you for your business!', "
+                 "invoice_prefix VARCHAR(10) DEFAULT 'INV', "
+                 "next_invoice_number INTEGER DEFAULT 1, "
+                 "created_at DATETIME DEFAULT CURRENT_TIMESTAMP)")
     conn.commit()
     conn.close()
     monkeypatch.setattr(gigledger.app, 'DB_PATH', db_path)
