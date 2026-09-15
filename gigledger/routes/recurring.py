@@ -2,7 +2,8 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
-from ..models import RecurringTransaction, Transaction, db, clean_kind, EXPENSE, INCOME
+from ..models import (RecurringTransaction, Transaction, db, clean_kind,
+                      EXPENSE, INCOME, INVENTORY)
 
 recurring_bp = Blueprint('recurring', __name__, url_prefix='/recurring')
 
@@ -74,9 +75,15 @@ def add():
         flash('Amount must be greater than zero.', 'error')
         return redirect(url_for('recurring.index'))
 
+    # The recurring form offers income and expense; recurring inventory is a
+    # later piece (see the piece 2 spec). The route agrees with the form so a
+    # crafted POST cannot mint an inventory row that has no InventoryItem.
+    kind = clean_kind(tx_type, fallback=EXPENSE)
+    if kind == INVENTORY:
+        kind = EXPENSE
+
     # Non-income kinds are cash out, so they are stored negative - the same
     # rule edit() uses, so a row's sign does not flip between the two paths.
-    kind = clean_kind(tx_type, fallback=EXPENSE)
     amount = amount if kind == INCOME else -amount
 
     category = request.form.get('category', '')

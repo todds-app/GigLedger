@@ -253,7 +253,7 @@
         </form>
         <div class="space-y-2">
             {% for cat in inventory_categories %}
-            <div class="flex items-start gap-3">
+            <div class="flex flex-col items-start gap-1">
                 <div class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50/80 text-amber-700 rounded-xl text-sm font-bold whitespace-nowrap">
                     {{ cat }}
                     {% if cat not in default_inventory_categories %}
@@ -268,7 +268,7 @@
                     <span class="text-amber-200 ml-1">&#8226;</span>
                     {% endif %}
                 </div>
-                {% if inventory_guidance[cat] %}<p class="text-xs text-gray-400 leading-relaxed pt-1.5">{{ inventory_guidance[cat] }}</p>{% endif %}
+                {% if inventory_guidance[cat] %}<p class="text-xs text-gray-400 leading-relaxed pl-1">{{ inventory_guidance[cat] }}</p>{% endif %}
             </div>
             {% endfor %}
         </div>

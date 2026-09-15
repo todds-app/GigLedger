@@ -1,8 +1,9 @@
+import math
 from datetime import datetime
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
 from ..models import (Transaction, InventoryItem, Project, db, clean_kind,
-                      EXPENSE, INCOME, INVENTORY, KINDS)
+                      INCOME, INVENTORY, KINDS)
 
 transactions_bp = Blueprint('transactions', __name__)
 
@@ -81,7 +82,8 @@ def _inventory_fields(form, uid):
     except ValueError:
         raise InvalidInventory(
             'Quantity and unit cost are required for an inventory purchase.')
-    if quantity <= 0 or unit_cost <= 0:
+    if not (math.isfinite(quantity) and math.isfinite(unit_cost)) \
+            or quantity <= 0 or unit_cost <= 0:
         raise InvalidInventory('Quantity and unit cost must be greater than zero.')
 
     project_id = None
@@ -199,6 +201,14 @@ def edit(id):
     if (kind == INVENTORY) != tx.is_inventory:
         flash('Delete and re-add to change an inventory purchase into an '
               'expense, or an expense into an inventory purchase.', 'error')
+        return redirect(back)
+
+    if kind == INVENTORY and tx.inventory_item is None:
+        # A kind='inventory' row with no item cannot come from this app's
+        # routes any more, but a database may already hold one. Repair is
+        # delete-and-re-add, the same wall as a kind change (ADR-0011).
+        flash('This inventory row has no item behind it. Delete it and add '
+              'the purchase again.', 'error')
         return redirect(back)
 
     # Validate everything before writing anything, so a refused edit is a

@@ -212,7 +212,8 @@ def test_an_inventory_purchase_can_be_bought_for_a_project(app):
 
 @pytest.mark.parametrize('bad', [
     {'quantity': '0'}, {'unit_cost': '-3'}, {'quantity': 'six'},
-    {'quantity': ''}, {'unit_cost': ''}])
+    {'quantity': ''}, {'unit_cost': ''}, {'quantity': 'inf'},
+    {'unit_cost': '1e999'}, {'quantity': 'nan'}])
 def test_a_non_positive_or_missing_quantity_or_unit_cost_is_refused(app, bad):
     body = add_purchase(authenticated_client(app), **bad).get_data(as_text=True)
     # Not the bare word 'required': every form input carries that attribute.
@@ -337,6 +338,13 @@ def test_an_invalid_inventory_edit_changes_nothing(app):
         assert tx.amount == -980.0
 
 
+def test_editing_can_turn_a_consumable_back_into_a_reusable(app):
+    tx_id = purchase(app, is_consumable=True)
+    edit_purchase(authenticated_client(app), tx_id)  # no is_consumable key posted
+    with app.app_context():
+        assert Transaction.query.get(tx_id).inventory_item.is_consumable is False
+
+
 def test_editing_an_expense_still_works_as_before(app):
     client = authenticated_client(app)
     client.post('/transactions/add', data={
@@ -390,8 +398,8 @@ def test_the_edit_button_carries_the_item_for_an_inventory_row(app):
     purchase(app, quantity=2, unit_cost=490.0)
     page = authenticated_client(app).get('/transactions').get_data(as_text=True)
     # tojson|forceescape turns the quotes into &#34;
-    assert '&#34;quantity&#34;: 2' in page
-    assert '&#34;unit_cost&#34;: 490' in page
+    assert '&#34;quantity&#34;: 2.0' in page
+    assert '&#34;unit_cost&#34;: 490.0' in page
 
 
 def test_the_html_export_shows_the_type_column(app):
@@ -558,3 +566,38 @@ def test_reset_clears_the_inventory_list_too(app):
 def test_the_recurring_page_does_not_offer_inventory_categories(app):
     page = authenticated_client(app).get('/recurring/').get_data(as_text=True)
     assert 'Casegoods' not in page
+
+
+# --- Recurring cannot mint an itemless inventory row ------------------------
+
+def test_the_recurring_route_refuses_the_inventory_kind(app):
+    """The recurring form offers two kinds; a crafted POST must not create a
+    third. A recurring inventory row would generate inventory transactions
+    with no InventoryItem behind them."""
+    authenticated_client(app).post('/recurring/add', data={
+        'type': 'inventory', 'description': 'Candles, monthly',
+        'amount': '120', 'category': 'Seating', 'frequency': 'monthly',
+        'day_of_month': '1'})
+    with app.app_context():
+        rt = RecurringTransaction.query.filter_by(description='Candles, monthly').one()
+        assert rt.is_expense
+        assert rt.amount == -120.0
+
+
+def test_editing_an_itemless_inventory_row_is_refused_not_crashed(app):
+    with app.app_context():
+        uid = demo_user_id(app)
+        tx = Transaction(user_id=uid, amount=-50.0, date=datetime(2026, 3, 1),
+                         kind=INVENTORY, category='Seating',
+                         description='Orphan', is_tax_deductible=False,
+                         source='manual')
+        db.session.add(tx)
+        db.session.commit()
+        tx_id = tx.id
+    body = edit_purchase(authenticated_client(app), tx_id, description='Renamed'
+                         ).get_data(as_text=True)
+    assert 'no item behind it' in body
+    with app.app_context():
+        tx = Transaction.query.get(tx_id)
+        assert tx.description == 'Orphan'
+        assert tx.amount == -50.0
