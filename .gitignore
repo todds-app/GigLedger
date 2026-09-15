@@ -14,3 +14,7 @@ env/
 
 # Env / secrets
 .env
+
+# Worktrees (Claude Code native and manual)
+.claude/worktrees/
+.worktrees/
