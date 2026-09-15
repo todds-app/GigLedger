@@ -189,28 +189,55 @@ def edit(id):
         flash('Transaction not found.', 'error')
         return redirect(url_for('transactions.list_transactions'))
 
-    try: amount = float(request.form.get('amount', '0'))
-    except ValueError:
-        flash('Invalid amount.', 'error')
-        return redirect(url_for('transactions.list_transactions'))
-
+    back = request.referrer or url_for('transactions.list_transactions')
     kind = clean_kind(request.form.get('type', tx.kind), fallback=tx.kind)
-    if kind == EXPENSE and amount > 0: amount = -amount
-    elif kind == INCOME and amount < 0: amount = abs(amount)
+
+    # A purchase cannot become an expense, or an expense a purchase, by
+    # editing. The item would have to be created or orphaned mid-edit, and
+    # piece 3 needs a placed item never to quietly become a cost. One wall.
+    if (kind == INVENTORY) != tx.is_inventory:
+        flash('Delete and re-add to change an inventory purchase into an '
+              'expense, or an expense into an inventory purchase.', 'error')
+        return redirect(back)
+
+    # Validate everything before writing anything, so a refused edit is a
+    # no-op rather than a half-applied one.
+    item_fields = None
+    if kind == INVENTORY:
+        try:
+            item_fields = _inventory_fields(request.form, current_user.id)
+        except InvalidInventory as why:
+            flash(str(why), 'error')
+            return redirect(back)
+        quantity, unit_cost, _, _ = item_fields
+        amount = quantity * unit_cost
+    else:
+        try:
+            amount = float(request.form.get('amount', '0'))
+        except ValueError:
+            flash('Invalid amount.', 'error')
+            return redirect(back)
+
     tx.kind = kind
+    tx.amount = _signed(amount, kind)
 
     date_str = request.form.get('date', '')
     try: tx.date = datetime.strptime(date_str, '%Y-%m-%d')
     except: pass
 
-    tx.amount = amount
     tx.category = request.form.get('category', 'Uncategorized')
     tx.description = request.form.get('description', '')
-    tx.is_tax_deductible = request.form.get('is_tax_deductible') == 'on'
+    tx.is_tax_deductible = (kind != INVENTORY
+                            and request.form.get('is_tax_deductible') == 'on')
+
+    if item_fields:
+        item = tx.inventory_item
+        (item.quantity, item.unit_cost,
+         item.is_consumable, item.project_id) = item_fields
 
     db.session.commit()
     flash('Transaction updated!', 'success')
-    return redirect(url_for('transactions.list_transactions'))
+    return redirect(back)
 
 
 @transactions_bp.route('/transactions/delete/<int:id>', methods=['POST'])

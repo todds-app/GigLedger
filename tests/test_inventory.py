@@ -246,3 +246,116 @@ def test_one_sign_rule_for_income_and_expense(app, kind, posted, stored):
     with app.app_context():
         assert Transaction.query.filter_by(
             description='sign probe').one().amount == stored
+
+
+# --- edit(): the blocker piece 1 recorded -----------------------------------
+
+def edit_purchase(client, tx_id, **overrides):
+    data = {'type': 'inventory', 'date': '2026-03-15', 'category': 'Seating',
+            'description': 'Sectional sofa', 'quantity': '2',
+            'unit_cost': '490', 'project_id': ''}
+    data.update(overrides)
+    return client.post(f'/transactions/edit/{tx_id}', data=data,
+                       follow_redirects=True)
+
+
+def test_editing_only_the_date_leaves_an_inventory_row_inventory(app):
+    """The failure piece 1's appendix describes: the old modal posted
+    type=expense for anything not income, and one date change moved the
+    purchase into every cost total forever."""
+    from gigledger.finance import calculate_monthly_summary
+    with app.app_context():
+        Transaction.query.delete()  # only our purchase in the ledger
+        db.session.commit()
+    tx_id = purchase(app)
+    edit_purchase(authenticated_client(app), tx_id, date='2026-03-20')
+    with app.app_context():
+        tx = Transaction.query.get(tx_id)
+        assert tx.is_inventory
+        assert tx.date.day == 20
+        assert tx.amount == -980.0
+        _, expenses = calculate_monthly_summary(demo_user_id(app), 2026, 3)
+    assert expenses == 0
+
+
+def test_editing_an_inventory_row_updates_the_item_and_recomputes_the_amount(app):
+    with app.app_context():
+        pid = Project.query.filter_by(user_id=demo_user_id(app)).first().id
+    tx_id = purchase(app)
+    edit_purchase(authenticated_client(app), tx_id, quantity='3',
+                  unit_cost='100', is_consumable='on', project_id=str(pid),
+                  description='Three lamps', category='Lighting')
+    with app.app_context():
+        tx = Transaction.query.get(tx_id)
+        assert tx.amount == -300.0
+        assert tx.description == 'Three lamps'
+        assert tx.category == 'Lighting'
+        assert tx.inventory_item.quantity == 3
+        assert tx.inventory_item.is_consumable is True
+        assert tx.inventory_item.project_id == pid
+        assert InventoryItem.query.count() == 1
+
+
+def test_a_kind_change_out_of_inventory_is_refused_and_changes_nothing(app):
+    tx_id = purchase(app)
+    body = edit_purchase(authenticated_client(app), tx_id, type='expense',
+                         amount='980', description='Now an expense',
+                         date='2026-03-20').get_data(as_text=True)
+    assert 'Delete and re-add' in body
+    with app.app_context():
+        tx = Transaction.query.get(tx_id)
+        assert tx.is_inventory
+        assert tx.description == 'Sectional sofa'
+        assert tx.date.day == 15
+        assert tx.inventory_item is not None
+
+
+def test_a_kind_change_into_inventory_is_refused_and_changes_nothing(app):
+    client = authenticated_client(app)
+    client.post('/transactions/add', data={
+        'type': 'expense', 'amount': '59.99', 'date': '2026-03-04',
+        'category': 'Software', 'description': 'Adobe CC'})
+    with app.app_context():
+        tx_id = Transaction.query.filter_by(description='Adobe CC').one().id
+    body = edit_purchase(client, tx_id, description='Adobe as furniture'
+                         ).get_data(as_text=True)
+    assert 'Delete and re-add' in body
+    with app.app_context():
+        tx = Transaction.query.get(tx_id)
+        assert tx.is_expense
+        assert tx.description == 'Adobe CC'
+        assert tx.inventory_item is None
+
+
+def test_an_invalid_inventory_edit_changes_nothing(app):
+    tx_id = purchase(app)
+    edit_purchase(authenticated_client(app), tx_id, quantity='0',
+                  description='Should not land')
+    with app.app_context():
+        tx = Transaction.query.get(tx_id)
+        assert tx.description == 'Sectional sofa'
+        assert tx.amount == -980.0
+
+
+def test_editing_an_expense_still_works_as_before(app):
+    client = authenticated_client(app)
+    client.post('/transactions/add', data={
+        'type': 'expense', 'amount': '59.99', 'date': '2026-03-04',
+        'category': 'Software', 'description': 'Adobe CC'})
+    with app.app_context():
+        tx_id = Transaction.query.filter_by(description='Adobe CC').one().id
+    client.post(f'/transactions/edit/{tx_id}', data={
+        'type': 'expense', 'amount': '60', 'date': '2026-03-05',
+        'category': 'Software', 'description': 'Adobe CC',
+        'is_tax_deductible': 'on'})
+    with app.app_context():
+        tx = Transaction.query.get(tx_id)
+        assert (tx.amount, tx.is_tax_deductible, tx.date.day) == (-60.0, True, 5)
+
+
+def test_deleting_an_inventory_purchase_through_the_route_removes_the_item(app):
+    tx_id = purchase(app)
+    authenticated_client(app).post(f'/transactions/delete/{tx_id}')
+    with app.app_context():
+        assert Transaction.query.get(tx_id) is None
+        assert InventoryItem.query.count() == 0
