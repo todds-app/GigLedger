@@ -36,10 +36,14 @@ existing one, so the column would otherwise never appear.
 A fourth kind is now a change to one set and the sites that name it, rather than
 a survey of every comparison against zero.
 
-**The two balance sums stay kind-blind on purpose.** `calculate_safe_to_spend`
+**Three cash figures stay kind-blind on purpose.** `calculate_safe_to_spend`
 and `calculate_runway` sum every kind, because they measure cash and inventory
-cash really does leave the account. This looks like a missed conversion and is
-not one. Do not "fix" it.
+cash really does leave the account. The "Monthly Commitments" figure on the
+dashboard and the recurring page is the third: it filters on `not is_income`,
+so a recurring inventory order counts. A commitment is an obligation to pay,
+not a P&L category. Piece 1 left this undecided and it defaulted to cost;
+piece 2 decided it (2026-09-15). None of these looks like a missed conversion
+and none of them is one. Do not "fix" them.
 
 Templates read the sign for two purposes and only one was classification. The
 `+` and the red-green colouring describe the amount and remain sign tests; the

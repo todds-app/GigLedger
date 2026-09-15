@@ -13,6 +13,22 @@ DEFAULT_INCOME_CATEGORIES = ['Client Payment', 'Consulting', 'Freelance Project'
 DEFAULT_EXPENSE_CATEGORIES = ['Software', 'Internet', 'Office Supplies', 'Marketing',
                                'Travel', 'Equipment', 'Meal', 'Entertainment', 'Tax Reserve']
 
+DEFAULT_INVENTORY_CATEGORIES = ['Casegoods & Storage', 'Seating', 'Lighting',
+                                'Soft Goods & Textiles', 'Wall Decor & Art',
+                                'Tabletop & Decorative Accessories', 'Outdoor & Patio']
+
+# Shown under the category picker so people file consistently. Guidance, not
+# data: nothing is stored from this dict, and a custom category has none.
+INVENTORY_CATEGORY_GUIDANCE = {
+    'Casegoods & Storage': 'Beds, nightstands, dressers, chests, armoires; TV stands, media consoles, bookcases, shelving, sideboards, credenzas; dining tables, buffets, desks, filing cabinets',
+    'Seating': 'Sofas, sectionals, loveseats, accent chairs, recliners, ottomans, benches; upholstered dining chairs, executive desk chairs',
+    'Lighting': 'Chandeliers, pendants, flush mounts, track lighting; table, floor and desk lamps; wall sconces, vanity lights, picture lights',
+    'Soft Goods & Textiles': 'Curtains, drapes, blinds, shades and hardware; area rugs, runners, doormats, rug pads; sheets, comforters, duvet covers, pillows, bath towels, shower curtains; throw pillows, poufs, blankets',
+    'Wall Decor & Art': 'Framed canvas prints, paintings, photographic prints, wall sculptures; mirrors, wall clocks, floating shelves',
+    'Tabletop & Decorative Accessories': 'Vases, sculptures, decorative bowls, trays, candles and holders, picture frames; faux plants, dried florals, planters, pots; dinnerware, glassware, flatware, serveware, table linens',
+    'Outdoor & Patio': 'Outdoor seating, dining sets, fire pits, outdoor rugs, weather-resistant lighting',
+}
+
 # Transaction kinds. The kind is stored, never derived from the sign of the
 # amount: a sign carries one bit, which is enough for two kinds and no more.
 # See docs/adr/0010.
@@ -77,6 +93,7 @@ class User(UserMixin, db.Model):
     currency = db.Column(db.String(3), default='USD')
     custom_income_categories = db.Column(db.Text, default='')   # comma-separated
     custom_expense_categories = db.Column(db.Text, default='')  # comma-separated
+    custom_inventory_categories = db.Column(db.Text, default='')  # comma-separated
     theme = db.Column(db.String(20), default='emerald')  # theme name
     dark_mode = db.Column(db.Boolean, default=False)      # dark mode toggle
     business_name = db.Column(db.String(200), default='')
@@ -105,8 +122,23 @@ class User(UserMixin, db.Model):
             return [c.strip() for c in self.custom_expense_categories.split(',') if c.strip()]
         return DEFAULT_EXPENSE_CATEGORIES.copy()
 
-    def get_all_categories(self):
-        return list(dict.fromkeys(self.get_income_categories() + self.get_expense_categories()))
+    def get_inventory_categories(self):
+        if self.custom_inventory_categories:
+            return [c.strip() for c in self.custom_inventory_categories.split(',') if c.strip()]
+        return DEFAULT_INVENTORY_CATEGORIES.copy()
+
+    def get_all_categories(self, kinds=KINDS):
+        """The category lists for `kinds`, merged in kind order, duplicates
+        dropped. Kind-aware so a page that cannot create an inventory row
+        does not offer seven categories it cannot use."""
+        merged = []
+        if INCOME in kinds:
+            merged += self.get_income_categories()
+        if EXPENSE in kinds:
+            merged += self.get_expense_categories()
+        if INVENTORY in kinds:
+            merged += self.get_inventory_categories()
+        return list(dict.fromkeys(merged))
 
     def get_next_invoice_number(self):
         num = self.next_invoice_number
@@ -129,6 +161,60 @@ class Transaction(KindMixin, db.Model):
     source = db.Column(db.String(20), default='manual')
     invoice_id = db.Column(db.Integer, db.ForeignKey('invoices.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # The asset half of an inventory purchase; None for every other kind.
+    # delete-orphan: the item has no meaning without its purchase.
+    inventory_item = db.relationship('InventoryItem', back_populates='transaction',
+                                     uselist=False, cascade='all, delete-orphan')
+
+
+class InventoryItem(db.Model):
+    """The asset half of an inventory purchase.
+
+    One row per purchase Transaction, never shared: `amount` on the transaction
+    is always -(quantity * unit_cost), so the ledger and the pool cannot
+    disagree. A separate table rather than nullable columns on Transaction
+    because an item has a lifecycle a ledger line does not - it is placed,
+    consumed, returned (piece 3) - and the ADR-0006 argument for one table
+    ("every other operation is identical") does not hold. See docs/adr/0011.
+
+    `project_id` NULL means General Inventory: bought for stock, not for a job.
+    """
+    __tablename__ = 'inventory_items'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    transaction_id = db.Column(db.Integer, db.ForeignKey('transactions.id'),
+                               nullable=False, unique=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=True)
+    quantity = db.Column(db.Float, nullable=False)   # yards of fabric, not only chairs
+    unit_cost = db.Column(db.Float, nullable=False)
+    is_consumable = db.Column(db.Boolean, nullable=False, default=False)  # False = reusable
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # No delete cascade from Project on purpose: deleting a project returns
+    # its items to General Inventory (SQLAlchemy nulls the FK), it does not
+    # destroy assets that are still owned.
+    project = db.relationship('Project', backref='inventory_items', lazy=True)
+    transaction = db.relationship('Transaction', back_populates='inventory_item')
+
+    @property
+    def total_cost(self):
+        return self.quantity * self.unit_cost
+
+    @property
+    def location_label(self):
+        return self.project.name if self.project else 'General Inventory'
+
+    @property
+    def usage_label(self):
+        return 'Consumable' if self.is_consumable else 'Reusable'
+
+    @property
+    def form_values(self):
+        """What the edit modal needs to prefill its inventory block."""
+        return {'quantity': self.quantity, 'unit_cost': self.unit_cost,
+                'is_consumable': self.is_consumable, 'project_id': self.project_id}
 
 
 class TaxEstimate(db.Model):

@@ -1,7 +1,7 @@
 # Inventory purchases and the asset pool
 
 - **Date:** 2026-09-15
-- **Status:** Approved, not yet implemented
+- **Status:** Implemented 2026-09-15
 - **Scope:** Piece 2 of 3 in the Inventory work. First visible change: an
   inventory purchase can be recorded, edited, listed and filtered.
 - **Builds on:** `2026-08-29-transaction-kind-design.md` (piece 1), ADR-0010.

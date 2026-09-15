@@ -41,7 +41,7 @@ No more setting aside random percentages. No more spreadsheet gymnastics. Just c
 - **Quick Add** — Add income or expenses right from the dashboard
 - **Runway Calculator** — Color-coded survival months (green ≥6, yellow ≥3, red <3)
 - **Bank Balance & Net This Month** — Instant financial health check
-- **Monthly Commitments** — Total from active recurring expenses
+- **Monthly Commitments** — Everything that leaves the account monthly from active recurring transactions, inventory orders included
 - **Savings Goals Progress** — Visual progress bars with color-coded status
 - **Active Projects** — Quick view of ongoing work with earnings
 - **Outstanding Invoices** — Unpaid invoice summary with overdue warnings
@@ -54,8 +54,16 @@ No more setting aside random percentages. No more spreadsheet gymnastics. Just c
 - **Summary bar** — Total Income, Expenses, Deductible amount, Tax Saving, Net
 - **Add Transaction modal** — Dynamic categories, real-time tax savings preview
 - **Edit & Delete** — Full CRUD with inline actions
+- **Three kinds** — Income, Expense, and Inventory: purchases held as assets that never touch your expense totals
 - **Export to CSV or printable HTML** — Filtered reports with full detail and summary rows
 - **Auto-Posted from Invoices** — Income and tax reserve transactions created automatically when invoices are paid
+
+### 📦 Inventory
+- **Asset pool** — Purchases recorded as Inventory stay out of expenses, deductions and profit while their cash still leaves the balance
+- **Quantity, unit cost, consumable or reusable** — Recorded per purchase; the amount is always quantity × unit cost
+- **Bought for a project, or General Inventory** — Each purchase names a project or sits on hand; project pages list what was bought for them
+- **Inventory page** — Asset value, on hand vs. on projects, filter by location and category
+- **Seven default categories with guidance** — Casegoods, Seating, Lighting, Soft Goods, Wall Decor, Tabletop, Outdoor; editable in Settings
 
 ### 🧾 Invoicing
 - **Create professional invoices** with line items, quantities, and rates

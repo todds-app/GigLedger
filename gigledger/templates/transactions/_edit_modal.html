@@ -1,0 +1,154 @@
+{#
+  The edit-transaction modal and the kind-aware form logic it shares with the
+  add modal. Included by transactions/index.html and inventory/index.html so
+  the inventory page does not carry a second copy of a form that must post
+  exactly what transactions.edit() expects.
+
+  Expects `projects` and `currency` in context. Every id is `edit_<field>`;
+  the add modal uses `modal_<field>`, and applyKind() works on either prefix.
+#}
+{% from 'transactions/_inventory_fields.html' import inventory_fields with context %}
+<div id="editModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" onclick="document.getElementById('editModal').classList.add('hidden')"></div>
+    <div class="relative glass-card rounded-3xl p-7 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto" style="background:rgba(255,255,255,0.9)">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-lg font-extrabold text-gray-900">Edit Transaction &#x270F;&#xFE0F;</h2>
+            <button onclick="document.getElementById('editModal').classList.add('hidden')" class="text-gray-300 hover:text-gray-600 transition-colors p-1">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+        </div>
+        <form method="POST" id="editForm" class="space-y-4">
+            {{ csrf_field() }}
+            <input type="hidden" name="tx_id" id="edit_tx_id">
+            <div>
+                <label class="block text-sm font-semibold text-gray-600 mb-1.5">Type</label>
+                <div class="flex gap-2">
+                    <label class="flex-1 cursor-pointer">
+                        <input type="radio" name="type" value="income" class="peer sr-only" id="edit_type_income" onchange="updateEditCategories()">
+                        <div class="text-center py-2.5 rounded-xl border-2 border-gray-200/80 peer-checked:border-green-400 peer-checked:bg-green-50/80 peer-checked:text-green-700 text-sm font-semibold transition-all">Income</div>
+                    </label>
+                    <label class="flex-1 cursor-pointer">
+                        <input type="radio" name="type" value="expense" class="peer sr-only" id="edit_type_expense" onchange="updateEditCategories()">
+                        <div class="text-center py-2.5 rounded-xl border-2 border-gray-200/80 peer-checked:border-red-400 peer-checked:bg-red-50/80 peer-checked:text-red-700 text-sm font-semibold transition-all">Expense</div>
+                    </label>
+                    <label class="flex-1 cursor-pointer">
+                        <input type="radio" name="type" value="inventory" class="peer sr-only" id="edit_type_inventory" onchange="updateEditCategories()">
+                        <div class="text-center py-2.5 rounded-xl border-2 border-gray-200/80 peer-checked:border-amber-400 peer-checked:bg-amber-50/80 peer-checked:text-amber-700 text-sm font-semibold transition-all">Inventory</div>
+                    </label>
+                </div>
+                <p class="text-[11px] text-gray-400 mt-1.5">To turn a purchase into an expense, or an expense into a purchase, delete it and add it again.</p>
+            </div>
+            <div id="edit_amount_section">
+                <label class="block text-sm font-semibold text-gray-600 mb-1.5">Amount ({{ currency }})</label>
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 font-medium">{{ currency | currency_symbol }}</span>
+                    <input type="number" name="amount" id="edit_amount" step="0.01" min="0.01" required class="candy-input block w-full pl-7 pr-3 py-2.5 text-gray-900 focus:outline-none">
+                </div>
+            </div>
+            {{ inventory_fields('edit') }}
+            <div>
+                <label class="block text-sm font-semibold text-gray-600 mb-1.5">Date</label>
+                <input type="date" name="date" id="edit_date" required class="candy-input block w-full px-3 py-2.5 text-gray-900 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-600 mb-1.5">Category</label>
+                <select name="category" id="edit_category" class="candy-input block w-full px-3 py-2.5 text-gray-900 focus:outline-none" onchange="showGuidance('edit')">
+                </select>
+                <p id="edit_category_guidance" class="hidden text-xs text-gray-400 mt-1.5 leading-relaxed"></p>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-600 mb-1.5">Description</label>
+                <input type="text" name="description" id="edit_description" class="candy-input block w-full px-3 py-2.5 text-gray-900 focus:outline-none">
+            </div>
+            <div id="edit_deductible_section" class="hidden">
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" name="is_tax_deductible" id="edit_ded" class="h-4 w-4 text-brand-600 border-gray-300 rounded focus:ring-brand-500">
+                    <label for="edit_ded" class="text-sm font-medium text-gray-600">Tax deductible &#x1F4B0;</label>
+                </div>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="document.getElementById('editModal').classList.add('hidden')" class="flex-1 py-3 px-4 glass-card rounded-xl text-sm font-semibold text-gray-600 hover:bg-white/80 transition-all">Cancel</button>
+                <button type="submit" class="candy-btn flex-1 py-3 px-4 text-sm">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Shared by the add and edit modals. One lookup keyed on the kind, not
+    // an income/else branch: the else is what used to turn inventory into
+    // expense (see the piece 2 spec).
+    var kindCategories = {
+        income: {{ current_user.get_income_categories() | tojson }},
+        expense: {{ current_user.get_expense_categories() | tojson }},
+        inventory: {{ current_user.get_inventory_categories() | tojson }}
+    };
+    var inventoryGuidance = {{ inventory_guidance | tojson }};
+
+    function fillCategories(select, kind, selectedCat) {
+        var cats = kindCategories[kind] || [];
+        select.innerHTML = '';
+        cats.forEach(function(cat) {
+            var opt = document.createElement('option');
+            opt.value = cat;
+            opt.textContent = cat;
+            if (cat === selectedCat) opt.selected = true;
+            select.appendChild(opt);
+        });
+    }
+
+    function showGuidance(prefix) {
+        var kind = checkedKind(prefix);
+        var el = document.getElementById(prefix + '_category_guidance');
+        var text = kind === 'inventory'
+            ? inventoryGuidance[document.getElementById(prefix + '_category').value] : '';
+        el.textContent = text || '';
+        el.classList.toggle('hidden', !text);
+    }
+
+    function checkedKind(prefix) {
+        var form = prefix === 'edit' ? '#editForm' : '#modalForm';
+        var radio = document.querySelector(form + ' input[name="type"]:checked');
+        return radio ? radio.value : '';
+    }
+
+    // Show the fields a kind needs and require only those. A hidden `required`
+    // input blocks submission, so `required` follows visibility.
+    function applyKind(prefix, kind, selectedCat) {
+        var isInventory = kind === 'inventory';
+        document.getElementById(prefix + '_amount_section').classList.toggle('hidden', isInventory);
+        document.getElementById(prefix + '_amount').required = !isInventory;
+        document.getElementById(prefix + '_inventory_section').classList.toggle('hidden', !isInventory);
+        document.getElementById(prefix + '_quantity').required = isInventory;
+        document.getElementById(prefix + '_unit_cost').required = isInventory;
+        document.getElementById(prefix + '_deductible_section').classList.toggle('hidden', kind !== 'expense');
+        if (kind !== 'expense') document.getElementById(prefix + '_ded').checked = false;
+        fillCategories(document.getElementById(prefix + '_category'), kind, selectedCat);
+        showGuidance(prefix);
+    }
+
+    function openEditModal(id, amount, type, date, category, description, deductible, item) {
+        document.getElementById('edit_tx_id').value = id;
+        document.getElementById('edit_amount').value = amount;
+        document.getElementById('edit_date').value = date;
+        document.getElementById('edit_description').value = description;
+
+        var radio = document.querySelector('#editForm input[name="type"][value="' + type + '"]');
+        if (radio) radio.checked = true;
+        applyKind('edit', type, category);
+        document.getElementById('edit_ded').checked = type === 'expense' && !!deductible;
+
+        item = item || {};
+        document.getElementById('edit_quantity').value = item.quantity == null ? '' : item.quantity;
+        document.getElementById('edit_unit_cost').value = item.unit_cost == null ? '' : item.unit_cost;
+        document.getElementById('edit_consumable').checked = !!item.is_consumable;
+        document.getElementById('edit_project').value = item.project_id == null ? '' : String(item.project_id);
+
+        document.getElementById('editForm').action = '{{ url_port("transactions.edit", id=0) }}'.replace('/0', '/' + id);
+        document.getElementById('editModal').classList.remove('hidden');
+    }
+
+    function updateEditCategories() {
+        applyKind('edit', checkedKind('edit'));
+    }
+</script>

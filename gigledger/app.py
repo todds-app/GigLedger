@@ -145,7 +145,9 @@ def create_app():
                 return f"{url}{sep}XTransformPort={port}"
             return url
 
-        return {'xport': port, 'url_port': url_port, 'currency_symbols': CURRENCY_SYMBOLS}
+        from .models import INVENTORY_CATEGORY_GUIDANCE
+        return {'xport': port, 'url_port': url_port, 'currency_symbols': CURRENCY_SYMBOLS,
+                'inventory_guidance': INVENTORY_CATEGORY_GUIDANCE}
 
     # Register blueprints
     from .routes.auth import auth_bp
@@ -159,6 +161,7 @@ def create_app():
     from .routes.invoices import invoices_bp
     from .routes.goals import goals_bp
     from .routes.recurring import recurring_bp
+    from .routes.inventory import inventory_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -171,6 +174,7 @@ def create_app():
     app.register_blueprint(invoices_bp)
     app.register_blueprint(goals_bp)
     app.register_blueprint(recurring_bp)
+    app.register_blueprint(inventory_bp)
 
     # Registered conditionally, so switching the portal off removes the routes
     # rather than making them refuse. A route that exists and refuses is still a
@@ -205,6 +209,8 @@ def _migrate_db(db):
         cursor.execute("ALTER TABLE users ADD COLUMN custom_income_categories TEXT DEFAULT ''")
     if 'custom_expense_categories' not in existing_columns:
         cursor.execute("ALTER TABLE users ADD COLUMN custom_expense_categories TEXT DEFAULT ''")
+    if 'custom_inventory_categories' not in existing_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN custom_inventory_categories TEXT DEFAULT ''")
     if 'theme' not in existing_columns:
         cursor.execute("ALTER TABLE users ADD COLUMN theme VARCHAR(20) DEFAULT 'emerald'")
     if 'dark_mode' not in existing_columns:

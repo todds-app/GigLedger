@@ -2,7 +2,8 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
-from ..models import RecurringTransaction, Transaction, db, clean_kind, EXPENSE, INCOME
+from ..models import (RecurringTransaction, Transaction, db, clean_kind,
+                      EXPENSE, INCOME, INVENTORY)
 
 recurring_bp = Blueprint('recurring', __name__, url_prefix='/recurring')
 
@@ -40,9 +41,10 @@ def index():
         RecurringTransaction.is_active.desc(), RecurringTransaction.next_date.asc().nullslast(),
         RecurringTransaction.created_at.desc()).all()
 
-    # Monthly commitments: sum of active monthly recurring expenses
+    # Monthly commitments: everything that leaves the account each month.
+    # Cash, not cost - a recurring inventory order counts. ADR-0010.
     monthly_commitments = sum(abs(r.amount) for r in recurring
-                              if r.is_active and r.is_expense and r.frequency == 'monthly')
+                              if r.is_active and not r.is_income and r.frequency == 'monthly')
     active_count = sum(1 for r in recurring if r.is_active)
 
     return render_template('recurring/index.html',
@@ -50,7 +52,7 @@ def index():
         monthly_commitments=monthly_commitments,
         active_count=active_count,
         currency=current_user.currency,
-        user_categories=current_user.get_all_categories(),
+        user_categories=current_user.get_all_categories(kinds={INCOME, EXPENSE}),
         now=datetime.now())
 
 
@@ -73,9 +75,15 @@ def add():
         flash('Amount must be greater than zero.', 'error')
         return redirect(url_for('recurring.index'))
 
+    # The recurring form offers income and expense; recurring inventory is a
+    # later piece (see the piece 2 spec). The route agrees with the form so a
+    # crafted POST cannot mint an inventory row that has no InventoryItem.
+    kind = clean_kind(tx_type, fallback=EXPENSE)
+    if kind == INVENTORY:
+        kind = EXPENSE
+
     # Non-income kinds are cash out, so they are stored negative - the same
     # rule edit() uses, so a row's sign does not flip between the two paths.
-    kind = clean_kind(tx_type, fallback=EXPENSE)
     amount = amount if kind == INCOME else -amount
 
     category = request.form.get('category', '')

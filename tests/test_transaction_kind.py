@@ -492,18 +492,31 @@ def test_editing_an_inventory_recurring_amount_stays_negative(app):
         assert edited.amount == -300.00
 
 
-def test_creating_a_recurring_inventory_row_stores_it_negative(app):
+def test_a_recurring_inventory_row_is_stored_negative(app):
     """add() originally coerced the sign only for EXPENSE, leaving a fresh
-    inventory row positive - the mirror image of the edit() bug above, and
-    on the opposite route. add() now follows the same rule as edit(): every
-    non-income kind is cash out and is stored negative."""
-    authenticated_client(app).post('/recurring/add', data={
-        'type': 'inventory', 'description': 'Showroom sectional',
-        'amount': '300', 'category': 'Seating', 'frequency': 'monthly',
-        'day_of_month': '1'})
+    inventory row positive - the mirror image of the edit() bug above. That
+    was fixed by having add() follow the same rule as edit(): every
+    non-income kind is cash out and is stored negative.
+
+    Piece 2 then closed the route this test used to exercise - /recurring/add
+    now refuses type=inventory outright (see test_inventory.py's
+    test_the_recurring_route_refuses_the_inventory_kind), because the
+    recurring form offers no inventory option and a recurring inventory row
+    would have no InventoryItem behind it. So this is rewritten, like its
+    sibling test_editing_an_inventory_recurring_amount_stays_negative, to
+    build the row directly rather than through a route that no longer
+    accepts this kind - and it still pins the sign rule: inventory is cash
+    out, stored negative, same as expense."""
+    with app.app_context():
+        rt = RecurringTransaction(
+            user_id=demo_user_id(app), description='Showroom sectional',
+            amount=-300.00, category='Seating', kind=INVENTORY,
+            frequency='monthly', day_of_month=1, is_active=True)
+        db.session.add(rt)
+        db.session.commit()
+        rt_id = rt.id
 
     with app.app_context():
-        rt = RecurringTransaction.query.filter_by(
-            description='Showroom sectional').one()
+        rt = db.session.get(RecurringTransaction, rt_id)
         assert rt.is_inventory
         assert rt.amount == -300.00
