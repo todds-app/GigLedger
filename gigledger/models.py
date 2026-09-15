@@ -351,6 +351,27 @@ class PortalInvite(db.Model):
         return self.redeemed_at is None and self.expires_at > datetime.utcnow()
 
 
+class AdminInvite(db.Model):
+    """A single-use, expiring grant that lets someone become an admin.
+
+    Same rules as PortalInvite, for the same reason: the token is a bearer
+    credential that will be pasted into email and chat, and a database read
+    must not hand over working invites. See docs/adr/0014.
+    """
+    __tablename__ = 'admin_invites'
+
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(200), nullable=False)
+    token_hash = db.Column(db.String(64), nullable=False, index=True)
+    invited_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    redeemed_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def is_open(self):
+        return self.redeemed_at is None and self.expires_at > datetime.utcnow()
+
+
 class LoginAttempt(db.Model):
     """Failed logins, for throttling. Durable rather than in-memory so a restart
     is not a way to clear the counter, and so it works with more than one worker

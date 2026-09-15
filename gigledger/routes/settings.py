@@ -1,7 +1,7 @@
-from flask import Blueprint, render_template, redirect, url_for, request, flash
+from flask import Blueprint, render_template, redirect, url_for, request, flash, session
 from flask_login import login_required, current_user
-from ..models import (db, Business, DEFAULT_INCOME_CATEGORIES, DEFAULT_EXPENSE_CATEGORIES,
-                      DEFAULT_INVENTORY_CATEGORIES)
+from ..models import (db, AdminInvite, Business, User, DEFAULT_INCOME_CATEGORIES,
+                      DEFAULT_EXPENSE_CATEGORIES, DEFAULT_INVENTORY_CATEGORIES)
 
 settings_bp = Blueprint('settings', __name__)
 
@@ -28,7 +28,11 @@ def index():
         default_inventory_categories=DEFAULT_INVENTORY_CATEGORIES,
         available_themes=AVAILABLE_THEMES,
         current_theme=current_user.theme or 'emerald',
-        dark_mode=current_user.dark_mode or False)
+        dark_mode=current_user.dark_mode or False,
+        admins=User.query.order_by(User.created_at).all(),
+        open_invites=[i for i in AdminInvite.query.order_by(AdminInvite.created_at).all()
+                      if i.is_open()],
+        invite_url=session.pop('admin_invite_url', None))
 
 
 @settings_bp.route('/settings/tax-rate', methods=['POST'])
