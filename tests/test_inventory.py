@@ -425,3 +425,73 @@ def test_monthly_commitment_counts_a_recurring_inventory_order(app):
     client = authenticated_client(app)
     assert '$150.00' in client.get('/recurring/').get_data(as_text=True)
     assert '$150.00' in client.get('/').get_data(as_text=True)
+
+
+# --- The Inventory page ------------------------------------------------------
+
+@pytest.fixture
+def pool(app):
+    """Two items on hand, one on a project."""
+    with app.app_context():
+        project = Project.query.filter_by(user_id=demo_user_id(app)).first()
+        pid, pname = project.id, project.name
+    purchase(app, description='Sectional sofa', quantity=2, unit_cost=490.0)
+    purchase(app, description='Brass floor lamp', quantity=1, unit_cost=220.0,
+             category='Lighting', day=16)
+    purchase(app, description='Throw pillows', quantity=6, unit_cost=25.0,
+             category='Soft Goods & Textiles', project_id=pid,
+             is_consumable=True, day=17)
+    return app, pid, pname
+
+
+def test_the_inventory_page_totals_the_pool(pool):
+    app, _, pname = pool
+    page = authenticated_client(app).get('/inventory/').get_data(as_text=True)
+    assert '$1,350.00' in page   # asset value: 980 + 220 + 150
+    assert '$1,200.00' in page   # on hand
+    assert '$150.00' in page     # on projects
+    for text in ('Sectional sofa', 'Brass floor lamp', 'Throw pillows',
+                 'General Inventory', pname, 'Consumable', 'Reusable'):
+        assert text in page
+
+
+def test_the_inventory_page_filters_by_project_and_category(pool):
+    app, pid, _ = pool
+    client = authenticated_client(app)
+    general = client.get('/inventory/?project=general').get_data(as_text=True)
+    assert 'Sectional sofa' in general and 'Throw pillows' not in general
+    on_project = client.get(f'/inventory/?project={pid}').get_data(as_text=True)
+    assert 'Throw pillows' in on_project and 'Sectional sofa' not in on_project
+    lighting = client.get('/inventory/?category=Lighting').get_data(as_text=True)
+    assert 'Brass floor lamp' in lighting and 'Sectional sofa' not in lighting
+    # The stats describe the whole pool, not the filtered list.
+    assert '$1,350.00' in lighting
+
+
+def test_the_inventory_page_shows_only_the_current_users_items(pool):
+    app, _, _ = pool
+    with app.app_context():
+        other = User(email='other@example.com', password_hash='x')
+        db.session.add(other)
+        db.session.flush()
+        tx = Transaction(user_id=other.id, amount=-999.0,
+                         date=datetime(2026, 3, 1), kind=INVENTORY,
+                         category='Seating', description='Theirs')
+        tx.inventory_item = InventoryItem(user_id=other.id, quantity=1,
+                                          unit_cost=999.0)
+        db.session.add(tx)
+        db.session.commit()
+    page = authenticated_client(app).get('/inventory/').get_data(as_text=True)
+    assert 'Theirs' not in page
+    assert '$1,350.00' in page
+
+
+def test_the_inventory_page_has_an_empty_state_and_the_edit_modal(app):
+    page = authenticated_client(app).get('/inventory/').get_data(as_text=True)
+    assert 'No inventory yet' in page
+    assert 'id="editModal"' in page
+
+
+def test_the_nav_links_to_inventory(app):
+    page = authenticated_client(app).get('/transactions').get_data(as_text=True)
+    assert 'href="/inventory/"' in page

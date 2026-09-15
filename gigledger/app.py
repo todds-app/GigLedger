@@ -161,6 +161,7 @@ def create_app():
     from .routes.invoices import invoices_bp
     from .routes.goals import goals_bp
     from .routes.recurring import recurring_bp
+    from .routes.inventory import inventory_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -173,6 +174,7 @@ def create_app():
     app.register_blueprint(invoices_bp)
     app.register_blueprint(goals_bp)
     app.register_blueprint(recurring_bp)
+    app.register_blueprint(inventory_bp)
 
     # Registered conditionally, so switching the portal off removes the routes
     # rather than making them refuse. A route that exists and refuses is still a

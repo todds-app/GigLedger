@@ -1,0 +1,51 @@
+"""The asset pool: what was bought as inventory and where it was bought for.
+
+Read-only. Every write goes through transactions.py, so money has one
+authorisation path and this page cannot drift from the ledger. Movements,
+quantity remaining and cost recognition are piece 3.
+"""
+from flask import Blueprint, render_template, request
+from flask_login import login_required, current_user
+from ..models import InventoryItem, Transaction, Project
+
+inventory_bp = Blueprint('inventory', __name__, url_prefix='/inventory')
+
+
+def _filtered(items, args):
+    project = args.get('project', '')
+    if project == 'general':
+        items = [i for i in items if i.project_id is None]
+    elif project:
+        try:
+            pid = int(project)
+            items = [i for i in items if i.project_id == pid]
+        except ValueError:
+            pass
+
+    category = args.get('category', '')
+    if category:
+        items = [i for i in items if i.transaction.category == category]
+    return items
+
+
+@inventory_bp.route('/')
+@login_required
+def index():
+    uid = current_user.id
+    everything = (InventoryItem.query.filter_by(user_id=uid)
+                  .join(InventoryItem.transaction)
+                  .order_by(Transaction.date.desc()).all())
+
+    # The cards describe the whole pool; the filters narrow only the table.
+    asset_value = sum(i.total_cost for i in everything)
+    on_hand = sum(i.total_cost for i in everything if i.project_id is None)
+
+    return render_template('inventory/index.html',
+        items=_filtered(everything, request.args),
+        asset_value=asset_value, on_hand=on_hand,
+        on_projects=asset_value - on_hand,
+        projects=Project.query.filter_by(user_id=uid).order_by(Project.name).all(),
+        categories=sorted(current_user.get_inventory_categories()),
+        selected_project=request.args.get('project', ''),
+        selected_category=request.args.get('category', ''),
+        currency=current_user.currency)
