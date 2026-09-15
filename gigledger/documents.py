@@ -30,9 +30,9 @@ UPLOAD_ROOT = os.path.join(
     'uploads',
 )
 
-# 25 MB. Enforced by Flask via MAX_CONTENT_LENGTH before a request body is
+# 50 MB. Enforced by Flask via MAX_CONTENT_LENGTH before a request body is
 # read, so an oversized upload never reaches disk.
-MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
 ALLOWED_EXTENSIONS = {
     '.pdf', '.doc', '.docx', '.odt', '.rtf',

@@ -167,6 +167,7 @@ def test_the_upload_cap_is_wired_to_the_configured_limit(app):
     """The cap has to be enforced by Flask rather than checked in the route:
     a route-level check runs after the body has already been read."""
     assert app.config['MAX_CONTENT_LENGTH'] == gigledger.documents.MAX_UPLOAD_BYTES
+    assert gigledger.documents.MAX_UPLOAD_BYTES == 50 * 1024 * 1024
 
 
 def test_an_oversized_upload_is_refused_before_it_reaches_disk(tmp_path, monkeypatch):

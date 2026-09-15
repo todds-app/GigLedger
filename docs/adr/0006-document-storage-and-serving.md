@@ -67,7 +67,9 @@ SQLAlchemy's `delete-orphan` works either way. Deleting a project cascades to
 its document rows; the route then unlinks the files, **after** the commit
 succeeds, because no ORM cascade touches a filesystem.
 
-**No per-user quota.** A 25 MB per-file cap via `MAX_CONTENT_LENGTH`, enforced
+**No per-user quota.** A per-file cap via `MAX_CONTENT_LENGTH` (25 MB at the
+time; raised to 50 MB on 2026-09-15, once clients could upload floor plans
+through the portal), enforced
 by Flask before the request body is read. This is self-hosted; the operator owns
 the disk, and a quota would be a support burden with no beneficiary.
 
@@ -84,7 +86,7 @@ the disk, and a quota would be a support burden with no beneficiary.
 - `uploads/` is gitignored in the same commit that creates it. An upload
   directory that appears in `git status` before anyone thinks about it is how
   client contracts end up in version control.
-- The 25 MB cap is enforced by Flask, which returns a bare `413`. There is no
+- The cap is enforced by Flask, which returns a bare `413`. There is no
   friendly flash message, because by the time a handler could flash one the body
   has already been read — which is the thing the cap exists to prevent.
 - Replacing a document is not implemented: remove and re-upload. There is no

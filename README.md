@@ -91,7 +91,7 @@ No more setting aside random percentages. No more spreadsheet gymnastics. Just c
 - **7 demo projects** — Showing various states and rate types
 
 ### 📎 Project Documents
-- **Attach files to a project** — Contracts, briefs, spreadsheets, presentations, images, archives (25 MB each)
+- **Attach files to a project** — Contracts, briefs, spreadsheets, presentations, images, archives (50 MB each)
 - **Or link a document** — Paste a Google Drive URL and GigLedger keeps the reference
 - **Downloads are always attachments** — Never rendered in the browser, whatever the file type
 - **Stored under generated names** — The name you chose is data; the file on disk is an opaque token

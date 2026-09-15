@@ -63,7 +63,7 @@ is its `client_id` among the account's visible clients. Anything else is a
 
 ## Consequences
 
-- **An invited client can write to the owner's disk.** Up to 25 MB per file,
+- **An invited client can write to the owner's disk.** Up to 50 MB per file,
   no quota — ADR-0006's "the operator owns the disk" now includes the people
   the operator has invited. Revoking portal access closes the path; it does
   not remove what was written.
