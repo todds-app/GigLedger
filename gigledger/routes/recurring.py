@@ -51,7 +51,7 @@ def index():
         monthly_commitments=monthly_commitments,
         active_count=active_count,
         currency=current_user.currency,
-        user_categories=current_user.get_all_categories(),
+        user_categories=current_user.get_all_categories(kinds={INCOME, EXPENSE}),
         now=datetime.now())
 
 

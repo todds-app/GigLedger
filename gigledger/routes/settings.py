@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
-from ..models import db, DEFAULT_INCOME_CATEGORIES, DEFAULT_EXPENSE_CATEGORIES
+from ..models import (db, DEFAULT_INCOME_CATEGORIES, DEFAULT_EXPENSE_CATEGORIES,
+                      DEFAULT_INVENTORY_CATEGORIES)
 
 settings_bp = Blueprint('settings', __name__)
 
@@ -22,6 +23,8 @@ def index():
         expense_categories=current_user.get_expense_categories(),
         default_income_categories=DEFAULT_INCOME_CATEGORIES,
         default_expense_categories=DEFAULT_EXPENSE_CATEGORIES,
+        inventory_categories=current_user.get_inventory_categories(),
+        default_inventory_categories=DEFAULT_INVENTORY_CATEGORIES,
         available_themes=AVAILABLE_THEMES,
         current_theme=current_user.theme or 'emerald',
         dark_mode=current_user.dark_mode or False)
@@ -54,68 +57,86 @@ def update_currency():
     return redirect(url_for('settings.index'))
 
 
-@settings_bp.route('/settings/categories/income/add', methods=['POST'])
-@login_required
-def add_income_category():
+# One list per kind. The routes stay separate endpoints - templates and the
+# CSRF walk name them - but the behaviour is written once.
+CATEGORY_LISTS = {
+    'income': ('Income', 'custom_income_categories', DEFAULT_INCOME_CATEGORIES),
+    'expense': ('Expense', 'custom_expense_categories', DEFAULT_EXPENSE_CATEGORIES),
+    'inventory': ('Inventory', 'custom_inventory_categories', DEFAULT_INVENTORY_CATEGORIES),
+}
+
+
+def _current(kind):
+    return {'income': current_user.get_income_categories,
+            'expense': current_user.get_expense_categories,
+            'inventory': current_user.get_inventory_categories}[kind]()
+
+
+def _add_category(kind):
+    label, column, _ = CATEGORY_LISTS[kind]
     name = request.form.get('category_name', '').strip()
     if not name:
         flash('Category name cannot be empty.', 'error')
-    elif name in current_user.get_income_categories():
+    elif name in _current(kind):
         flash(f'Category "{name}" already exists.', 'error')
     else:
-        cats = current_user.get_income_categories()
-        cats.append(name)
-        current_user.custom_income_categories = ','.join(cats)
+        setattr(current_user, column, ','.join(_current(kind) + [name]))
         db.session.commit()
-        flash(f'Income category "{name}" added!', 'success')
+        flash(f'{label} category "{name}" added!', 'success')
     return redirect(url_for('settings.index'))
+
+
+def _delete_category(kind):
+    label, column, defaults = CATEGORY_LISTS[kind]
+    name = request.form.get('category_name', '').strip()
+    cats = _current(kind)
+    if name in defaults:
+        # The UI offers no button for these; the route agrees.
+        flash('Default categories cannot be removed.', 'error')
+    elif name in cats:
+        cats.remove(name)
+        setattr(current_user, column, ','.join(cats) if cats else '')
+        db.session.commit()
+        flash(f'{label} category "{name}" removed.', 'success')
+    else:
+        flash(f'Category "{name}" not found.', 'error')
+    return redirect(url_for('settings.index'))
+
+
+@settings_bp.route('/settings/categories/income/add', methods=['POST'])
+@login_required
+def add_income_category():
+    return _add_category('income')
 
 
 @settings_bp.route('/settings/categories/income/delete', methods=['POST'])
 @login_required
 def delete_income_category():
-    name = request.form.get('category_name', '').strip()
-    cats = current_user.get_income_categories()
-    if name in cats:
-        cats.remove(name)
-        current_user.custom_income_categories = ','.join(cats) if cats else ''
-        db.session.commit()
-        flash(f'Income category "{name}" removed.', 'success')
-    else:
-        flash(f'Category "{name}" not found.', 'error')
-    return redirect(url_for('settings.index'))
+    return _delete_category('income')
 
 
 @settings_bp.route('/settings/categories/expense/add', methods=['POST'])
 @login_required
 def add_expense_category():
-    name = request.form.get('category_name', '').strip()
-    if not name:
-        flash('Category name cannot be empty.', 'error')
-    elif name in current_user.get_expense_categories():
-        flash(f'Category "{name}" already exists.', 'error')
-    else:
-        cats = current_user.get_expense_categories()
-        cats.append(name)
-        current_user.custom_expense_categories = ','.join(cats)
-        db.session.commit()
-        flash(f'Expense category "{name}" added!', 'success')
-    return redirect(url_for('settings.index'))
+    return _add_category('expense')
 
 
 @settings_bp.route('/settings/categories/expense/delete', methods=['POST'])
 @login_required
 def delete_expense_category():
-    name = request.form.get('category_name', '').strip()
-    cats = current_user.get_expense_categories()
-    if name in cats:
-        cats.remove(name)
-        current_user.custom_expense_categories = ','.join(cats) if cats else ''
-        db.session.commit()
-        flash(f'Expense category "{name}" removed.', 'success')
-    else:
-        flash(f'Category "{name}" not found.', 'error')
-    return redirect(url_for('settings.index'))
+    return _delete_category('expense')
+
+
+@settings_bp.route('/settings/categories/inventory/add', methods=['POST'])
+@login_required
+def add_inventory_category():
+    return _add_category('inventory')
+
+
+@settings_bp.route('/settings/categories/inventory/delete', methods=['POST'])
+@login_required
+def delete_inventory_category():
+    return _delete_category('inventory')
 
 
 @settings_bp.route('/settings/theme', methods=['POST'])
@@ -146,6 +167,7 @@ def toggle_dark_mode():
 def reset_categories():
     current_user.custom_income_categories = ''
     current_user.custom_expense_categories = ''
+    current_user.custom_inventory_categories = ''
     db.session.commit()
     flash('Categories reset to defaults.', 'success')
     return redirect(url_for('settings.index'))

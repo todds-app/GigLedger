@@ -512,3 +512,49 @@ def test_project_detail_without_items_says_so_in_one_line(app):
         pid = Project.query.filter_by(user_id=demo_user_id(app)).first().id
     page = authenticated_client(app).get(f'/projects/{pid}').get_data(as_text=True)
     assert 'No inventory bought for this project' in page
+
+
+# --- Settings ----------------------------------------------------------------
+
+def test_settings_shows_the_inventory_categories_with_guidance(app):
+    page = authenticated_client(app).get('/settings').get_data(as_text=True)
+    assert 'Inventory Categories' in page
+    assert 'Casegoods &amp; Storage' in page
+    assert 'Beds, nightstands, dressers' in page
+
+
+def test_an_inventory_category_can_be_added_and_removed(app):
+    client = authenticated_client(app)
+    client.post('/settings/categories/inventory/add', data={'category_name': 'Appliances'})
+    with app.app_context():
+        assert 'Appliances' in User.query.get(demo_user_id(app)).get_inventory_categories()
+    client.post('/settings/categories/inventory/delete', data={'category_name': 'Appliances'})
+    with app.app_context():
+        assert 'Appliances' not in User.query.get(demo_user_id(app)).get_inventory_categories()
+
+
+@pytest.mark.parametrize('kind,default', [
+    ('income', 'Client Payment'), ('expense', 'Software'), ('inventory', 'Seating')])
+def test_a_default_category_cannot_be_removed(app, kind, default):
+    body = authenticated_client(app).post(
+        f'/settings/categories/{kind}/delete', data={'category_name': default},
+        follow_redirects=True).get_data(as_text=True)
+    assert 'Default categories' in body
+    with app.app_context():
+        user = User.query.get(demo_user_id(app))
+        assert default in user.get_all_categories()
+
+
+def test_reset_clears_the_inventory_list_too(app):
+    client = authenticated_client(app)
+    client.post('/settings/categories/inventory/add', data={'category_name': 'Appliances'})
+    client.post('/settings/categories/reset')
+    with app.app_context():
+        user = User.query.get(demo_user_id(app))
+        assert user.custom_inventory_categories == ''
+        assert user.get_inventory_categories() == DEFAULT_INVENTORY_CATEGORIES
+
+
+def test_the_recurring_page_does_not_offer_inventory_categories(app):
+    page = authenticated_client(app).get('/recurring/').get_data(as_text=True)
+    assert 'Casegoods' not in page

@@ -239,6 +239,41 @@
         </div>
     </div>
 
+    <!-- Inventory categories -->
+    <div class="glass-card p-6 fade-up fade-up-delay-5">
+        <div class="flex items-center justify-between mb-2">
+            <h2 class="text-lg font-extrabold text-gray-900">Inventory Categories</h2>
+            <span class="text-xs text-gray-300 font-medium">Assets, not expenses</span>
+        </div>
+        <p class="text-sm text-gray-400 mb-4 font-medium">Add or remove categories for inventory you buy and hold. The notes under each default say what belongs there.</p>
+        <form method="POST" action="{{ url_port('settings.add_inventory_category') }}" class="flex gap-2 mb-4">
+            {{ csrf_field() }}
+            <input type="text" name="category_name" placeholder="New inventory category..." required class="candy-input flex-1 px-4 py-2.5 text-gray-900 focus:outline-none text-sm">
+            <button type="submit" class="candy-btn px-4 py-2.5 text-sm">Add</button>
+        </form>
+        <div class="space-y-2">
+            {% for cat in inventory_categories %}
+            <div class="flex items-start gap-3">
+                <div class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50/80 text-amber-700 rounded-xl text-sm font-bold whitespace-nowrap">
+                    {{ cat }}
+                    {% if cat not in default_inventory_categories %}
+                    <form method="POST" action="{{ url_port('settings.delete_inventory_category') }}" class="inline" onsubmit="return confirm({{ ('Remove ' ~ cat ~ '?')|tojson|forceescape }})">
+                        {{ csrf_field() }}
+                        <input type="hidden" name="category_name" value="{{ cat }}">
+                        <button type="submit" class="text-amber-300 hover:text-amber-700 transition-colors ml-1">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </form>
+                    {% else %}
+                    <span class="text-amber-200 ml-1">&#8226;</span>
+                    {% endif %}
+                </div>
+                {% if inventory_guidance[cat] %}<p class="text-xs text-gray-400 leading-relaxed pt-1.5">{{ inventory_guidance[cat] }}</p>{% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
     <!-- Reset categories -->
     <div class="glass-card p-6 fade-up fade-up-delay-5">
         <h2 class="text-lg font-extrabold text-gray-900 mb-2">Reset Categories</h2>
