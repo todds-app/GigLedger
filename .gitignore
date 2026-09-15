@@ -22,3 +22,6 @@ env/
 # Database backups made by the run wrapper, and browser-driven verification output
 *.db.bak-*
 .playwright-mcp/
+
+# Local test logins (plaintext passwords — never commit)
+TEST_CREDENTIALS.md
