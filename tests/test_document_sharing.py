@@ -515,3 +515,187 @@ def test_the_migration_adds_documents_seen_at_to_an_existing_portal_accounts_tab
     columns = {row[1] for row in conn.execute("PRAGMA table_info(portal_accounts)")}
     conn.close()
     assert 'documents_seen_at' in columns
+
+
+# --- client uploads ------------------------------------------------------
+#
+# A portal client can add a file or a link to a project they are the client
+# of. The row is the freelancer's document (user_id is theirs), attributed to
+# the Client row, and shared back to that client in the same commit. Only the
+# owner removes. See docs/superpowers/specs/2026-09-15-portal-client-uploads-design.md
+# and ADR-0013.
+
+def portal_upload(http, project_id, filename='floorplan.pdf', title='Floor plan',
+                  content=b'%PDF-1.4 client'):
+    return http.post(f'/portal/projects/{project_id}/documents/upload',
+                     data={'title': title, 'file': (io.BytesIO(content), filename)},
+                     content_type='multipart/form-data', follow_redirects=True)
+
+
+def portal_link(http, project_id, url='https://docs.google.com/document/d/xyz/edit',
+                title='Design board'):
+    return http.post(f'/portal/projects/{project_id}/documents/link',
+                     data={'title': title, 'url': url}, follow_redirects=True)
+
+
+def test_a_client_can_upload_to_their_own_project(app):
+    project_id = a_project(app)            # project 1, whose client is Acme Corp
+    client_id = a_client_id(app)           # Acme Corp
+    http = portal_for(app, client_id)
+
+    response = portal_upload(http, project_id)
+
+    assert response.status_code == 200
+    with app.app_context():
+        doc = ProjectDocument.query.one()
+        assert doc.kind == 'upload'
+        assert doc.project_id == project_id
+        assert doc.user_id == 1                       # the freelancer's document
+        assert doc.added_by_client_id == client_id    # attributed to the client
+        assert doc.shared_client_ids == {client_id}   # and visible to them at once
+        assert os.path.exists(gigledger.documents.path_for(doc.stored_name))
+
+
+def test_a_client_can_add_a_link_to_their_own_project(app):
+    project_id = a_project(app)
+    client_id = a_client_id(app)
+
+    portal_link(portal_for(app, client_id), project_id)
+
+    with app.app_context():
+        doc = ProjectDocument.query.one()
+        assert doc.kind == 'link'
+        assert doc.provider == 'google_drive'
+        assert doc.user_id == 1
+        assert doc.added_by_client_id == client_id
+        assert doc.shared_client_ids == {client_id}
+
+
+def test_a_client_cannot_upload_to_another_clients_project(app):
+    """Project 2 belongs to StartupXYZ. Acme Corp's account gets the same 404
+    the download route gives: which reason would itself be information."""
+    with app.app_context():
+        other_project = Project.query.filter_by(user_id=1, client_id=2).one().id
+    http = portal_for(app, a_client_id(app))
+
+    response = portal_upload(http, other_project)
+
+    assert response.status_code == 404
+    with app.app_context():
+        assert ProjectDocument.query.count() == 0
+
+
+def test_a_client_cannot_upload_to_a_project_with_no_client(app):
+    project_id = a_project(app)
+    client_id = a_client_id(app)
+    with app.app_context():
+        db.session.get(Project, project_id).client_id = None
+        db.session.commit()
+
+    response = portal_upload(portal_for(app, client_id), project_id)
+
+    assert response.status_code == 404
+
+
+def test_a_client_upload_obeys_the_same_allowlist(app):
+    project_id = a_project(app)
+    http = portal_for(app, a_client_id(app))
+
+    portal_upload(http, project_id, filename='payload.html', content=b'<script>')
+
+    with app.app_context():
+        assert ProjectDocument.query.count() == 0
+    assert os.listdir(gigledger.documents.UPLOAD_ROOT) == []
+
+
+def test_a_client_link_obeys_the_same_scheme_rule(app):
+    project_id = a_project(app)
+    http = portal_for(app, a_client_id(app))
+
+    portal_link(http, project_id, url='javascript:alert(1)')
+
+    with app.app_context():
+        assert ProjectDocument.query.count() == 0
+
+
+def test_the_portal_has_no_way_to_delete_a_document(app):
+    """Only the owner removes: a client who uploaded the wrong file asks."""
+    project_id = a_project(app)
+    http = portal_for(app, a_client_id(app))
+    portal_upload(http, project_id)
+    with app.app_context():
+        doc_id = ProjectDocument.query.one().id
+
+    assert http.post(f'/portal/documents/{doc_id}/delete').status_code in (404, 405)
+    owner_route = http.post(f'/projects/documents/{doc_id}/delete', follow_redirects=False)
+    assert owner_route.status_code in (302, 401, 403, 404)   # not the owner's session
+    with app.app_context():
+        assert ProjectDocument.query.count() == 1
+
+
+def test_the_portal_lists_a_project_before_anything_is_shared(app):
+    """A client cannot add to a project they cannot see, so the home page
+    lists every project the account is the client of - by name only."""
+    client_id = a_client_id(app)
+
+    body = portal_for(app, client_id).get('/portal/').get_data(as_text=True)
+
+    assert 'Website Redesign' in body         # Acme Corp's project
+    assert 'Monthly Retainer' not in body     # StartupXYZ's
+    assert 'No documents yet' in body
+
+
+def test_the_portal_does_not_list_a_project_with_no_client(app):
+    project_id = a_project(app)
+    client_id = a_client_id(app)
+    with app.app_context():
+        db.session.get(Project, project_id).client_id = None
+        db.session.commit()
+
+    body = portal_for(app, client_id).get('/portal/').get_data(as_text=True)
+
+    assert 'Website Redesign' not in body
+
+
+def test_the_owner_sees_who_added_a_document(app):
+    project_id = a_project(app)
+    portal_upload(portal_for(app, a_client_id(app)), project_id, title='Site survey')
+
+    body = freelancer(app).get(f'/projects/{project_id}').get_data(as_text=True)
+
+    assert 'Site survey' in body
+    assert 'Added by Acme Corp' in body
+
+
+def test_a_clients_own_upload_is_not_new_to_them(app):
+    """It was not shared *with* them; greeting an uploader with "1 document
+    shared with you since your last visit" would be wrong."""
+    project_id = a_project(app)
+    http = portal_for(app, a_client_id(app))
+    portal_upload(http, project_id)
+
+    body = http.get('/portal/').get_data(as_text=True)
+
+    assert new_marker_count(body) == 0
+    assert 'since your last visit' not in body
+
+
+def test_the_migration_adds_added_by_client_id_to_an_existing_documents_table(tmp_path, monkeypatch):
+    db_path = str(tmp_path / 'legacy.db')
+    conn = sqlite3.connect(db_path)
+    conn.execute("CREATE TABLE project_documents ("
+                 "id INTEGER PRIMARY KEY, user_id INTEGER, project_id INTEGER, "
+                 "kind VARCHAR(20), title VARCHAR(200), stored_name VARCHAR(80), "
+                 "original_name VARCHAR(255), byte_size INTEGER, external_url TEXT, "
+                 "provider VARCHAR(20), created_at DATETIME, updated_at DATETIME)")
+    conn.commit()
+    conn.close()
+
+    monkeypatch.setattr(gigledger.app, 'DB_PATH', db_path)
+    monkeypatch.setattr(gigledger.documents, 'UPLOAD_ROOT', str(tmp_path / 'uploads'))
+    create_app()
+
+    conn = sqlite3.connect(db_path)
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(project_documents)")}
+    conn.close()
+    assert 'added_by_client_id' in columns

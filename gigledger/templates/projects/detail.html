@@ -47,7 +47,7 @@
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
             <div>
                 <h2 class="text-sm font-bold text-gray-400 uppercase tracking-wider">Documents</h2>
-                <p class="text-xs text-gray-400 mt-1">Visible only to you until you share one with a client.</p>
+                <p class="text-xs text-gray-400 mt-1">Yours and your client&rsquo;s, in one place. Share a document to make it visible in the portal.</p>
             </div>
             <div class="flex items-center gap-2">
                 <button onclick="document.getElementById('uploadModal').classList.remove('hidden')" class="inline-flex items-center gap-2 px-4 py-2.5 glass-card font-semibold rounded-xl transition-all text-sm hover:scale-105">
@@ -82,6 +82,7 @@
                             {{ doc.original_name }} &middot; {{ doc.size_label }}
                         {% endif %}
                         &middot; {{ doc.created_at.strftime('%d %b %Y') }}
+                        {% if doc.added_by_client %}&middot; <span class="text-amber-600 font-semibold">Added by {{ doc.added_by_client.name }}</span>{% endif %}
                     </p>
                 </div>
                 <div class="flex items-center gap-1.5 shrink-0">

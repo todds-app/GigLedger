@@ -99,25 +99,96 @@ def index():
     new_ids = documents_module.newly_shared_ids(clients, g.portal_account.documents_seen_at)
     documents_module.mark_documents_seen(g.portal_account)
 
-    # Grouped by the freelancer who shared them, then by project. A portal
-    # account is global (ADR-0008), so one page can carry two tenants' material;
-    # rendering it as one undifferentiated list would be a leak of context even
-    # though every individual row is authorised.
+    # Every project the account is the client of is listed, documents or not:
+    # a client cannot add to a project they cannot see. A project reached only
+    # through a share grant is listed too, but nothing can be added to it -
+    # the grant gave access to one document, not to the project (ADR-0009).
+    # Grouped by freelancer, because a portal account is global (ADR-0008)
+    # and one page can carry two tenants' material.
     by_owner = {}
-    for doc in documents:
-        owner = db.session.get(User, doc.user_id)
-        group = by_owner.setdefault(doc.user_id, {
+    projects = {}
+
+    def project_entry(project, can_add):
+        owner = db.session.get(User, project.user_id)
+        group = by_owner.setdefault(project.user_id, {
             'name': owner.business_name or owner.email,
-            'projects': {},
+            'projects': [],
         })
-        project = db.session.get(Project, doc.project_id)
-        group['projects'].setdefault(project.name, []).append(doc)
+        entry = projects.get(project.id)
+        if entry is None:
+            entry = {'id': project.id, 'name': project.name, 'docs': [], 'can_add': can_add}
+            projects[project.id] = entry
+            group['projects'].append(entry)
+        return entry
+
+    for project in documents_module.projects_of(clients):
+        project_entry(project, can_add=True)
+    for doc in documents:
+        project_entry(db.session.get(Project, doc.project_id), can_add=False)['docs'].append(doc)
 
     return render_template('portal/index.html',
                            account=g.portal_account,
                            groups=list(by_owner.values()),
                            new_ids=new_ids,
-                           new_count=len(new_ids))
+                           new_count=len(new_ids),
+                           max_upload_mb=documents_module.MAX_UPLOAD_BYTES // (1024 * 1024))
+
+
+def _project_of_mine(project_id):
+    """The project, if this account is its client. One 404 for "no such
+    project", "somebody else's client" and "no client on it": which of those
+    it is would itself be information - the same answer download() gives."""
+    project = db.session.get(Project, project_id)
+    clients = portal_auth.visible_clients(g.portal_account)
+    if not project or project.client_id is None or project.client_id not in {c.id for c in clients}:
+        abort(404)
+    return project
+
+
+@portal_bp.route('/projects/<int:project_id>/documents/upload', methods=['POST'])
+@client_required
+def upload_document(project_id):
+    """A client's file becomes the owner's document, attributed to the client
+    and shared back to them in the same commit. See ADR-0013."""
+    project = _project_of_mine(project_id)
+
+    upload = request.files.get('file')
+    if not upload or not upload.filename:
+        flash('Choose a file to upload.', 'error')
+        return redirect(url_for('portal.index'))
+
+    if not documents_module.is_allowed_upload(upload.filename):
+        flash('That file type is not accepted. Documents, spreadsheets, '
+              'presentations, images and zip archives only.', 'error')
+        return redirect(url_for('portal.index'))
+
+    stored_name, byte_size = documents_module.store(upload)
+    documents_module.add_from_client(
+        project, kind='upload',
+        title=request.form.get('title', '').strip() or upload.filename,
+        stored_name=stored_name, original_name=upload.filename, byte_size=byte_size)
+
+    flash('Document uploaded.', 'success')
+    return redirect(url_for('portal.index'))
+
+
+@portal_bp.route('/projects/<int:project_id>/documents/link', methods=['POST'])
+@client_required
+def link_document(project_id):
+    project = _project_of_mine(project_id)
+
+    url = documents_module.clean_external_url(request.form.get('url', ''))
+    if not url:
+        flash('Enter a document link starting with http:// or https://.', 'error')
+        return redirect(url_for('portal.index'))
+
+    documents_module.add_from_client(
+        project, kind='link',
+        title=request.form.get('title', '').strip() or url,
+        external_url=url, provider=documents_module.provider_of(url))
+
+    flash('Document link added.', 'success')
+    return redirect(url_for('portal.index'))
 
 
 @portal_bp.route('/documents/<int:doc_id>/download')

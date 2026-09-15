@@ -350,6 +350,14 @@ class ProjectDocument(db.Model):
     external_url = db.Column(db.Text, nullable=True)
     provider = db.Column(db.String(20), nullable=True)  # google_drive, other
 
+    # Set when a portal client added the document; null means the owner did.
+    # Names the Client row rather than the PortalAccount for the reason a
+    # share grant does (ADR-0009): it is the identity the owner recognises,
+    # and it survives portal access being revoked and reissued. The document
+    # is still the owner's - `user_id` is theirs. See ADR-0013.
+    added_by_client_id = db.Column(db.Integer, db.ForeignKey('clients.id'), nullable=True)
+    added_by_client = db.relationship('Client', foreign_keys=[added_by_client_id], lazy=True)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

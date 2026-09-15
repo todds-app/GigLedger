@@ -450,3 +450,19 @@ def test_another_users_documents_do_not_count_on_my_list(app):
         their_pid = Project.query.filter_by(user_id=stranger_id).one().id
 
     assert 'No documents' in documents_row(app, their_pid, user_id=stranger_id)
+
+
+def test_a_recent_client_added_document_is_flagged_as_from_a_client(app):
+    """The owner did not add it, so the pill says where it came from rather
+    than merely that it is recent."""
+    pid = a_project(app)
+    with app.app_context():
+        db.session.add(ProjectDocument(user_id=1, project_id=pid, kind='link',
+                                       title='From the client', external_url='https://x.example',
+                                       provider='other', added_by_client_id=1))
+        db.session.commit()
+
+    row = documents_row(app, pid)
+
+    assert 'New from client' in row
+    assert 'New this week' not in row

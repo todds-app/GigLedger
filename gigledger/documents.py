@@ -133,23 +133,28 @@ def documents_shared_with(clients):
 
 
 def per_project_stats(user_id):
-    """{project_id: (document count, most recent created_at)} for one owner.
+    """{project_id: (count, latest created_at, latest client-added created_at)}
+    for one owner.
 
     One grouped query rather than `project.documents` per card: the list page
     renders every project the user has, and a lazy load per card is a query
-    per card.
+    per card. The third value is None when no client has added anything.
     """
-    from sqlalchemy import func
+    from sqlalchemy import case, func
     from .models import ProjectDocument
 
+    client_added = case((ProjectDocument.added_by_client_id.isnot(None),
+                         ProjectDocument.created_at), else_=None)
     rows = (ProjectDocument.query
             .with_entities(ProjectDocument.project_id,
                            func.count(ProjectDocument.id),
-                           func.max(ProjectDocument.created_at))
+                           func.max(ProjectDocument.created_at),
+                           func.max(client_added))
             .filter_by(user_id=user_id)
             .group_by(ProjectDocument.project_id)
             .all())
-    return {project_id: (count, latest) for project_id, count, latest in rows}
+    return {project_id: (count, latest, latest_from_client)
+            for project_id, count, latest, latest_from_client in rows}
 
 
 def recent_cutoff(now=None):
@@ -161,17 +166,54 @@ def newly_shared_ids(clients, since):
 
     Computed from the grant, not the document: the grant is what gives a
     client access (ADR-0006), so the grant is what makes a document new *to
-    them*. `since=None` is a first visit, and everything counts.
+    them*. `since=None` is a first visit, and everything counts. A document
+    one of these clients added themselves is never new to them - it was not
+    shared *with* them (ADR-0013).
     """
-    from .models import DocumentShare
+    from sqlalchemy import or_
+    from .models import DocumentShare, ProjectDocument
 
     client_ids = [c.id for c in clients]
     if not client_ids:
         return set()
-    query = DocumentShare.query.filter(DocumentShare.client_id.in_(client_ids))
+    query = (DocumentShare.query
+             .join(ProjectDocument, ProjectDocument.id == DocumentShare.document_id)
+             .filter(DocumentShare.client_id.in_(client_ids))
+             .filter(or_(ProjectDocument.added_by_client_id.is_(None),
+                         ProjectDocument.added_by_client_id.not_in(client_ids))))
     if since is not None:
         query = query.filter(DocumentShare.created_at > since)
     return {share.document_id for share in query.all()}
+
+
+def projects_of(clients):
+    """Every project one of these Client rows is the client of."""
+    from .models import Project
+
+    client_ids = [c.id for c in clients]
+    if not client_ids:
+        return []
+    return (Project.query.filter(Project.client_id.in_(client_ids))
+            .order_by(Project.name).all())
+
+
+def add_from_client(project, **columns):
+    """Record a document a portal client added to their project.
+
+    The row is the owner's (`user_id` is the project owner's), attributed to
+    the project's Client, and granted back to that client in the same commit
+    so the person who added it sees it at once. The owner's existing list,
+    share and delete paths apply to it unchanged. See ADR-0013.
+    """
+    from .models import DocumentShare, ProjectDocument, db
+
+    doc = ProjectDocument(user_id=project.user_id, project_id=project.id,
+                          added_by_client_id=project.client_id, **columns)
+    db.session.add(doc)
+    db.session.flush()
+    db.session.add(DocumentShare(document_id=doc.id, client_id=project.client_id))
+    db.session.commit()
+    return doc
 
 
 def mark_documents_seen(account):

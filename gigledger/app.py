@@ -258,6 +258,13 @@ def _migrate_db(db):
     if pa_columns and 'documents_seen_at' not in pa_columns:
         cursor.execute("ALTER TABLE portal_accounts ADD COLUMN documents_seen_at DATETIME")
 
+    # Migrate project_documents table - who added it, when a portal client did
+    cursor.execute("PRAGMA table_info(project_documents)")
+    pd_columns = {row[1] for row in cursor.fetchall()}
+    if pd_columns and 'added_by_client_id' not in pd_columns:
+        cursor.execute("ALTER TABLE project_documents ADD COLUMN added_by_client_id "
+                       "INTEGER REFERENCES clients(id)")
+
     # Migrate tax_estimates table - fix foreign key
     cursor.execute("PRAGMA table_info(tax_estimates)")
     te_columns = {row[1] for row in cursor.fetchall()}

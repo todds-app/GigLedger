@@ -21,6 +21,7 @@ carries a vacuity check for the same reason that one does.
 """
 from datetime import datetime, timedelta
 
+import re
 import pytest
 
 import gigledger.app
@@ -171,7 +172,7 @@ def routes_that_answered(app, make_client):
     answered = []
     for rule in portal_rules(app):
         method = 'POST' if 'POST' in rule.methods else 'GET'
-        path = rule.rule.replace('<int:doc_id>', '1').replace('<int:id>', '1')
+        path = re.sub(r'<int:\w+>', '1', rule.rule)
         response = make_client().open(path, method=method)
         bounced = (response.status_code == 302
                    and '/portal/login' in response.headers.get('Location', ''))

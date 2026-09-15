@@ -1,7 +1,7 @@
 # Client uploads from the portal
 
 - **Date:** 2026-09-15
-- **Status:** Approved, not yet implemented
+- **Status:** Implemented (ADR-0013)
 - **Scope:** One piece. A portal client can add a file or a Drive link to a
   project they are the client of; the freelancer sees who added it.
 - **Builds on:** ADR-0006 (storage), ADR-0007 (links as references), ADR-0008
