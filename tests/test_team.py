@@ -94,3 +94,15 @@ def test_login_records_last_login_at(app):
                                            'password': 'demo1234'})
     with app.app_context():
         assert User.query.get(1).last_login_at is not None
+
+
+def test_login_accepts_the_email_in_any_case(app):
+    from gigledger.app import bcrypt
+    with app.app_context():
+        user = User.query.get(1)
+        user.password_hash = bcrypt.generate_password_hash('demo1234').decode('utf-8')
+        db.session.commit()
+    response = app.test_client().post('/login', data={'email': 'Demo@GigLedger.com',
+                                                      'password': 'demo1234'})
+    assert response.status_code == 302
+    assert response.headers['Location'].endswith('/')

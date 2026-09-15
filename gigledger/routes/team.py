@@ -32,6 +32,7 @@ def setup():
                         password_hash=bcrypt.generate_password_hash(password).decode('utf-8'))
             db.session.add(user)
             db.session.commit()
+            portal_auth.forget_portal_session()
             login_user(user, remember=True)
             flash(f'Welcome to {business_name}.', 'success')
             return redirect(url_for('dashboard.index'))

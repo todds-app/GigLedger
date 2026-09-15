@@ -20,7 +20,7 @@ def login():
         return redirect(url_for('dashboard.index'))
 
     if request.method == 'POST':
-        email = request.form.get('email', '').strip()
+        email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
 
         # The same throttle the portal uses. Hardening the client-facing login
