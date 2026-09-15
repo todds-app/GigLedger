@@ -359,3 +359,30 @@ def test_deleting_an_inventory_purchase_through_the_route_removes_the_item(app):
     with app.app_context():
         assert Transaction.query.get(tx_id) is None
         assert InventoryItem.query.count() == 0
+
+
+# --- Monthly commitment ------------------------------------------------------
+
+def test_monthly_commitment_counts_a_recurring_inventory_order(app):
+    """A commitment is an obligation to pay, not a P&L category. Decided in
+    the piece 2 spec; ADR-0010 lists it as the third kind-blind figure."""
+    with app.app_context():
+        uid = demo_user_id(app)
+        RecurringTransaction.query.delete()
+        db.session.add(RecurringTransaction(
+            user_id=uid, description='Candles, monthly', amount=-120.0,
+            kind=INVENTORY, category='Tabletop & Decorative Accessories',
+            frequency='monthly', day_of_month=1, is_active=True,
+            next_date=datetime(2099, 1, 1)))
+        db.session.add(RecurringTransaction(
+            user_id=uid, description='Hosting', amount=-30.0, kind=EXPENSE,
+            frequency='monthly', day_of_month=1, is_active=True,
+            next_date=datetime(2099, 1, 1)))
+        db.session.add(RecurringTransaction(
+            user_id=uid, description='Retainer', amount=500.0, kind=INCOME,
+            frequency='monthly', day_of_month=1, is_active=True,
+            next_date=datetime(2099, 1, 1)))
+        db.session.commit()
+    client = authenticated_client(app)
+    assert '$150.00' in client.get('/recurring/').get_data(as_text=True)
+    assert '$150.00' in client.get('/').get_data(as_text=True)

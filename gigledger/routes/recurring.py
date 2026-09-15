@@ -40,9 +40,10 @@ def index():
         RecurringTransaction.is_active.desc(), RecurringTransaction.next_date.asc().nullslast(),
         RecurringTransaction.created_at.desc()).all()
 
-    # Monthly commitments: sum of active monthly recurring expenses
+    # Monthly commitments: everything that leaves the account each month.
+    # Cash, not cost - a recurring inventory order counts. ADR-0010.
     monthly_commitments = sum(abs(r.amount) for r in recurring
-                              if r.is_active and r.is_expense and r.frequency == 'monthly')
+                              if r.is_active and not r.is_income and r.frequency == 'monthly')
     active_count = sum(1 for r in recurring if r.is_active)
 
     return render_template('recurring/index.html',

@@ -64,10 +64,11 @@ def index():
     # New: Client count
     client_count = Client.query.filter_by(user_id=uid, is_active=True).count()
 
-    # New: Recurring monthly commitment
+    # Recurring monthly commitment: everything that leaves the account each
+    # month. Cash, not cost - a recurring inventory order counts. ADR-0010.
     from ..models import RecurringTransaction
     recurring_active = RecurringTransaction.query.filter_by(user_id=uid, is_active=True, frequency='monthly').all()
-    monthly_commitment = sum(abs(r.amount) for r in recurring_active if r.is_expense)
+    monthly_commitment = sum(abs(r.amount) for r in recurring_active if not r.is_income)
 
     return render_template('dashboard/index.html',
         month_income=month_income, month_expenses=month_expenses,
