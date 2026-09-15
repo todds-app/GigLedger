@@ -104,7 +104,7 @@ No more setting aside random percentages. No more spreadsheet gymnastics. Just c
 - **Downloads are always attachments** — Never rendered in the browser, whatever the file type
 - **Stored under generated names** — The name you chose is data; the file on disk is an opaque token
 - **Deleting a project deletes its documents** — Rows *and* bytes
-- **Private by default** — A document is visible to nobody until you grant it to named clients
+- **Private by default** — A document is visible to every admin and to no client until you grant it to named clients
 - **Share with any of your clients** — Not just the project's own client; unchecking a box revokes access immediately
 - **Access log** — Every successful download is recorded, by you or by a client
 
@@ -179,7 +179,7 @@ No more setting aside random percentages. No more spreadsheet gymnastics. Just c
 ### 🔐 Authentication
 - Secure login with Flask-Login + Flask-Bcrypt
 - "Remember me" session support
-- Demo account pre-loaded with 6 months of realistic data
+- Demo account with 6 months of realistic data, but only when the database was seeded with `SEED_DEMO=1`
 
 ---
 
@@ -282,7 +282,9 @@ The app starts at **http://localhost:3030**
 
 ### Demo Account
 
-Log in instantly with pre-loaded data:
+Only exists when the database was seeded with `SEED_DEMO=1`; a fresh install
+run without it has no admin at all and starts at `/setup`. When seeded, log
+in instantly with pre-loaded data:
 
 | Field | Value |
 |---|---|
@@ -310,7 +312,7 @@ gigledger/                      # Repository root — may be named anything
 ├── uploads/                    # Attached project documents (auto-created, gitignored)
 ├── gigledger/                  # The application package
 │   ├── app.py                  # Flask app factory, config, seed data, DB migrations
-│   ├── models.py               # SQLAlchemy models (15 models)
+│   ├── models.py               # SQLAlchemy models (18 models)
 │   ├── documents.py            # Document storage: upload root, allowlist, URL scheme rules
 │   ├── portal_auth.py          # Client Portal sessions, invites, revocation, throttling
 │   ├── team.py                 # Admin invites: setup, issue, cancel, redeem, remove
@@ -377,13 +379,15 @@ gigledger/                      # Repository root — may be named anything
 
 | Model | Table | Key Fields |
 |---|---|---|
-| **User** | `users` | email, password_hash, tax_rate, currency, categories, theme, dark_mode, business info, invoice settings |
+| **Business** | `business` | name, address, phone, default_tax_rate, currency, invoice_prefix, next_invoice_number, invoice_note, custom categories (one row, `Business.get()`) |
+| **User** | `users` | email, password_hash, theme, dark_mode, created_at, last_login_at |
 | **Transaction** | `transactions` | amount (+income/-expense), date, category, description, is_tax_deductible, source (manual/invoice/project/recurring), invoice_id |
 | **Invoice** | `invoices` | client_id, invoice_number, status, issue_date, due_date, subtotal, tax_amount, total, paid_date |
 | **InvoiceLineItem** | `invoice_line_items` | invoice_id, description, quantity, rate, amount |
 | **Client** | `clients` | name, email, phone, company, address, notes, is_active, portal_account_id |
 | **PortalAccount** | `portal_accounts` | email (global, unique), password_hash, session_epoch, last_login_at |
 | **PortalInvite** | `portal_invites` | client_id, email, token_hash, expires_at, redeemed_at |
+| **AdminInvite** | `admin_invites` | email, token_hash, invited_by, expires_at, redeemed_at |
 | **LoginAttempt** | `login_attempts` | scope (portal/app), identifier, ip, at |
 | **Project** | `projects` | client_id, name, description, status, rate_type, rate, hours_logged, deadline, color |
 | **ProjectDocument** | `project_documents` | project_id, kind (upload/link), title, stored_name, original_name, byte_size, external_url, provider |
@@ -529,7 +533,7 @@ When an invoice is **un-paid** (reverted to Sent), **both** auto-posted transact
 - [ ] **Receipt upload** — Attach receipts to transactions
 - [ ] **Time tracking** — Built-in timer with project integration
 - [ ] **Mobile app** — React Native companion
-- [ ] **Multi-user / Team** — Shared workspaces for small studios
+- [x] ~~**Multiple admins by invitation** — Every admin shares one business; see [docs/adr/0014](docs/adr/0014-one-business-per-install.md)~~
 - [ ] **Email invoicing** — Send invoices directly from the app
 - [ ] **Payment reminders** — Auto-notify overdue clients
 

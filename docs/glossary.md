@@ -162,14 +162,14 @@ a temporary directory and every writer follows.
 ### Share Grant
 
 A `DocumentShare` row — one document granted to one **Client**, unique on the
-pair. A document with no grants is visible to its owner alone: **private by
-default**, so a mis-click leaks nothing because there is nothing to mis-click
-into.
+pair. A document with no grants is visible to every admin and to no client:
+**private by default** on the portal side, so a mis-click leaks nothing
+because there is nothing to mis-click into.
 
-Points at a `Client` rather than a [[Portal Account]] deliberately: the
-freelancer grants access to a client of theirs, and whether that client has ever
-signed in is a separate question. Revoking portal access leaves the grants
-standing. See [ADR-0009](adr/0009-share-documents-by-explicit-grant.md).
+Points at a `Client` rather than a [[Portal Account]] deliberately: an admin
+grants access to a client, and whether that client has ever signed in is a
+separate question. Revoking portal access leaves the grants standing. See
+[ADR-0009](adr/0009-share-documents-by-explicit-grant.md).
 
 ### Access Log
 
