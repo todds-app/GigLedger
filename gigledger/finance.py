@@ -5,6 +5,8 @@ Implements:
   A. The "Safe to Spend" Formula
   B. Quarterly Tax Estimator
   C. Runway Calculator
+
+Every query here is business-wide: there is one business per install (ADR-0014).
 """
 from datetime import datetime
 from .models import COST_KINDS, INCOME, Transaction, db
@@ -28,7 +30,7 @@ def get_quarter_date_range(quarter, year):
     return start_date, end_date
 
 
-def _get_tx_range(user_id, start_date, end_date):
+def _get_tx_range(start_date, end_date):
     """Fetch amounts, deductible flags and kinds for a date range.
 
     The kind comes along because classification is this tuple's job: every
@@ -38,26 +40,25 @@ def _get_tx_range(user_id, start_date, end_date):
     return db.session.query(
         Transaction.amount, Transaction.is_tax_deductible, Transaction.kind
     ).filter(
-        Transaction.user_id == user_id,
         Transaction.date >= start_date,
         Transaction.date < end_date,
     ).all()
 
 
-def calculate_monthly_summary(user_id, year, month):
+def calculate_monthly_summary(year, month):
     """Return (income, expenses) for a given month."""
     if month == 12:
         end = datetime(year + 1, 1, 1)
     else:
         end = datetime(year, month + 1, 1)
     start = datetime(year, month, 1)
-    results = _get_tx_range(user_id, start, end)
+    results = _get_tx_range(start, end)
     income = sum(amount for amount, _, kind in results if kind == INCOME)
     expenses = abs(sum(amount for amount, _, kind in results if kind in COST_KINDS))
     return float(income), float(expenses)
 
 
-def calculate_safe_to_spend(user_id, tax_rate):
+def calculate_safe_to_spend(tax_rate):
     """
     A. The "Safe to Spend" Formula:
        Safe Balance = Bank Balance - Total Unsaved Tax Obligation
@@ -67,16 +68,14 @@ def calculate_safe_to_spend(user_id, tax_rate):
     # Bank Balance = sum of all transactions (income - expenses)
     # Every kind, deliberately. This is cash, not profit: an inventory
     # purchase is money that has left the bank. See docs/adr/0010.
-    result = db.session.query(db.func.sum(Transaction.amount)).filter(
-        Transaction.user_id == user_id,
-    ).scalar()
+    result = db.session.query(db.func.sum(Transaction.amount)).scalar()
     balance = float(result or 0)
 
     # Calculate total tax obligation for the current year
     current_year = datetime.now().year
     tax_obligation = 0.0
     for q in range(1, 5):
-        income, deductions = calculate_quarterly_income_deductions(user_id, q, current_year)
+        income, deductions = calculate_quarterly_income_deductions(q, current_year)
         net = income - deductions
         if net > 0:
             tax_obligation += net * tax_rate
@@ -85,20 +84,20 @@ def calculate_safe_to_spend(user_id, tax_rate):
     return balance, tax_obligation, safe_balance
 
 
-def calculate_quarterly_income_deductions(user_id, quarter, year):
+def calculate_quarterly_income_deductions(quarter, year):
     """
     Compute total income and total tax-deductible expenses for a quarter.
     Only expenses marked as is_tax_deductible reduce the tax burden.
     """
     start_date, end_date = get_quarter_date_range(quarter, year)
-    results = _get_tx_range(user_id, start_date, end_date)
+    results = _get_tx_range(start_date, end_date)
     income = sum(amount for amount, _, kind in results if kind == INCOME)
     deductions = sum(abs(amount) for amount, deductible, kind in results
                      if kind in COST_KINDS and deductible)
     return float(income), float(deductions)
 
 
-def calculate_quarterly_tax(user_id, quarter, year, tax_rate):
+def calculate_quarterly_tax(quarter, year, tax_rate):
     """
     B. Quarterly Tax Estimator:
        Quarterly Net Income = Income - Deductible Expenses
@@ -106,13 +105,13 @@ def calculate_quarterly_tax(user_id, quarter, year, tax_rate):
 
     Returns (income, deductions, net_income, estimated_tax)
     """
-    income, deductions = calculate_quarterly_income_deductions(user_id, quarter, year)
+    income, deductions = calculate_quarterly_income_deductions(quarter, year)
     net_income = income - deductions
     estimated_tax = max(0, net_income * tax_rate)
     return float(income), float(deductions), float(net_income), float(estimated_tax)
 
 
-def calculate_runway(user_id):
+def calculate_runway():
     """
     C. Runway Calculator:
        Average Monthly Expenses = Average of last 3 months of total expenses
@@ -128,19 +127,17 @@ def calculate_runway(user_id):
         while month <= 0:
             month += 12
             year -= 1
-        _, expenses = calculate_monthly_summary(user_id, year, month)
+        _, expenses = calculate_monthly_summary(year, month)
         monthly_expenses.append(expenses)
 
     avg_monthly_expenses = sum(monthly_expenses) / len(monthly_expenses) if monthly_expenses else 0
-    result = db.session.query(db.func.sum(Transaction.amount)).filter(
-        Transaction.user_id == user_id,
-    ).scalar()
+    result = db.session.query(db.func.sum(Transaction.amount)).scalar()
     balance = float(result or 0)
     runway = balance / avg_monthly_expenses if avg_monthly_expenses > 0 else float('inf')
     return balance, avg_monthly_expenses, runway
 
 
-def get_6_month_chart_data(user_id):
+def get_6_month_chart_data():
     """Return chart labels, income data, and expense data for the last 6 months."""
     now = datetime.now()
     labels = []
@@ -156,21 +153,21 @@ def get_6_month_chart_data(user_id):
             month += 12
             year -= 1
         labels.append(f"{month_names[month - 1]} {year}")
-        income, expenses = calculate_monthly_summary(user_id, year, month)
+        income, expenses = calculate_monthly_summary(year, month)
         income_data.append(income)
         expense_data.append(expenses)
 
     return labels, income_data, expense_data
 
 
-def get_recent_transactions(user_id, limit=5):
-    """Return the most recent transactions for a user."""
-    return Transaction.query.filter_by(user_id=user_id)\
+def get_recent_transactions(limit=5):
+    """Return the most recent transactions."""
+    return Transaction.query\
         .order_by(Transaction.date.desc())\
         .limit(limit).all()
 
 
-def get_category_breakdown(user_id, year=None, month=None):
+def get_category_breakdown(year=None, month=None):
     """Return expense totals grouped by category for a given period."""
     now = datetime.now()
     if year is None:
@@ -187,7 +184,6 @@ def get_category_breakdown(user_id, year=None, month=None):
     results = db.session.query(
         Transaction.category, db.func.sum(Transaction.amount)
     ).filter(
-        Transaction.user_id == user_id,
         Transaction.date >= start,
         Transaction.date < end,
         Transaction.kind.in_(COST_KINDS),

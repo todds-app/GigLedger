@@ -418,8 +418,7 @@ def test_an_inventory_purchase_is_not_an_expense(with_inventory):
     characterization figures: expenses are unchanged by 980 of inventory."""
     from gigledger.finance import calculate_monthly_summary
     with with_inventory.app_context():
-        income, expenses = calculate_monthly_summary(
-            demo_user_id(with_inventory), 2026, 3)
+        income, expenses = calculate_monthly_summary(2026, 3)
     assert income == 7500.00
     assert expenses == 1950.00
 
@@ -427,8 +426,7 @@ def test_an_inventory_purchase_is_not_an_expense(with_inventory):
 def test_an_inventory_purchase_does_not_reduce_taxable_income(with_inventory):
     from gigledger.finance import calculate_quarterly_tax
     with with_inventory.app_context():
-        income, deductions, net, _ = calculate_quarterly_tax(
-            demo_user_id(with_inventory), 1, 2026, 0.30)
+        income, deductions, net, _ = calculate_quarterly_tax(1, 2026, 0.30)
     assert (income, deductions, net) == (7500.00, 1500.00, 6000.00)
 
 
@@ -437,16 +435,14 @@ def test_an_inventory_purchase_does_leave_the_bank(with_inventory):
     recognised, so the balance falls by the full purchase price."""
     from gigledger.finance import calculate_safe_to_spend
     with with_inventory.app_context():
-        balance, _, _ = calculate_safe_to_spend(
-            demo_user_id(with_inventory), 0.30)
+        balance, _, _ = calculate_safe_to_spend(0.30)
     assert balance == pytest.approx(5550.00 - INVENTORY_PURCHASE)
 
 
 def test_an_inventory_purchase_is_absent_from_expense_categories(with_inventory):
     from gigledger.finance import get_category_breakdown
     with with_inventory.app_context():
-        categories, _ = get_category_breakdown(
-            demo_user_id(with_inventory), year=2026, month=3)
+        categories, _ = get_category_breakdown(year=2026, month=3)
     assert 'Seating' not in categories
 
 

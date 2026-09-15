@@ -275,7 +275,7 @@ def test_editing_only_the_date_leaves_an_inventory_row_inventory(app):
         assert tx.is_inventory
         assert tx.date.day == 20
         assert tx.amount == -980.0
-        _, expenses = calculate_monthly_summary(demo_user_id(app), 2026, 3)
+        _, expenses = calculate_monthly_summary(2026, 3)
     assert expenses == 0
 
 

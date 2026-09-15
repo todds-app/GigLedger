@@ -132,13 +132,13 @@ def documents_shared_with(clients):
             .all())
 
 
-def per_project_stats(user_id):
+def per_project_stats():
     """{project_id: (count, latest created_at, latest client-added created_at)}
-    for one owner.
+    for every project.
 
     One grouped query rather than `project.documents` per card: the list page
-    renders every project the user has, and a lazy load per card is a query
-    per card. The third value is None when no client has added anything.
+    renders every project, and a lazy load per card is a query per card. The
+    third value is None when no client has added anything.
     """
     from sqlalchemy import case, func
     from .models import ProjectDocument
@@ -150,7 +150,6 @@ def per_project_stats(user_id):
                            func.count(ProjectDocument.id),
                            func.max(ProjectDocument.created_at),
                            func.max(client_added))
-            .filter_by(user_id=user_id)
             .group_by(ProjectDocument.project_id)
             .all())
     return {project_id: (count, latest, latest_from_client)

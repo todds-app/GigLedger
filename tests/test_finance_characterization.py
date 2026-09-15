@@ -73,7 +73,7 @@ def authenticated_client(app):
 def test_monthly_summary(ledger):
     from gigledger.finance import calculate_monthly_summary
     with ledger.app_context():
-        income, expenses = calculate_monthly_summary(demo_user_id(ledger), 2026, 3)
+        income, expenses = calculate_monthly_summary(2026, 3)
     assert income == 7500.00
     assert expenses == 1950.00
 
@@ -81,8 +81,7 @@ def test_monthly_summary(ledger):
 def test_quarterly_income_and_deductions(ledger):
     from gigledger.finance import calculate_quarterly_income_deductions
     with ledger.app_context():
-        income, deductions = calculate_quarterly_income_deductions(
-            demo_user_id(ledger), 1, 2026)
+        income, deductions = calculate_quarterly_income_deductions(1, 2026)
     assert income == 7500.00
     assert deductions == 1500.00
 
@@ -90,8 +89,7 @@ def test_quarterly_income_and_deductions(ledger):
 def test_quarterly_tax(ledger):
     from gigledger.finance import calculate_quarterly_tax
     with ledger.app_context():
-        income, deductions, net, tax = calculate_quarterly_tax(
-            demo_user_id(ledger), 1, 2026, 0.30)
+        income, deductions, net, tax = calculate_quarterly_tax(1, 2026, 0.30)
     assert (income, deductions, net) == (7500.00, 1500.00, 6000.00)
     assert tax == pytest.approx(1800.00)
 
@@ -100,15 +98,14 @@ def test_bank_balance_is_every_transaction(ledger):
     """Cash, not profit: the balance sums all transactions regardless of kind."""
     from gigledger.finance import calculate_safe_to_spend
     with ledger.app_context():
-        balance, _, _ = calculate_safe_to_spend(demo_user_id(ledger), 0.30)
+        balance, _, _ = calculate_safe_to_spend(0.30)
     assert balance == pytest.approx(5550.00)
 
 
 def test_category_breakdown_is_expenses_only(ledger):
     from gigledger.finance import get_category_breakdown
     with ledger.app_context():
-        categories, totals = get_category_breakdown(
-            demo_user_id(ledger), year=2026, month=3)
+        categories, totals = get_category_breakdown(year=2026, month=3)
     assert dict(zip(categories, totals)) == {
         'Software': 1200.00, 'Travel': 300.00, 'Meal': 450.00}
 

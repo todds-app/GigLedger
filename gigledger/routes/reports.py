@@ -6,8 +6,8 @@ top clients, expense categories, and key insights.
 """
 from datetime import datetime
 from flask import Blueprint, render_template, request
-from flask_login import login_required, current_user
-from ..models import Transaction, Client, Invoice, COST_KINDS, db
+from flask_login import login_required
+from ..models import Transaction, Client, Invoice, Business, COST_KINDS, db
 from ..finance import calculate_monthly_summary, get_quarter, get_quarter_date_range
 
 reports_bp = Blueprint('reports', __name__)
@@ -16,16 +16,16 @@ reports_bp = Blueprint('reports', __name__)
 @reports_bp.route('/reports')
 @login_required
 def index():
-    uid = current_user.id
-    tax_rate = current_user.default_tax_rate
+    business = Business.get()
+    tax_rate = business.default_tax_rate
 
     # Year selector - default to current year
     now = datetime.now()
     selected_year = request.args.get('year', now.year, type=int)
 
     # Determine available years from transactions
-    year_result = db.session.query(db.func.strftime('%Y', Transaction.date)).filter(
-        Transaction.user_id == uid
+    year_result = db.session.query(
+        db.func.strftime('%Y', Transaction.date)
     ).distinct().all()
     available_years = sorted([int(r[0]) for r in year_result if r[0]], reverse=True)
     if not available_years:
@@ -38,7 +38,6 @@ def index():
     year_start = datetime(selected_year, 1, 1)
     year_end = datetime(selected_year + 1, 1, 1)
     year_txs = db.session.query(Transaction).filter(
-        Transaction.user_id == uid,
         Transaction.date >= year_start,
         Transaction.date < year_end,
     ).all()
@@ -58,7 +57,7 @@ def index():
     chart_expenses = []
 
     for m in range(1, 13):
-        income, expenses = calculate_monthly_summary(uid, selected_year, m)
+        income, expenses = calculate_monthly_summary(selected_year, m)
         net = income - expenses
         savings_rate = ((income - expenses) / income * 100) if income > 0 else 0
         monthly_data.append({
@@ -87,8 +86,6 @@ def index():
     ).join(
         Invoice, Invoice.client_id == Client.id
     ).filter(
-        Client.user_id == uid,
-        Invoice.user_id == uid,
         Invoice.status == 'paid',
         db.func.strftime('%Y', Invoice.paid_date) == str(selected_year),
     ).group_by(Client.id).order_by(db.func.sum(Invoice.total).desc()).limit(5).all()
@@ -98,7 +95,6 @@ def index():
         Transaction.category,
         db.func.sum(Transaction.amount).label('total')
     ).filter(
-        Transaction.user_id == uid,
         Transaction.kind.in_(COST_KINDS),
         Transaction.date >= year_start,
         Transaction.date < year_end,
@@ -116,7 +112,6 @@ def index():
     for q in range(1, 5):
         q_start, q_end = get_quarter_date_range(q, selected_year)
         q_txs = db.session.query(Transaction).filter(
-            Transaction.user_id == uid,
             Transaction.date >= q_start,
             Transaction.date < q_end,
         ).all()
@@ -140,7 +135,6 @@ def index():
 
     # Average invoice size
     paid_invoices = Invoice.query.filter(
-        Invoice.user_id == uid,
         Invoice.status == 'paid',
     ).all()
     avg_invoice_size = (sum(inv.total for inv in paid_invoices) / len(paid_invoices)) if paid_invoices else 0
@@ -152,8 +146,6 @@ def index():
     ).join(
         Invoice, Invoice.client_id == Client.id
     ).filter(
-        Client.user_id == uid,
-        Invoice.user_id == uid,
         Invoice.status == 'paid',
     ).group_by(Client.id).order_by(db.func.sum(Invoice.total).desc()).first()
 
@@ -184,5 +176,5 @@ def index():
         avg_invoice_size=avg_invoice_size,
         most_profitable=most_profitable,
         highest_expense_cat=highest_expense_cat,
-        currency=current_user.currency,
+        currency=business.currency,
     )
