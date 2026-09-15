@@ -255,6 +255,47 @@ Lives in `.env` — gitignored, sourced by `proj@.service`. Deliberately **not**
 
 ---
 
+## Finance
+
+### Transaction Kind
+
+`Transaction.kind` and `RecurringTransaction.kind` — `income`, `expense` or
+`inventory`. Stored, never derived from the sign of `amount`: a sign carries
+one bit and the vocabulary has three members. The sign says which way the money
+moved; the kind says what the movement was. [ADR-0010](adr/0010-classify-transactions-by-kind.md).
+
+### Cost Kind
+
+A kind that reduces profit. `COST_KINDS = {EXPENSE}` in `models.py` is the one
+place that answers the question; inventory's absence from the set is the entire
+behaviour that keeps it out of every expense total.
+
+### Kind-Blind Figure
+
+A figure that sums every kind on purpose because it measures cash, not cost:
+Safe to Spend, Runway, and Monthly Commitments. Each looks like a missed
+conversion to kind and is not one. Listed in ADR-0010 so nobody "fixes" them.
+
+### Inventory Item
+
+`InventoryItem` — the asset half of an inventory purchase, 1:1 with its
+`Transaction`: quantity, unit cost, consumable or reusable, and where it was
+bought for. The transaction's `amount` is always `-(quantity × unit_cost)`.
+[ADR-0011](adr/0011-inventory-purchases-as-ledger-lines.md).
+
+### General Inventory
+
+Stock held for no particular job. Represented as `InventoryItem.project_id IS
+NULL`, not as a sentinel project. Items whose project is deleted return here.
+
+### Consumable / Reusable
+
+`InventoryItem.is_consumable`. A consumable becomes a cost when used on a
+project; a reusable is placed on a project and comes back, staying an asset
+throughout. Both are piece 3 behaviour; piece 2 only records the flag.
+
+---
+
 ## Deployment
 
 ### Project Manifest
