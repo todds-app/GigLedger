@@ -118,15 +118,25 @@ No more setting aside random percentages. No more spreadsheet gymnastics. Just c
 - **Immediate revocation** — Revoking signs the client out on their next request, not whenever their cookie happens to expire
 - **One login per person** — A client working with several freelancers uses one account
 - **Login throttling** — Repeated failures lock an address out for 15 minutes, on the client login *and* yours
-- **Documents grouped by who shared them** — One login shows every freelancer's documents, never as one undifferentiated list
+- **Documents grouped by project under the business name** — One login shows every document it's been granted, organized by the project it belongs to
 - **Project name only** — Clients see the project a document belongs to, never its rate, hours or internal description
 - **Off switch** — `PORTAL_ENABLED=0` removes the portal routes entirely
 - **Demo seed is opt-in** — `SEED_DEMO=1` seeds the demo business and `demo@gigledger.com` on an empty database; without it a fresh install starts at `/setup`
 
-> **Clients are not users.** Portal sessions live outside Flask-Login on purpose:
-> `current_user` means *freelancer* everywhere in this app, and ~40 routes filter
-> rows with `user_id=current_user.id`. See
-> [docs/adr/0008](docs/adr/0008-client-portal-authentication.md).
+> **Clients are not admins.** Portal sessions live outside Flask-Login on
+> purpose: `current_user` always means an admin, and an admin sees every row.
+> A portal session and an admin session are mutually exclusive, so no request
+> has two principals. See
+> [docs/adr/0008](docs/adr/0008-client-portal-authentication.md) and
+> [docs/adr/0014](docs/adr/0014-one-business-per-install.md).
+
+### 👥 Team
+- **Every admin sees the same books** — one install, one business
+- **Invite-based** — Settings → Team creates a single-use link (7 days); you send it
+- **Remove an admin** — their entries stay, attributed to nobody
+- **No public sign-up** — `/setup` exists only until the first admin is created
+
+> See [docs/adr/0014](docs/adr/0014-one-business-per-install.md).
 
 ### 🎯 Savings Goals
 - **Visual progress bars** — Color-coded with percentage complete
@@ -245,6 +255,12 @@ python run.py
 
 The app starts at **http://localhost:3030**
 
+> **First run opens `/setup`.** There is no public sign-up: the first visit to
+> a fresh install creates the business and its first admin, and `/setup` 404s
+> once that admin exists. Every admin added after that comes from an
+> invitation — see the Team feature section below and
+> [docs/adr/0014](docs/adr/0014-one-business-per-install.md).
+
 > The application package is the `gigledger/` directory inside the repository,
 > so it is importable under that name no matter what the checkout folder is
 > called. Earlier versions derived the package name from the folder and
@@ -297,9 +313,11 @@ gigledger/                      # Repository root — may be named anything
 │   ├── models.py               # SQLAlchemy models (15 models)
 │   ├── documents.py            # Document storage: upload root, allowlist, URL scheme rules
 │   ├── portal_auth.py          # Client Portal sessions, invites, revocation, throttling
+│   ├── team.py                 # Admin invites: setup, issue, cancel, redeem, remove
 │   ├── finance.py              # Core financial calculation engine
 │   ├── routes/
-│   │   ├── auth.py             # Login / Signup / Logout
+│   │   ├── auth.py             # Login / Logout
+│   │   ├── team.py             # /setup, Settings → Team invite/cancel/remove, /join/<token>
 │   │   ├── dashboard.py        # Main dashboard + Quick Add
 │   │   ├── transactions.py     # CRUD + CSV/HTML export
 │   │   ├── invoices.py         # Invoice CRUD + HTML export + mark-as-paid + auto-post
@@ -314,7 +332,8 @@ gigledger/                      # Repository root — may be named anything
 │       ├── base.html           # Layout: sidebar + mobile nav + themes + dark mode
 │       ├── auth/
 │       │   ├── login.html
-│       │   └── signup.html
+│       │   ├── setup.html
+│       │   └── join.html
 │       ├── dashboard/
 │       │   └── index.html      # Full dashboard with hero cards, charts, Quick Add
 │       ├── transactions/
@@ -381,7 +400,7 @@ gigledger/                      # Repository root — may be named anything
 | Method | Route | Description |
 |---|---|---|
 | `GET/POST` | `/auth/login` | User login |
-| `GET/POST` | `/auth/signup` | User registration |
+| `GET/POST` | `/setup` | First-run setup (404 once an admin exists) |
 | `POST` | `/logout` | User logout (POST so it is covered by CSRF protection) |
 | `GET/POST` | `/dashboard` | Dashboard view + Quick Add |
 | `GET` | `/transactions` | Transaction list with filters |
@@ -432,6 +451,10 @@ gigledger/                      # Repository root — may be named anything
 | `GET/POST` | `/taxes` | Quarterly tax breakdown + recalculate |
 | `GET` | `/reports` | Yearly financial report |
 | `GET/POST` | `/settings` | Tax rate, currency, categories, themes, dark mode, business profile |
+| `POST` | `/settings/team/invite` | Create an admin invitation (link shown once) |
+| `POST` | `/settings/team/invites/<id>/cancel` | Cancel a pending admin invitation |
+| `POST` | `/settings/team/admins/<id>/remove` | Remove an admin (their rows stay, attributed to nobody) |
+| `GET/POST` | `/join/<token>` | Redeem an admin invitation and set a password |
 
 ---
 

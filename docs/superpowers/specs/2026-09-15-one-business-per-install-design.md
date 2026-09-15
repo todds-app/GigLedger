@@ -1,7 +1,7 @@
 # One business per install
 
 - **Date:** 2026-09-15
-- **Status:** Approved, not yet implemented
+- **Status:** Implemented 2026-09-15
 - **Scope:** Every admin login sees and edits the same clients, projects,
   invoices, transactions, documents and settings. Admins are added by
   invitation from Settings; public sign-up is removed; a fresh install starts
@@ -117,8 +117,8 @@ and a set-password form (minimum length as for portal accounts).
 `POST /join/<token>` creates the `User`, marks the invite redeemed and signs
 the new admin in. An expired, redeemed or unknown token gets one and the same
 "this invitation is not valid" page — which of the three it is would itself be
-information. The route is throttled by the same `LoginAttempt` scope machinery
-the two login forms use.
+information. The route is not throttled: like the portal's redeem route, the
+token is a 256-bit random value, not a guessable secret.
 
 `/signup` and its template are deleted. The login page loses its "Sign up"
 link.

@@ -46,3 +46,4 @@ the failure modes the decision does *not* protect against.
 | [0011](0011-inventory-purchases-as-ledger-lines.md) | Inventory purchases are ledger lines with a linked asset row | Accepted |
 | [0012](0012-document-freshness-is-since-last-visit.md) | Flag a document as new by recency for the owner and by last visit for the client | Accepted |
 | [0013](0013-accept-documents-from-portal-clients.md) | Accept documents from portal clients as the owner's, attributed to the client | Accepted |
+| [0014](0014-one-business-per-install.md) | One business per install | Accepted |

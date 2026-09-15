@@ -200,28 +200,39 @@ access rule is **enforced** for uploads and **advisory** for links. The two must
 never be presented to a user as equivalent. See
 [ADR-0007](adr/0007-google-drive-as-reference.md).
 
+### Business
+
+`Business` — the one row holding business-wide settings. `Business.get()`
+fetches it; templates receive it as `business`. See
+[ADR-0014](adr/0014-one-business-per-install.md).
+
+### Admin
+
+An admin login (`User`). Every admin sees every row; `current_user` always
+means an admin. Added by invitation from Settings → Team; see
+[ADR-0014](adr/0014-one-business-per-install.md).
+
 ### Portal Account
 
 `PortalAccount` — a client's login for the Client Portal. Keyed by email and
-**global**, linked many-to-one from tenant-scoped `Client` rows, because the
-same person is routinely a client of several freelancers and one row per
-(freelancer, email) makes the login form ambiguous.
+**global**, linked many-to-one from `Client` rows, because the same person is
+routinely a client of several freelancers and one row per (freelancer, email)
+makes the login form ambiguous.
 
-The schema's only deliberately cross-tenant object. It holds credentials and
-nothing else; `portal_auth.visible_clients()` is the single seam where a portal
-request drops back into tenant-scoped data.
+It holds credentials and nothing else; `portal_auth.visible_clients()` is the
+single seam between a login and the Client rows it may act through.
 
 ### Portal Session
 
 The `portal_account_id` key in the Flask session — how a client is
 authenticated. Deliberately **not** Flask-Login.
 
-The distinction is not stylistic. `current_user` is assumed to be a freelancer
-by ~40 routes that filter rows with `user_id=current_user.id`; if a client could
-become `current_user`, a portal account with id 3 would be served freelancer
-#3's rows. A **Portal Session** and a freelancer session are mutually exclusive,
-so no request has two principals. See
-[ADR-0008](adr/0008-client-portal-authentication.md).
+The distinction is not stylistic. `current_user` is an admin everywhere in
+this app, and an admin sees every row (ADR-0014); if a client could become
+`current_user`, a portal account would be an admin. A **Portal Session** and
+an admin session are mutually exclusive, so no request has two principals.
+See [ADR-0008](adr/0008-client-portal-authentication.md) and
+[ADR-0014](adr/0014-one-business-per-install.md).
 
 ### Session Epoch
 
@@ -243,6 +254,12 @@ password, so there is no dictionary to slow down — the only property needed is
 that the stored form cannot be used as the token. Delivered by the freelancer,
 not emailed, because **this app cannot send email** and an invite flow that
 assumes SMTP is one that fails silently.
+
+### Admin Invite
+
+`AdminInvite` — a single-use, 7-day, hashed token that lets someone become an
+admin; issued from Settings → Team; same rules as a portal invite. See
+[ADR-0014](adr/0014-one-business-per-install.md).
 
 ### Secret Key
 
