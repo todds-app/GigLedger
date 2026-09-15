@@ -83,34 +83,38 @@ class KindMixin:
         return (self.kind or '').title()
 
 
-class User(UserMixin, db.Model):
-    __tablename__ = 'users'
+class Business(db.Model):
+    """The one business this install keeps books for.
+
+    Exactly one row. Everything here used to be a column on `User`, back when
+    one login was one business; now every admin shares these values, so they
+    live where there is only one of them. `get()` is the single seam that
+    fetches the row - no route or template asks *which* business. See
+    docs/adr/0014.
+    """
+    __tablename__ = 'business'
 
     id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False)
+    name = db.Column(db.String(200), default='')
+    address = db.Column(db.Text, default='')
+    phone = db.Column(db.String(50), default='')
     default_tax_rate = db.Column(db.Float, default=0.30)
     currency = db.Column(db.String(3), default='USD')
-    custom_income_categories = db.Column(db.Text, default='')   # comma-separated
-    custom_expense_categories = db.Column(db.Text, default='')  # comma-separated
-    custom_inventory_categories = db.Column(db.Text, default='')  # comma-separated
-    theme = db.Column(db.String(20), default='emerald')  # theme name
-    dark_mode = db.Column(db.Boolean, default=False)      # dark mode toggle
-    business_name = db.Column(db.String(200), default='')
-    business_address = db.Column(db.Text, default='')
-    business_phone = db.Column(db.String(50), default='')
-    invoice_note = db.Column(db.Text, default='Thank you for your business!')
     invoice_prefix = db.Column(db.String(10), default='INV')
     next_invoice_number = db.Column(db.Integer, default=1)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    invoice_note = db.Column(db.Text, default='Thank you for your business!')
+    custom_income_categories = db.Column(db.Text, default='')     # comma-separated
+    custom_expense_categories = db.Column(db.Text, default='')    # comma-separated
+    custom_inventory_categories = db.Column(db.Text, default='')  # comma-separated
 
-    transactions = db.relationship('Transaction', backref='user', lazy=True)
-    tax_estimates = db.relationship('TaxEstimate', backref='user', lazy=True)
-    clients = db.relationship('Client', backref='user', lazy=True)
-    invoices = db.relationship('Invoice', backref='user', lazy=True)
-    projects = db.relationship('Project', backref='user', lazy=True)
-    goals = db.relationship('Goal', backref='user', lazy=True)
-    recurring_transactions = db.relationship('RecurringTransaction', backref='user', lazy=True)
+    @classmethod
+    def get(cls):
+        business = cls.query.first()
+        if business is None:
+            business = cls()
+            db.session.add(business)
+            db.session.commit()
+        return business
 
     def get_income_categories(self):
         if self.custom_income_categories:
@@ -145,6 +149,31 @@ class User(UserMixin, db.Model):
         self.next_invoice_number = num + 1
         db.session.commit()
         return f"{self.invoice_prefix}-{num:04d}"
+
+
+class User(UserMixin, db.Model):
+    """An admin login. Personal preferences only: anything about the business
+    is on `Business`, and every admin sees every row. `user_id` columns on
+    other tables record who created a row and nothing more - no query reads
+    them for visibility. See docs/adr/0014.
+    """
+    __tablename__ = 'users'
+
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
+    theme = db.Column(db.String(20), default='emerald')  # theme name
+    dark_mode = db.Column(db.Boolean, default=False)      # dark mode toggle
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_login_at = db.Column(db.DateTime, nullable=True)
+
+    transactions = db.relationship('Transaction', backref='user', lazy=True)
+    tax_estimates = db.relationship('TaxEstimate', backref='user', lazy=True)
+    clients = db.relationship('Client', backref='user', lazy=True)
+    invoices = db.relationship('Invoice', backref='user', lazy=True)
+    projects = db.relationship('Project', backref='user', lazy=True)
+    goals = db.relationship('Goal', backref='user', lazy=True)
+    recurring_transactions = db.relationship('RecurringTransaction', backref='user', lazy=True)
 
 
 class Transaction(KindMixin, db.Model):

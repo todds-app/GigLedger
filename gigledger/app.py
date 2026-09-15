@@ -187,7 +187,11 @@ def create_app():
     with app.app_context():
         db.create_all()
         _migrate_db(db)
-        _seed_demo_data()
+        # Opt-in. The seed creates an admin with a public password, and on a
+        # one-business install that admin sees everything (ADR-0014). A fresh
+        # database without the flag starts unseeded.
+        if os.environ.get('SEED_DEMO', '').lower() in ('1', 'true', 'yes'):
+            _seed_demo_data()
 
     return app
 
@@ -201,32 +205,40 @@ def _migrate_db(db):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    # Check existing columns in users table
+    # Users: business settings used to be columns here. They are left in place
+    # on an existing database (SQLite cannot drop a column cleanly) and simply
+    # stop being declared on the model. See docs/adr/0014.
     cursor.execute("PRAGMA table_info(users)")
-    existing_columns = {row[1] for row in cursor.fetchall()}
-
-    if 'custom_income_categories' not in existing_columns:
-        cursor.execute("ALTER TABLE users ADD COLUMN custom_income_categories TEXT DEFAULT ''")
-    if 'custom_expense_categories' not in existing_columns:
-        cursor.execute("ALTER TABLE users ADD COLUMN custom_expense_categories TEXT DEFAULT ''")
-    if 'custom_inventory_categories' not in existing_columns:
-        cursor.execute("ALTER TABLE users ADD COLUMN custom_inventory_categories TEXT DEFAULT ''")
-    if 'theme' not in existing_columns:
+    user_columns = {row[1] for row in cursor.fetchall()}
+    if 'theme' not in user_columns:
         cursor.execute("ALTER TABLE users ADD COLUMN theme VARCHAR(20) DEFAULT 'emerald'")
-    if 'dark_mode' not in existing_columns:
+    if 'dark_mode' not in user_columns:
         cursor.execute("ALTER TABLE users ADD COLUMN dark_mode BOOLEAN DEFAULT 0")
-    if 'business_name' not in existing_columns:
-        cursor.execute("ALTER TABLE users ADD COLUMN business_name VARCHAR(200) DEFAULT ''")
-    if 'business_address' not in existing_columns:
-        cursor.execute("ALTER TABLE users ADD COLUMN business_address TEXT DEFAULT ''")
-    if 'business_phone' not in existing_columns:
-        cursor.execute("ALTER TABLE users ADD COLUMN business_phone VARCHAR(50) DEFAULT ''")
-    if 'invoice_note' not in existing_columns:
-        cursor.execute("ALTER TABLE users ADD COLUMN invoice_note TEXT DEFAULT 'Thank you for your business!'")
-    if 'invoice_prefix' not in existing_columns:
-        cursor.execute("ALTER TABLE users ADD COLUMN invoice_prefix VARCHAR(10) DEFAULT 'INV'")
-    if 'next_invoice_number' not in existing_columns:
-        cursor.execute("ALTER TABLE users ADD COLUMN next_invoice_number INTEGER DEFAULT 1")
+    if 'last_login_at' not in user_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN last_login_at DATETIME")
+
+    # Business: one row, seeded from the lowest-id user's old columns the first
+    # time a pre-0014 database starts. create_all() has already made the table.
+    if 'custom_inventory_categories' not in user_columns and 'business_name' in user_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN custom_inventory_categories TEXT DEFAULT ''")
+
+    cursor.execute("SELECT COUNT(*) FROM business")
+    if cursor.fetchone()[0] == 0 and 'business_name' in user_columns:
+        cursor.execute("""
+            INSERT INTO business (name, address, phone, default_tax_rate, currency,
+                                  invoice_prefix, next_invoice_number, invoice_note,
+                                  custom_income_categories, custom_expense_categories,
+                                  custom_inventory_categories)
+            SELECT COALESCE(business_name, ''), COALESCE(business_address, ''),
+                   COALESCE(business_phone, ''), COALESCE(default_tax_rate, 0.30),
+                   COALESCE(currency, 'USD'), COALESCE(invoice_prefix, 'INV'),
+                   COALESCE(next_invoice_number, 1),
+                   COALESCE(invoice_note, 'Thank you for your business!'),
+                   COALESCE(custom_income_categories, ''),
+                   COALESCE(custom_expense_categories, ''),
+                   COALESCE(custom_inventory_categories, '')
+            FROM users ORDER BY id LIMIT 1
+        """)
 
     # Migrate transactions table
     cursor.execute("PRAGMA table_info(transactions)")
@@ -282,7 +294,7 @@ def _migrate_db(db):
 
 
 def _seed_demo_data():
-    from .models import (User, Transaction, Client, Invoice, InvoiceLineItem,
+    from .models import (User, Business, Transaction, Client, Invoice, InvoiceLineItem,
                           Project, Goal, RecurringTransaction)
     from flask_bcrypt import generate_password_hash
 
@@ -290,13 +302,14 @@ def _seed_demo_data():
         return
 
     password_hash = generate_password_hash('demo1234').decode('utf-8')
-    demo_user = User(email='demo@gigledger.com', password_hash=password_hash,
-                     default_tax_rate=0.30, currency='USD',
-                     business_name='Demo Freelance Studio',
-                     business_address='123 Creative Ave, San Francisco, CA 94102',
-                     business_phone='+1 (555) 123-4567',
-                     invoice_note='Payment due within 30 days. Thank you for your business!')
+    demo_user = User(email='demo@gigledger.com', password_hash=password_hash)
     db.session.add(demo_user)
+    db.session.add(Business(
+        name='Demo Freelance Studio',
+        address='123 Creative Ave, San Francisco, CA 94102',
+        phone='+1 (555) 123-4567',
+        default_tax_rate=0.30, currency='USD',
+        invoice_note='Payment due within 30 days. Thank you for your business!'))
     db.session.commit()
 
     from datetime import datetime, timedelta
@@ -368,7 +381,7 @@ def _seed_demo_data():
 
     # ---- Create Invoices ----
     now = datetime.now()
-    tax_rate = demo_user.default_tax_rate  # 30%
+    tax_rate = Business.get().default_tax_rate  # 30%
     invoice_data = [
         # Paid invoices (past) — with proper tax amounts
         {'client_id': client_objects[0].id, 'status': 'paid', 'invoice_number': 'INV-0001',
@@ -433,6 +446,11 @@ def _seed_demo_data():
                                    category='Tax Reserve', description=f'Tax reserve for Invoice {inv.invoice_number} - {client_name} ({tax_rate*100:.0f}%)',
                                    is_tax_deductible=False, source='invoice', invoice_id=inv.id)
                 db.session.add(tax_tx)
+    db.session.commit()
+
+    # The seed writes INV-0001..0008 by name; the counter must agree or the
+    # first invoice created in the UI collides with INV-0001.
+    Business.get().next_invoice_number = len(invoice_data) + 1
     db.session.commit()
 
     # ---- Create Transactions (same as before but more) ----
