@@ -1,6 +1,6 @@
 # 0008. Authenticate portal clients outside Flask-Login, in their own session
 
-- **Status:** Accepted
+- **Status:** Accepted — premise superseded in part by [ADR-0014](0014-one-business-per-install.md); the principal separation stands.
 - **Date:** 2026-08-17
 
 ## Context

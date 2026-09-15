@@ -191,8 +191,24 @@ read.
 
 1. Back up `gigledger.db` (the run wrapper already does this).
 2. Deploy. The first request runs the migration above.
-3. Sign in as `dani@danismithdesign.com`, rename the business on the Business
-   settings page, then remove `demo@gigledger.com` from the Team panel.
+3. The migration seeds `business` from the **lowest-id user**, which on the
+   live database is `demo@gigledger.com`, not `dani@danismithdesign.com` (user
+   2). None of the values configured on user 2 are carried over. Sign in as
+   `dani@danismithdesign.com`, open Settings → Business, and re-enter exactly:
+   - Business name: `Dani Smith Design`
+   - Address: `Denver, CO`
+   - Invoice note: `Thank you for trusting us with your home.`
+   - Income categories: `Design Fee,Procurement Fee,Consultation,Client Payment`
+   - Expense categories: `Samples,Software,Travel,Office Supplies,Marketing,Meal,Subcontractor,Tax Reserve`
+
+   Then decide the invoice prefix: the migration carried over `next_invoice_number`
+   from the demo account's counter, so it currently continues at `INV-0015`.
+   Keeping the prefix `INV` preserves that numbering. Switching it to `DSD`
+   restarts the visible sequence at `DSD-0001` unless the counter is also set
+   to 15 on the Business settings page.
+
+   Once the values above are re-entered, remove `demo@gigledger.com` from the
+   Team panel.
 4. Update `TEST_CREDENTIALS.md`.
 
 The Okafor and Raman clients, projects, invoices, documents, grants and portal
