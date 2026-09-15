@@ -207,22 +207,23 @@ def test_download_is_an_attachment_with_a_generic_type(app):
     assert response.headers['Content-Disposition'].startswith('attachment')
 
 
-def test_download_refuses_another_users_document(app):
-    """The ownership filter is the whole access control story in commit 1."""
+def test_download_serves_a_document_uploaded_by_another_admin(app):
+    """Every admin works the same books (ADR-0014)."""
     client = login(app)
     pid = a_project(app)
-    upload(client, pid, 'contract.pdf')
+    upload(client, pid, 'contract.pdf', content=b'hello')
 
     with app.app_context():
         doc_id = ProjectDocument.query.one().id
-        stranger = User(email='stranger@example.com', password_hash='x')
-        db.session.add(stranger)
+        colleague = User(email='colleague@example.com', password_hash='x')
+        db.session.add(colleague)
         db.session.commit()
-        stranger_id = stranger.id
+        colleague_id = colleague.id
 
-    response = login(app, stranger_id).get(f'/projects/documents/{doc_id}/download')
+    response = login(app, colleague_id).get(f'/projects/documents/{doc_id}/download')
 
-    assert response.status_code == 404
+    assert response.status_code == 200
+    assert response.data == b'hello'
 
 
 def test_bytes_missing_from_disk_are_a_404_not_a_500(app):
@@ -308,23 +309,24 @@ def test_deleting_a_document_deletes_its_bytes(app):
     assert not os.path.exists(path)
 
 
-def test_delete_refuses_another_users_document(app):
+def test_delete_removes_a_document_uploaded_by_another_admin(app):
     client = login(app)
     pid = a_project(app)
     upload(client, pid, 'contract.pdf')
 
     with app.app_context():
-        doc_id = ProjectDocument.query.one().id
-        stranger = User(email='stranger@example.com', password_hash='x')
-        db.session.add(stranger)
+        doc = ProjectDocument.query.one()
+        doc_id, stored = doc.id, doc.stored_name
+        colleague = User(email='colleague@example.com', password_hash='x')
+        db.session.add(colleague)
         db.session.commit()
-        stranger_id = stranger.id
+        colleague_id = colleague.id
 
-    login(app, stranger_id).post(f'/projects/documents/{doc_id}/delete',
-                                 follow_redirects=True)
+    login(app, colleague_id).post(f'/projects/documents/{doc_id}/delete')
 
     with app.app_context():
-        assert ProjectDocument.query.count() == 1
+        assert ProjectDocument.query.count() == 0
+    assert not os.path.exists(gigledger.documents.path_for(stored))
 
 
 # --- demo data -----------------------------------------------------------
@@ -367,15 +369,15 @@ def test_project_detail_lists_the_projects_documents(app):
     assert 'Signed contract' in body
 
 
-def test_project_detail_refuses_another_users_project(app):
+def test_project_detail_is_visible_to_every_admin(app):
     pid = a_project(app)
     with app.app_context():
-        stranger = User(email='stranger@example.com', password_hash='x')
-        db.session.add(stranger)
+        colleague = User(email='colleague@example.com', password_hash='x')
+        db.session.add(colleague)
         db.session.commit()
-        stranger_id = stranger.id
+        colleague_id = colleague.id
 
-    assert login(app, stranger_id).get(f'/projects/{pid}').status_code == 404
+    assert login(app, colleague_id).get(f'/projects/{pid}').status_code == 200
 
 
 # --- the projects list ---------------------------------------------------
@@ -435,22 +437,22 @@ def test_a_document_older_than_a_week_is_not_flagged(app):
     assert 'New this week' not in row
 
 
-def test_another_users_documents_do_not_count_on_my_list(app):
-    """The aggregate is filtered by owner like every other query, not by
-    project id alone - a project id is guessable."""
+def test_documents_added_by_another_admin_count_on_every_admins_list(app):
+    """The aggregate is business-wide (ADR-0014): a document one admin added
+    shows on the card whoever is looking."""
     client = login(app)
     pid = a_project(app)
     upload(client, pid, 'contract.pdf')
     with app.app_context():
-        stranger = User(email='stranger@example.com', password_hash='x')
-        db.session.add(stranger)
+        colleague = User(email='colleague@example.com', password_hash='x')
+        db.session.add(colleague)
         db.session.commit()
-        db.session.add(Project(user_id=stranger.id, name='Theirs', rate=1))
-        db.session.commit()
-        stranger_id = stranger.id
-        their_pid = Project.query.filter_by(user_id=stranger_id).one().id
+        colleague_id = colleague.id
 
-    assert 'No documents' in documents_row(app, their_pid, user_id=stranger_id)
+    row = documents_row(app, pid, user_id=colleague_id)
+
+    assert 'No documents' not in row
+    assert '1 document' in row
 
 
 def test_a_recent_client_added_document_is_flagged_as_from_a_client(app):

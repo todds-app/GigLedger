@@ -2,7 +2,7 @@ from flask import (Blueprint, render_template, redirect, url_for, request, flash
                    abort, session)
 from flask_login import login_required, current_user
 from .. import portal_auth
-from ..models import Client, Invoice, Project, db
+from ..models import Business, Client, Invoice, Project, db
 
 clients_bp = Blueprint('clients', __name__, url_prefix='/clients')
 
@@ -10,10 +10,9 @@ clients_bp = Blueprint('clients', __name__, url_prefix='/clients')
 @clients_bp.route('/')
 @login_required
 def list_clients():
-    uid = current_user.id
     search = request.args.get('search', '')
 
-    clients = Client.query.filter_by(user_id=uid).order_by(Client.name.asc()).all()
+    clients = Client.query.order_by(Client.name.asc()).all()
 
     if search:
         clients = [c for c in clients if search.lower() in c.name.lower()
@@ -22,7 +21,7 @@ def list_clients():
 
     return render_template('clients/index.html',
         clients=clients, search=search,
-        currency=current_user.currency)
+        currency=Business.get().currency)
 
 
 @clients_bp.route('/add', methods=['POST'])
@@ -52,7 +51,7 @@ def add():
 @clients_bp.route('/edit/<int:id>', methods=['POST'])
 @login_required
 def edit(id):
-    client = Client.query.filter_by(id=id, user_id=current_user.id).first()
+    client = Client.query.filter_by(id=id).first()
     if not client:
         flash('Client not found.', 'error')
         return redirect(url_for('clients.list_clients'))
@@ -78,7 +77,7 @@ def edit(id):
 @clients_bp.route('/delete/<int:id>', methods=['POST'])
 @login_required
 def delete(id):
-    client = Client.query.filter_by(id=id, user_id=current_user.id).first()
+    client = Client.query.filter_by(id=id).first()
     if client:
         name = client.name
         db.session.delete(client)
@@ -92,7 +91,7 @@ def delete(id):
 @clients_bp.route('/<int:id>')
 @login_required
 def detail(id):
-    client = Client.query.filter_by(id=id, user_id=current_user.id).first()
+    client = Client.query.filter_by(id=id).first()
     if not client:
         flash('Client not found.', 'error')
         return redirect(url_for('clients.list_clients'))
@@ -113,7 +112,7 @@ def detail(id):
         total_outstanding=total_outstanding,
         portal_enabled=portal_auth.is_enabled(),
         invite_url=session.pop('portal_invite_url', None),
-        currency=current_user.currency)
+        currency=Business.get().currency)
 
 
 # --- Client Portal access ------------------------------------------------
@@ -123,7 +122,7 @@ def detail(id):
 # fails. See docs/adr/0008.
 
 def _owned_client(id):
-    client = Client.query.filter_by(id=id, user_id=current_user.id).first()
+    client = db.session.get(Client, id)
     if not client:
         abort(404)
     return client

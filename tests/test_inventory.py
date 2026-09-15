@@ -12,7 +12,8 @@ import pytest
 
 import gigledger.app
 from gigledger.app import create_app
-from gigledger.models import (DEFAULT_EXPENSE_CATEGORIES, DEFAULT_INCOME_CATEGORIES,
+from gigledger.models import (Business, DEFAULT_EXPENSE_CATEGORIES,
+                              DEFAULT_INCOME_CATEGORIES,
                               DEFAULT_INVENTORY_CATEGORIES, EXPENSE, INCOME,
                               INVENTORY, INVENTORY_CATEGORY_GUIDANCE, KINDS,
                               InventoryItem, Project, RecurringTransaction,
@@ -34,21 +35,21 @@ def test_there_are_seven_inventory_categories_each_with_guidance():
     assert all(INVENTORY_CATEGORY_GUIDANCE[c] for c in DEFAULT_INVENTORY_CATEGORIES)
 
 
-def test_a_user_gets_the_default_inventory_categories(app):
+def test_the_business_gets_the_default_inventory_categories(app):
     with app.app_context():
-        user = User.query.get(demo_user_id(app))
-        assert user.get_inventory_categories() == DEFAULT_INVENTORY_CATEGORIES
-        assert user.get_inventory_categories() is not DEFAULT_INVENTORY_CATEGORIES
+        business = Business.get()
+        assert business.get_inventory_categories() == DEFAULT_INVENTORY_CATEGORIES
+        assert business.get_inventory_categories() is not DEFAULT_INVENTORY_CATEGORIES
 
 
 def test_all_categories_is_kind_aware(app):
     """The transactions filter wants all three lists; the recurring page,
     which cannot create an inventory row, wants two."""
     with app.app_context():
-        user = User.query.get(demo_user_id(app))
-        everything = user.get_all_categories()
+        business = Business.get()
+        everything = business.get_all_categories()
         assert 'Seating' in everything and 'Software' in everything
-        two = user.get_all_categories(kinds={INCOME, EXPENSE})
+        two = business.get_all_categories(kinds={INCOME, EXPENSE})
         assert 'Seating' not in two
         assert two == list(dict.fromkeys(
             DEFAULT_INCOME_CATEGORIES + DEFAULT_EXPENSE_CATEGORIES))
@@ -540,10 +541,10 @@ def test_an_inventory_category_can_be_added_and_removed(app):
     client = authenticated_client(app)
     client.post('/settings/categories/inventory/add', data={'category_name': 'Appliances'})
     with app.app_context():
-        assert 'Appliances' in User.query.get(demo_user_id(app)).get_inventory_categories()
+        assert 'Appliances' in Business.get().get_inventory_categories()
     client.post('/settings/categories/inventory/delete', data={'category_name': 'Appliances'})
     with app.app_context():
-        assert 'Appliances' not in User.query.get(demo_user_id(app)).get_inventory_categories()
+        assert 'Appliances' not in Business.get().get_inventory_categories()
 
 
 @pytest.mark.parametrize('kind,default', [
@@ -554,8 +555,8 @@ def test_a_default_category_cannot_be_removed(app, kind, default):
         follow_redirects=True).get_data(as_text=True)
     assert 'Default categories' in body
     with app.app_context():
-        user = User.query.get(demo_user_id(app))
-        assert default in user.get_all_categories()
+        business = Business.get()
+        assert default in business.get_all_categories()
 
 
 def test_reset_clears_the_inventory_list_too(app):
@@ -563,9 +564,9 @@ def test_reset_clears_the_inventory_list_too(app):
     client.post('/settings/categories/inventory/add', data={'category_name': 'Appliances'})
     client.post('/settings/categories/reset')
     with app.app_context():
-        user = User.query.get(demo_user_id(app))
-        assert user.custom_inventory_categories == ''
-        assert user.get_inventory_categories() == DEFAULT_INVENTORY_CATEGORIES
+        business = Business.get()
+        assert business.custom_inventory_categories == ''
+        assert business.get_inventory_categories() == DEFAULT_INVENTORY_CATEGORIES
 
 
 def test_the_recurring_page_does_not_offer_inventory_categories(app):

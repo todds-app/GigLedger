@@ -4,7 +4,7 @@ GigLedger - Invoices Blueprint
 from datetime import datetime, timedelta
 from flask import Blueprint, render_template, redirect, url_for, request, flash, Response
 from flask_login import login_required, current_user
-from ..models import db, Invoice, InvoiceLineItem, Client, Transaction, INCOME, EXPENSE
+from ..models import db, Business, Invoice, InvoiceLineItem, Client, Transaction, INCOME, EXPENSE
 
 invoices_bp = Blueprint('invoices', __name__)
 
@@ -12,25 +12,24 @@ invoices_bp = Blueprint('invoices', __name__)
 @invoices_bp.route('/invoices')
 @login_required
 def list_invoices():
-    uid = current_user.id
     status_filter = request.args.get('status', 'all')
 
-    query = Invoice.query.filter_by(user_id=uid)
+    query = Invoice.query
     if status_filter and status_filter != 'all':
         query = query.filter_by(status=status_filter)
     invoices = query.order_by(Invoice.created_at.desc()).all()
 
     # Summary calculations
     now = datetime.now()
-    total_outstanding = sum(inv.total for inv in Invoice.query.filter_by(
-        user_id=uid).all() if inv.status in ('sent', 'overdue'))
+    total_outstanding = sum(inv.total for inv in Invoice.query.filter(
+        Invoice.status.in_(('sent', 'overdue'))).all())
     paid_this_month = sum(inv.total for inv in Invoice.query.filter_by(
-        user_id=uid, status='paid').all()
+        status='paid').all()
         if inv.paid_date and inv.paid_date.year == now.year and inv.paid_date.month == now.month)
     total_overdue = sum(inv.total for inv in Invoice.query.filter_by(
-        user_id=uid, status='overdue').all())
+        status='overdue').all())
 
-    clients = Client.query.filter_by(user_id=uid, is_active=True).order_by(Client.name).all()
+    clients = Client.query.filter_by(is_active=True).order_by(Client.name).all()
 
     return render_template('invoices/index.html',
         invoices=invoices,
@@ -39,14 +38,14 @@ def list_invoices():
         paid_this_month=paid_this_month,
         total_overdue=total_overdue,
         clients=clients,
-        currency=current_user.currency)
+        currency=Business.get().currency)
 
 
 @invoices_bp.route('/invoices/create', methods=['GET'])
 @login_required
 def create_form():
-    uid = current_user.id
-    clients = Client.query.filter_by(user_id=uid, is_active=True).order_by(Client.name).all()
+    business = Business.get()
+    clients = Client.query.filter_by(is_active=True).order_by(Client.name).all()
     today = datetime.now().strftime('%Y-%m-%d')
     default_due = (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
 
@@ -54,14 +53,14 @@ def create_form():
         clients=clients,
         today=today,
         default_due=default_due,
-        tax_rate=current_user.default_tax_rate,
-        currency=current_user.currency)
+        tax_rate=business.default_tax_rate,
+        currency=business.currency)
 
 
 @invoices_bp.route('/invoices/create', methods=['POST'])
 @login_required
 def create_invoice():
-    uid = current_user.id
+    business = Business.get()
     client_id = request.form.get('client_id', '')
     issue_date_str = request.form.get('issue_date', '')
     due_date_str = request.form.get('due_date', '')
@@ -111,24 +110,24 @@ def create_invoice():
         flash('Please add at least one line item with a description.', 'error')
         return redirect(url_for('invoices.create_form'))
 
-    tax_amount = subtotal * current_user.default_tax_rate
+    tax_amount = subtotal * business.default_tax_rate
     total = subtotal + tax_amount
 
-    # Resolve the client, ensuring it belongs to the current user. Referencing
-    # another user's client id would leak their details on the invoice/PDF (IDOR).
+    # Resolve the client, ensuring the id is a real one. Referencing an id that
+    # is not a client at all would leak whatever is at that id onto the invoice/PDF (IDOR).
     client_obj = None
     if client_id and client_id.isdigit():
-        client_obj = Client.query.filter_by(id=int(client_id), user_id=uid).first()
+        client_obj = db.session.get(Client, int(client_id))
 
     # Generate invoice number
-    invoice_number = current_user.get_next_invoice_number()
+    invoice_number = business.get_next_invoice_number()
 
     # Set status
     status = 'sent' if action == 'send' else 'draft'
 
     # Create invoice
     invoice = Invoice(
-        user_id=uid,
+        user_id=current_user.id,
         client_id=client_obj.id if client_obj else None,
         invoice_number=invoice_number,
         status=status,
@@ -164,7 +163,8 @@ def create_invoice():
 @invoices_bp.route('/invoices/status/<int:id>', methods=['POST'])
 @login_required
 def update_status(id):
-    invoice = Invoice.query.filter_by(id=id, user_id=current_user.id).first()
+    business = Business.get()
+    invoice = Invoice.query.filter_by(id=id).first()
     if not invoice:
         flash('Invoice not found.', 'error')
         return redirect(url_for('invoices.list_invoices'))
@@ -203,7 +203,7 @@ def update_status(id):
                 date=datetime.now(),
                 kind=EXPENSE,
                 category='Tax Reserve',
-                description=f'Tax reserve for Invoice {invoice.invoice_number} - {client_name} ({current_user.default_tax_rate*100:.0f}%)',
+                description=f'Tax reserve for Invoice {invoice.invoice_number} - {client_name} ({business.default_tax_rate*100:.0f}%)',
                 is_tax_deductible=False,
                 source='invoice',
                 invoice_id=invoice.id)
@@ -224,7 +224,7 @@ def update_status(id):
         'overdue': 'Overdue', 'cancelled': 'Cancelled'
     }
     if new_status == 'paid' and invoice.tax_amount and invoice.tax_amount > 0:
-        sym = {'USD':'$','EUR':'€','GBP':'£','CAD':'C$','AUD':'A$','INR':'₹','JPY':'¥'}.get(current_user.currency, '$')
+        sym = {'USD':'$','EUR':'€','GBP':'£','CAD':'C$','AUD':'A$','INR':'₹','JPY':'¥'}.get(business.currency, '$')
         flash(f'Invoice {invoice.invoice_number} marked as Paid! Income of {sym}{invoice.total:,.2f} recorded and {sym}{invoice.tax_amount:,.2f} tax reserve auto-set aside.', 'success')
     else:
         flash(f'Invoice {invoice.invoice_number} marked as {status_labels.get(new_status, new_status)}.', 'success')
@@ -234,7 +234,7 @@ def update_status(id):
 @invoices_bp.route('/invoices/delete/<int:id>', methods=['POST'])
 @login_required
 def delete(id):
-    invoice = Invoice.query.filter_by(id=id, user_id=current_user.id).first()
+    invoice = Invoice.query.filter_by(id=id).first()
     if not invoice:
         flash('Invoice not found.', 'error')
         return redirect(url_for('invoices.list_invoices'))
@@ -254,29 +254,26 @@ def delete(id):
 @invoices_bp.route('/invoices/<int:id>')
 @login_required
 def detail(id):
-    invoice = Invoice.query.filter_by(id=id, user_id=current_user.id).first()
+    invoice = Invoice.query.filter_by(id=id).first()
     if not invoice:
         flash('Invoice not found.', 'error')
         return redirect(url_for('invoices.list_invoices'))
 
     # Eagerly load line items
     line_items = InvoiceLineItem.query.filter_by(invoice_id=invoice.id).all()
+    business = Business.get()
 
     return render_template('invoices/detail.html',
         invoice=invoice,
         line_items=line_items,
-        currency=current_user.currency,
-        tax_rate=current_user.default_tax_rate,
-        business_name=current_user.business_name,
-        business_address=current_user.business_address,
-        business_phone=current_user.business_phone,
-        invoice_note=current_user.invoice_note)
+        currency=business.currency,
+        tax_rate=business.default_tax_rate)
 
 
 @invoices_bp.route('/invoices/<int:id>/pdf')
 @login_required
 def generate_pdf(id):
-    invoice = Invoice.query.filter_by(id=id, user_id=current_user.id).first()
+    invoice = Invoice.query.filter_by(id=id).first()
     if not invoice:
         flash('Invoice not found.', 'error')
         return redirect(url_for('invoices.list_invoices'))
@@ -285,7 +282,7 @@ def generate_pdf(id):
 
     sym = {'USD': '$', 'EUR': '\u20ac', 'GBP': '\u00a3',
            'CAD': 'C$', 'AUD': 'A$', 'INR': '\u20b9', 'JPY': '\u00a5'
-           }.get(current_user.currency, '$')
+           }.get(Business.get().currency, '$')
 
     status_colors = {
         'draft': '#6b7280', 'sent': '#3b82f6', 'paid': '#16a34a',

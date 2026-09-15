@@ -399,20 +399,22 @@ def test_enabling_portal_access_shows_the_invite_link_once(app):
     assert '/portal/invite/' in body
 
 
-def test_a_freelancer_cannot_invite_another_users_client(app):
+def test_any_admin_can_invite_a_client(app):
     client_id = a_client_id(app)
     with app.app_context():
-        stranger = User(email='stranger@example.com', password_hash='x')
-        db.session.add(stranger)
+        colleague = User(email='colleague@example.com', password_hash='x')
+        db.session.add(colleague)
         db.session.commit()
-        stranger_id = stranger.id
+        colleague_id = colleague.id
 
     http = app.test_client()
     with http.session_transaction() as session:
-        session['_user_id'] = str(stranger_id)
+        session['_user_id'] = str(colleague_id)
         session['_fresh'] = True
 
-    assert http.post(f'/clients/{client_id}/portal/invite',
-                     data={'email': 'x@example.com'}).status_code == 404
+    response = http.post(f'/clients/{client_id}/portal/invite',
+                         data={'email': 'x@example.com'})
+
+    assert response.status_code == 302
     with app.app_context():
-        assert PortalInvite.query.count() == 0
+        assert PortalInvite.query.filter_by(client_id=client_id).count() == 1

@@ -188,13 +188,13 @@ def test_revoking_portal_access_removes_the_documents_with_it(app):
 
 # --- the owner's side ----------------------------------------------------
 
-def test_a_document_cannot_be_shared_with_another_users_client(app):
+def test_a_document_can_be_shared_with_a_client_another_admin_added(app):
     doc_id = a_document(app)
     with app.app_context():
-        stranger = User(email='stranger@example.com', password_hash='x')
-        db.session.add(stranger)
+        colleague = User(email='colleague@example.com', password_hash='x')
+        db.session.add(colleague)
         db.session.commit()
-        their_client = Client(user_id=stranger.id, name='Not Yours')
+        their_client = Client(user_id=colleague.id, name='Added By Colleague')
         db.session.add(their_client)
         db.session.commit()
         their_client_id = their_client.id
@@ -202,23 +202,23 @@ def test_a_document_cannot_be_shared_with_another_users_client(app):
     share(app, doc_id, [their_client_id])
 
     with app.app_context():
-        assert DocumentShare.query.count() == 0
+        assert DocumentShare.query.filter_by(client_id=their_client_id).count() == 1
 
 
-def test_a_freelancer_cannot_share_another_users_document(app):
+def test_any_admin_can_share_a_document(app):
     client_id = a_client_id(app)
     doc_id = a_document(app)
     with app.app_context():
-        stranger = User(email='stranger@example.com', password_hash='x')
-        db.session.add(stranger)
+        colleague = User(email='colleague@example.com', password_hash='x')
+        db.session.add(colleague)
         db.session.commit()
-        stranger_id = stranger.id
+        colleague_id = colleague.id
 
-    freelancer(app, stranger_id).post(f'/projects/documents/{doc_id}/share',
-                                      data={'client_ids': [str(client_id)]})
+    freelancer(app, colleague_id).post(f'/projects/documents/{doc_id}/share',
+                                       data={'client_ids': [str(client_id)]})
 
     with app.app_context():
-        assert DocumentShare.query.count() == 0
+        assert DocumentShare.query.count() == 1
 
 
 def test_sharing_the_same_document_twice_does_not_duplicate_the_grant(app):

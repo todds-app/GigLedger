@@ -8,7 +8,7 @@ from flask import (Blueprint, render_template, redirect, url_for, request, flash
                    abort, send_file)
 from flask_login import login_required, current_user
 from .. import documents
-from ..models import (Project, Client, ProjectDocument, DocumentShare,
+from ..models import (Business, Project, Client, ProjectDocument, DocumentShare,
                       Transaction, InventoryItem, db, INCOME)
 
 projects_bp = Blueprint('projects', __name__, url_prefix='/projects')
@@ -34,10 +34,9 @@ def clean_color(value, fallback=DEFAULT_COLOR):
 @projects_bp.route('/')
 @login_required
 def list_projects():
-    uid = current_user.id
     status_filter = request.args.get('status', 'all')
 
-    all_projects = Project.query.filter_by(user_id=uid).order_by(Project.created_at.desc()).all()
+    all_projects = Project.query.order_by(Project.created_at.desc()).all()
 
     if status_filter and status_filter != 'all':
         projects = [p for p in all_projects if p.status == status_filter]
@@ -54,20 +53,20 @@ def list_projects():
         if p.start_date and p.start_date.month == now.month and p.start_date.year == now.year
     )
 
-    clients = Client.query.filter_by(user_id=uid, is_active=True).order_by(Client.name).all()
+    clients = Client.query.filter_by(is_active=True).order_by(Client.name).all()
 
     return render_template('projects/index.html',
         projects=projects,
         all_projects=all_projects,
         clients=clients,
-        document_stats=documents.per_project_stats(uid),
+        document_stats=documents.per_project_stats(),
         recent_cutoff=documents.recent_cutoff(),
         active_count=active_count,
         total_earned=total_earned,
         hours_this_month=hours_this_month,
         status_filter=status_filter,
         now=datetime.now(),
-        currency=current_user.currency)
+        currency=Business.get().currency)
 
 
 @projects_bp.route('/add', methods=['POST'])
@@ -78,11 +77,11 @@ def add():
         flash('Project name is required.', 'error')
         return redirect(url_for('projects.list_projects'))
 
-    # Only accept a client id that belongs to the current user (prevents IDOR).
+    # Only accept a client id that actually exists (prevents IDOR).
     client_id_raw = request.form.get('client_id', '')
     client_id = None
     if client_id_raw and client_id_raw.isdigit():
-        owned = Client.query.filter_by(id=int(client_id_raw), user_id=current_user.id).first()
+        owned = db.session.get(Client, int(client_id_raw))
         client_id = owned.id if owned else None
 
     rate_type = clean_rate_type(request.form.get('rate_type', DEFAULT_RATE_TYPE))
@@ -126,7 +125,7 @@ def add():
 @projects_bp.route('/edit/<int:id>', methods=['POST'])
 @login_required
 def edit(id):
-    project = Project.query.filter_by(id=id, user_id=current_user.id).first()
+    project = Project.query.filter_by(id=id).first()
     if not project:
         flash('Project not found.', 'error')
         return redirect(url_for('projects.list_projects'))
@@ -136,10 +135,10 @@ def edit(id):
         flash('Project name is required.', 'error')
         return redirect(url_for('projects.list_projects'))
 
-    # Only accept a client id that belongs to the current user (prevents IDOR).
+    # Only accept a client id that actually exists (prevents IDOR).
     client_id_raw = request.form.get('client_id', '')
     if client_id_raw and client_id_raw.isdigit():
-        owned = Client.query.filter_by(id=int(client_id_raw), user_id=current_user.id).first()
+        owned = db.session.get(Client, int(client_id_raw))
         project.client_id = owned.id if owned else None
     else:
         project.client_id = None
@@ -175,7 +174,7 @@ def edit(id):
 @projects_bp.route('/log-hours/<int:id>', methods=['POST'])
 @login_required
 def log_hours(id):
-    project = Project.query.filter_by(id=id, user_id=current_user.id).first()
+    project = Project.query.filter_by(id=id).first()
     if not project:
         flash('Project not found.', 'error')
         return redirect(url_for('projects.list_projects'))
@@ -215,7 +214,7 @@ def log_hours(id):
 @projects_bp.route('/update-status/<int:id>', methods=['POST'])
 @login_required
 def update_status(id):
-    project = Project.query.filter_by(id=id, user_id=current_user.id).first()
+    project = Project.query.filter_by(id=id).first()
     if not project:
         flash('Project not found.', 'error')
         return redirect(url_for('projects.list_projects'))
@@ -238,7 +237,7 @@ def update_status(id):
 @projects_bp.route('/delete/<int:id>', methods=['POST'])
 @login_required
 def delete(id):
-    project = Project.query.filter_by(id=id, user_id=current_user.id).first()
+    project = Project.query.filter_by(id=id).first()
     if project:
         # The ORM cascade removes the document rows; nothing in SQLAlchemy
         # removes their bytes, and SQLite is not enforcing the foreign key
@@ -258,20 +257,22 @@ def delete(id):
 
 # --- Documents -----------------------------------------------------------
 #
-# Ownership is checked by filtering on user_id at every entry point rather than
-# by fetching and then comparing, so a missed comparison cannot expose a row.
-# In this commit "may see it" means "owns it"; the client-facing half of the
-# rule arrives with the portal.
+# There is no per-admin ownership check here: @login_required is the whole
+# access rule on this side, and every admin works the same books (ADR-0014).
+# The client-facing half of the rule - what a portal account may see - arrives
+# with the portal, and stays scoped there.
 
 def _owned_project(id):
-    project = Project.query.filter_by(id=id, user_id=current_user.id).first()
+    """found or 404; every admin sees every project (ADR-0014)."""
+    project = db.session.get(Project, id)
     if not project:
         abort(404)
     return project
 
 
 def _owned_document(doc_id):
-    doc = ProjectDocument.query.filter_by(id=doc_id, user_id=current_user.id).first()
+    """found or 404; every admin sees every project (ADR-0014)."""
+    doc = db.session.get(ProjectDocument, doc_id)
     if not doc:
         abort(404)
     return doc
@@ -290,11 +291,11 @@ def detail(id):
         inventory_total=sum(i.total_cost for i in inventory_items),
         documents=ProjectDocument.query.filter_by(project_id=project.id)
                                        .order_by(ProjectDocument.created_at.desc()).all(),
-        clients=Client.query.filter_by(user_id=current_user.id, is_active=True)
+        clients=Client.query.filter_by(is_active=True)
                             .order_by(Client.name).all(),
         max_upload_mb=documents.MAX_UPLOAD_BYTES // (1024 * 1024),
         now=datetime.now(),
-        currency=current_user.currency)
+        currency=Business.get().currency)
 
 
 @projects_bp.route('/<int:id>/documents/upload', methods=['POST'])
@@ -386,10 +387,10 @@ def share_document(doc_id):
     """
     doc = _owned_document(doc_id)
 
-    # Only ids that are this user's clients. Filtering rather than validating
-    # means an id belonging to somebody else is dropped, not honoured.
+    # Only ids that are real clients. Filtering rather than validating means an
+    # id that is not a client at all is dropped, not honoured.
     requested = {int(v) for v in request.form.getlist('client_ids') if v.isdigit()}
-    allowed = {c.id for c in Client.query.filter_by(user_id=current_user.id).all()}
+    allowed = {c.id for c in Client.query.all()}
     target = requested & allowed
 
     current = doc.shared_client_ids
