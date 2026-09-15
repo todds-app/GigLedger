@@ -207,6 +207,12 @@ class PortalAccount(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login_at = db.Column(db.DateTime, nullable=True)
 
+    # When this account last loaded the portal home. A grant made after this
+    # is "new" on the next load - and only the next: the page stamps it on
+    # render. Per account, not per client, because the person reading the
+    # page is the account. See ADR-0012.
+    documents_seen_at = db.Column(db.DateTime, nullable=True)
+
     clients = db.relationship('Client', backref='portal_account', lazy=True)
 
 

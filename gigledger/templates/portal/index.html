@@ -14,6 +14,12 @@
     <p class="text-xs text-gray-400 mt-1">Files that have been shared with you.</p>
 </div>
 
+{% if new_count %}
+<div class="mb-5 px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-100 text-sm font-semibold text-emerald-800">
+    {{ new_count }} document{% if new_count != 1 %}s{% endif %} shared with you since your last visit.
+</div>
+{% endif %}
+
 {% if groups %}
     {% for group in groups %}
     <section class="panel p-6 mb-5">
@@ -26,7 +32,11 @@
                 {% for doc in docs %}
                 <div class="flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-100">
                     <div class="min-w-0 flex-1">
-                        <p class="text-sm font-semibold text-gray-700 truncate">{{ doc.title }}</p>
+                        <div class="flex items-center gap-1.5 min-w-0">
+                            <p class="text-sm font-semibold text-gray-700 truncate">{{ doc.title }}</p>
+                            {# Outside the truncating element, or a long title hides it #}
+                            {% if doc.id in new_ids %}<span class="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">New</span>{% endif %}
+                        </div>
                         <p class="text-[11px] text-gray-400">
                             {% if doc.is_link %}
                                 {% if doc.provider == 'google_drive' %}Google Drive{% else %}External link{% endif %}

@@ -250,6 +250,14 @@ def _migrate_db(db):
         cursor.execute("ALTER TABLE clients ADD COLUMN portal_account_id "
                        "INTEGER REFERENCES portal_accounts(id)")
 
+    # Migrate portal_accounts table - "new since your last visit" on the portal
+    # home. PRAGMA table_info on a table that does not exist yet returns no
+    # rows, so a fresh install falls through to create_all() as usual.
+    cursor.execute("PRAGMA table_info(portal_accounts)")
+    pa_columns = {row[1] for row in cursor.fetchall()}
+    if pa_columns and 'documents_seen_at' not in pa_columns:
+        cursor.execute("ALTER TABLE portal_accounts ADD COLUMN documents_seen_at DATETIME")
+
     # Migrate tax_estimates table - fix foreign key
     cursor.execute("PRAGMA table_info(tax_estimates)")
     te_columns = {row[1] for row in cursor.fetchall()}

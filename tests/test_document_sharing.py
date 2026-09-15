@@ -16,6 +16,7 @@ Three properties this file exists to hold:
    undifferentiated list (ADR-0008).
 """
 import io
+import sqlite3
 import os
 
 import pytest
@@ -94,9 +95,10 @@ def portal_for(app, client_id, email='billing@acmecorp.com'):
         _, token = portal_auth.create_invite(client, email)
         db.session.commit()
     http = app.test_client()
+    # Not following the redirect: redeeming lands on the portal home, and
+    # loading the home is a "visit" the freshness tests below need to control.
     http.post(f'/portal/invite/{token}',
-              data={'password': 'portal-pass-1234', 'confirm_password': 'portal-pass-1234'},
-              follow_redirects=True)
+              data={'password': 'portal-pass-1234', 'confirm_password': 'portal-pass-1234'})
     return http
 
 
@@ -389,3 +391,127 @@ def test_deleting_a_project_removes_its_documents_shares(app):
     with app.app_context():
         assert DocumentShare.query.count() == 0
         assert ProjectDocument.query.count() == 0
+
+
+# --- what is new ---------------------------------------------------------
+#
+# The portal flags documents shared since the account last loaded its home
+# page. "Since last visit" rather than "until opened", because opening a link
+# document never touches GigLedger - a read receipt would be honest for
+# uploads and silently absent for links. See ADR-0012.
+
+def link_document(app, project_id, title='Budget sheet'):
+    freelancer(app).post(f'/projects/{project_id}/documents/link',
+                         data={'title': title,
+                               'url': 'https://docs.google.com/spreadsheets/d/abc/edit'},
+                         follow_redirects=True)
+    with app.app_context():
+        return ProjectDocument.query.filter_by(kind='link').one().id
+
+
+def new_marker_count(body):
+    return body.count('>New</span>')
+
+
+def test_the_first_visit_flags_a_shared_document_and_stamps_the_visit(app):
+    client_id = a_client_id(app)
+    share(app, a_document(app), [client_id])
+    http = portal_for(app, client_id)
+
+    body = http.get('/portal/').get_data(as_text=True)
+
+    assert new_marker_count(body) == 1
+    assert '1 document shared with you since your last visit' in body
+    with app.app_context():
+        assert PortalAccount.query.one().documents_seen_at is not None
+
+
+def test_a_second_visit_no_longer_flags_it(app):
+    client_id = a_client_id(app)
+    share(app, a_document(app), [client_id])
+    http = portal_for(app, client_id)
+    http.get('/portal/')
+
+    body = http.get('/portal/').get_data(as_text=True)
+
+    assert new_marker_count(body) == 0
+    assert 'since your last visit' not in body
+
+
+def test_only_documents_shared_after_the_last_visit_are_flagged(app):
+    client_id = a_client_id(app)
+    project_id = a_project(app)
+    share(app, a_document(app, project_id, title='Old contract'), [client_id])
+    http = portal_for(app, client_id)
+    http.get('/portal/')
+    share(app, a_document(app, project_id, filename='v2.pdf', title='New contract'),
+          [client_id])
+
+    body = http.get('/portal/').get_data(as_text=True)
+
+    assert new_marker_count(body) == 1
+    assert body.index('New contract') < body.index('>New</span>') < body.index('Old contract')
+
+
+def test_resaving_the_same_share_does_not_reflag(app):
+    """The share form posts the whole set; an unchanged grant keeps its
+    timestamp, so saving again is not a new share."""
+    client_id = a_client_id(app)
+    doc_id = a_document(app)
+    share(app, doc_id, [client_id])
+    http = portal_for(app, client_id)
+    http.get('/portal/')
+    share(app, doc_id, [client_id])
+
+    assert new_marker_count(http.get('/portal/').get_data(as_text=True)) == 0
+
+
+def test_a_link_document_is_flagged_like_an_upload(app):
+    client_id = a_client_id(app)
+    share(app, link_document(app, a_project(app)), [client_id])
+
+    body = portal_for(app, client_id).get('/portal/').get_data(as_text=True)
+
+    assert new_marker_count(body) == 1
+
+
+def test_freshness_is_per_portal_account(app):
+    """Two people granted the same document each get their own 'since last
+    visit'; one of them reading the page must not clear it for the other."""
+    project_id = a_project(app)
+    first_client = a_client_id(app)
+    with app.app_context():
+        second = Client(user_id=1, name='Second Person', email='second@example.com')
+        db.session.add(second)
+        db.session.commit()
+        second_client = second.id
+    doc_id = a_document(app, project_id)
+    share(app, doc_id, [first_client, second_client])
+    first = portal_for(app, first_client, email='first@example.com')
+    second_http = portal_for(app, second_client, email='second@example.com')
+    first.get('/portal/')
+
+    assert new_marker_count(first.get('/portal/').get_data(as_text=True)) == 0
+    assert new_marker_count(second_http.get('/portal/').get_data(as_text=True)) == 1
+
+
+def test_the_migration_adds_documents_seen_at_to_an_existing_portal_accounts_table(tmp_path, monkeypatch):
+    """Existing installs have a portal_accounts table without the column;
+    create_all() does not alter tables, so _migrate_db() must."""
+    db_path = str(tmp_path / 'legacy.db')
+    conn = sqlite3.connect(db_path)
+    conn.execute("CREATE TABLE portal_accounts ("
+                 "id INTEGER PRIMARY KEY, email VARCHAR(200), "
+                 "password_hash VARCHAR(128), session_epoch INTEGER, "
+                 "created_at DATETIME, last_login_at DATETIME)")
+    conn.commit()
+    conn.close()
+
+    monkeypatch.setattr(gigledger.app, 'DB_PATH', db_path)
+    monkeypatch.setattr(gigledger.documents, 'UPLOAD_ROOT', str(tmp_path / 'uploads'))
+    create_app()
+
+    conn = sqlite3.connect(db_path)
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(portal_accounts)")}
+    conn.close()
+    assert 'documents_seen_at' in columns

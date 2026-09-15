@@ -94,6 +94,11 @@ def index():
     clients = portal_auth.visible_clients(g.portal_account)
     documents = documents_module.documents_shared_with(clients)
 
+    # "New" means shared since this account last loaded this page. Computed
+    # before the stamp moves, or nothing would ever be new. See ADR-0012.
+    new_ids = documents_module.newly_shared_ids(clients, g.portal_account.documents_seen_at)
+    documents_module.mark_documents_seen(g.portal_account)
+
     # Grouped by the freelancer who shared them, then by project. A portal
     # account is global (ADR-0008), so one page can carry two tenants' material;
     # rendering it as one undifferentiated list would be a leak of context even
@@ -110,7 +115,9 @@ def index():
 
     return render_template('portal/index.html',
                            account=g.portal_account,
-                           groups=list(by_owner.values()))
+                           groups=list(by_owner.values()),
+                           new_ids=new_ids,
+                           new_count=len(new_ids))
 
 
 @portal_bp.route('/documents/<int:doc_id>/download')

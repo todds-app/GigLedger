@@ -43,3 +43,8 @@ the failure modes the decision does *not* protect against.
 | [0008](0008-client-portal-authentication.md) | Authenticate portal clients outside Flask-Login, in their own session | Accepted |
 | [0009](0009-share-documents-by-explicit-grant.md) | Share documents by explicit grant to a client; private by default | Accepted |
 | [0010](0010-classify-transactions-by-kind.md) | Classify transactions by an explicit kind, not the sign of the amount | Accepted |
+| [0012](0012-document-freshness-is-since-last-visit.md) | Flag a document as new by recency for the owner and by last visit for the client | Accepted |
+
+0011 is reserved by the approved inventory-purchases spec
+(`docs/superpowers/specs/2026-09-15-inventory-purchases-design.md`), which
+will produce it when implemented.

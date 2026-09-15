@@ -18,6 +18,7 @@ here, because a reader of the tests should not have to infer them:
    has to be tested for what it leaves behind - rows *and* bytes.
 """
 import io
+from datetime import datetime, timedelta
 import os
 
 import pytest
@@ -374,3 +375,78 @@ def test_project_detail_refuses_another_users_project(app):
         stranger_id = stranger.id
 
     assert login(app, stranger_id).get(f'/projects/{pid}').status_code == 404
+
+
+# --- the projects list ---------------------------------------------------
+#
+# The Documents section lives on the detail page, which nothing on the list
+# page mentioned. Each card now carries a count and a link into the section,
+# and a recency cue for anything added in the last week. The cue is a cue,
+# not a notification: the owner added the file themselves.
+
+def documents_row(app, project_id, user_id=1):
+    """The card's documents link and whatever sits beside it."""
+    body = login(app, user_id).get('/projects/').get_data(as_text=True)
+    start = body.index(f'/projects/{project_id}#documents')
+    end = body.index('</div>', start)
+    return body[start:end]
+
+
+def test_the_projects_list_links_into_an_empty_documents_section(app):
+    pid = a_project(app)
+
+    row = documents_row(app, pid)
+
+    assert 'No documents' in row
+
+
+def test_the_projects_list_counts_uploads_and_links_together(app):
+    client = login(app)
+    pid = a_project(app)
+    upload(client, pid, 'contract.pdf')
+    client.post(f'/projects/{pid}/documents/link',
+                data={'title': 'Budget', 'url': 'https://docs.google.com/x'},
+                follow_redirects=True)
+
+    assert '2 documents' in documents_row(app, pid)
+
+
+def test_a_document_added_this_week_is_flagged_on_the_card(app):
+    client = login(app)
+    pid = a_project(app)
+    upload(client, pid, 'contract.pdf')
+
+    assert 'New this week' in documents_row(app, pid)
+
+
+def test_a_document_older_than_a_week_is_not_flagged(app):
+    client = login(app)
+    pid = a_project(app)
+    upload(client, pid, 'contract.pdf')
+    with app.app_context():
+        doc = ProjectDocument.query.one()
+        doc.created_at = datetime.utcnow() - timedelta(days=8)
+        db.session.commit()
+
+    row = documents_row(app, pid)
+
+    assert '1 document' in row
+    assert 'New this week' not in row
+
+
+def test_another_users_documents_do_not_count_on_my_list(app):
+    """The aggregate is filtered by owner like every other query, not by
+    project id alone - a project id is guessable."""
+    client = login(app)
+    pid = a_project(app)
+    upload(client, pid, 'contract.pdf')
+    with app.app_context():
+        stranger = User(email='stranger@example.com', password_hash='x')
+        db.session.add(stranger)
+        db.session.commit()
+        db.session.add(Project(user_id=stranger.id, name='Theirs', rate=1))
+        db.session.commit()
+        stranger_id = stranger.id
+        their_pid = Project.query.filter_by(user_id=stranger_id).one().id
+
+    assert 'No documents' in documents_row(app, their_pid, user_id=stranger_id)

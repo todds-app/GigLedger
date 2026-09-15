@@ -17,6 +17,7 @@ Two rules this module exists to enforce:
 """
 import os
 import uuid
+from datetime import datetime, timedelta
 from urllib.parse import urlsplit
 
 # Uploaded bytes live in the repository root, one level above this package,
@@ -57,6 +58,11 @@ DRIVE_HOSTS = {'docs.google.com', 'drive.google.com', 'sheets.google.com'}
 
 KINDS = {'upload', 'link'}
 PROVIDERS = {'google_drive', 'other'}
+
+# How long a document counts as "new" on the owner's own project cards. A cue,
+# not a notification: the owner added the file themselves, so there is no
+# state worth keeping about whether they have "seen" it. See ADR-0012.
+RECENTLY_ADDED = timedelta(days=7)
 
 
 def extension_of(filename):
@@ -124,6 +130,63 @@ def documents_shared_with(clients):
             .order_by(ProjectDocument.created_at.desc())
             .distinct()
             .all())
+
+
+def per_project_stats(user_id):
+    """{project_id: (document count, most recent created_at)} for one owner.
+
+    One grouped query rather than `project.documents` per card: the list page
+    renders every project the user has, and a lazy load per card is a query
+    per card.
+    """
+    from sqlalchemy import func
+    from .models import ProjectDocument
+
+    rows = (ProjectDocument.query
+            .with_entities(ProjectDocument.project_id,
+                           func.count(ProjectDocument.id),
+                           func.max(ProjectDocument.created_at))
+            .filter_by(user_id=user_id)
+            .group_by(ProjectDocument.project_id)
+            .all())
+    return {project_id: (count, latest) for project_id, count, latest in rows}
+
+
+def recent_cutoff(now=None):
+    return (now or datetime.utcnow()) - RECENTLY_ADDED
+
+
+def newly_shared_ids(clients, since):
+    """Ids of documents granted to any of these clients after `since`.
+
+    Computed from the grant, not the document: the grant is what gives a
+    client access (ADR-0006), so the grant is what makes a document new *to
+    them*. `since=None` is a first visit, and everything counts.
+    """
+    from .models import DocumentShare
+
+    client_ids = [c.id for c in clients]
+    if not client_ids:
+        return set()
+    query = DocumentShare.query.filter(DocumentShare.client_id.in_(client_ids))
+    if since is not None:
+        query = query.filter(DocumentShare.created_at > since)
+    return {share.document_id for share in query.all()}
+
+
+def mark_documents_seen(account):
+    """Stamp the portal account's visit to its document list.
+
+    Called from a GET, like `record_access` below, and for the same reason:
+    this records something the reader did, not something they asked for. A
+    forged cross-site GET could at worst clear a "new" badge the client had
+    not yet read - the same class of harm as a forged download writing an
+    access row - and the response is unreadable to the forger either way.
+    """
+    from .models import db
+
+    account.documents_seen_at = datetime.utcnow()
+    db.session.commit()
 
 
 def is_shared_with(document, clients):

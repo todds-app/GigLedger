@@ -60,6 +60,8 @@ def list_projects():
         projects=projects,
         all_projects=all_projects,
         clients=clients,
+        document_stats=documents.per_project_stats(uid),
+        recent_cutoff=documents.recent_cutoff(),
         active_count=active_count,
         total_earned=total_earned,
         hours_this_month=hours_this_month,

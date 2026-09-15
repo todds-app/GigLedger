@@ -18,3 +18,7 @@ env/
 # Worktrees (Claude Code native and manual)
 .claude/worktrees/
 .worktrees/
+
+# Database backups made by the run wrapper, and browser-driven verification output
+*.db.bak-*
+.playwright-mcp/
