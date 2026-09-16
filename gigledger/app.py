@@ -160,7 +160,6 @@ def create_app():
     from .routes.projects import projects_bp
     from .routes.reports import reports_bp
     from .routes.invoices import invoices_bp
-    from .routes.goals import goals_bp
     from .routes.recurring import recurring_bp
     from .routes.inventory import inventory_bp
     from .routes.team import team_bp
@@ -175,9 +174,12 @@ def create_app():
     app.register_blueprint(projects_bp)
     app.register_blueprint(reports_bp)
     app.register_blueprint(invoices_bp)
-    app.register_blueprint(goals_bp)
     app.register_blueprint(recurring_bp)
     app.register_blueprint(inventory_bp)
+
+    # Savings goals (routes/goals.py, templates/goals/) is parked, not deleted:
+    # the nav, dashboard card and blueprint are unplugged until it earns a place
+    # again. Restore by registering goals_bp and re-adding the nav links.
 
     # Registered conditionally, so switching the portal off removes the routes
     # rather than making them refuse. A route that exists and refuses is still a

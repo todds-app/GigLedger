@@ -1,7 +1,7 @@
 from datetime import datetime
 from flask import Blueprint, render_template
 from flask_login import login_required
-from ..models import Goal, Project, Invoice, Client, Business, COST_KINDS
+from ..models import Project, Invoice, Client, Business, COST_KINDS
 from ..finance import (calculate_monthly_summary, calculate_safe_to_spend,
                        calculate_runway, get_6_month_chart_data, get_quarter,
                        get_recent_transactions, get_category_breakdown)
@@ -48,10 +48,6 @@ def index():
                                 if kind in COST_KINDS and deductible)
     tax_saving_this_month = deductible_this_month * tax_rate
 
-    # New: Goals data
-    goals = Goal.query.filter_by(is_completed=False).order_by(Goal.deadline.asc().nulls_last()).limit(3).all()
-    total_goals_saved = sum(g.current_amount for g in Goal.query.all())
-
     # New: Active projects
     active_projects = Project.query.filter_by(status='active').order_by(Project.deadline.asc().nulls_last()).limit(3).all()
     active_project_count = Project.query.filter_by(status='active').count()
@@ -85,7 +81,6 @@ def index():
         deductible_this_month=deductible_this_month,
         tax_saving_this_month=tax_saving_this_month,
         user_categories=business.get_all_categories(),
-        goals=goals, total_goals_saved=total_goals_saved,
         active_projects=active_projects, active_project_count=active_project_count,
         unpaid_invoices=unpaid_invoices, total_outstanding=total_outstanding,
         overdue_count=overdue_count, client_count=client_count,

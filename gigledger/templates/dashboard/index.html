@@ -204,40 +204,8 @@
         </div>
     </div>
 
-    <!-- NEW: Goals + Projects + Invoices Row -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Goals Progress -->
-        <div class="glass-card p-6 fade-up fade-up-delay-3">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-lg font-extrabold text-gray-900">Savings Goals</h2>
-                <a href="{{ url_port('goals.index') }}" class="text-sm text-brand-600 hover:text-brand-500 font-semibold transition-colors">View all &rarr;</a>
-            </div>
-            {% if goals %}
-            <div class="space-y-4">
-                {% for goal in goals %}
-                <div class="p-3 rounded-xl bg-white/50 border border-gray-100/50">
-                    <div class="flex items-center justify-between mb-2">
-                        <div class="flex items-center gap-2">
-                            <div class="w-3 h-3 rounded-full" style="background-color: {{ goal.color }}"></div>
-                            <span class="text-sm font-bold text-gray-800 truncate">{{ goal.name }}</span>
-                        </div>
-                        <span class="text-xs font-bold {% if goal.progress_percent >= 75 %}text-green-600{% elif goal.progress_percent >= 50 %}text-amber-600{% else %}text-gray-500{% endif %}">{{ goal.progress_percent | int }}%</span>
-                    </div>
-                    <div class="w-full bg-gray-200/50 rounded-full h-2 mb-2">
-                        <div class="h-2 rounded-full transition-all" style="width: {{ goal.progress_percent | int }}%; background-color: {{ goal.color }}"></div>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs text-gray-400 font-medium">{{ currency | currency_symbol }}{{ goal.current_amount | money }}</span>
-                        <span class="text-xs text-gray-400 font-medium">{{ currency | currency_symbol }}{{ goal.target_amount | money }}</span>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <p class="text-sm text-gray-300 text-center py-6 font-medium">No active goals. <a href="{{ url_port('goals.index') }}" class="text-brand-600 font-semibold">Create one!</a></p>
-            {% endif %}
-        </div>
-
+    <!-- Projects + Invoices Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Active Projects -->
         <div class="glass-card p-6 fade-up fade-up-delay-4">
             <div class="flex items-center justify-between mb-4">

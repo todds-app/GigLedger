@@ -42,7 +42,6 @@ No more setting aside random percentages. No more spreadsheet gymnastics. Just c
 - **Runway Calculator** — Color-coded survival months (green ≥6, yellow ≥3, red <3)
 - **Bank Balance & Net This Month** — Instant financial health check
 - **Monthly Commitments** — Everything that leaves the account monthly from active recurring transactions, inventory orders included
-- **Savings Goals Progress** — Visual progress bars with color-coded status
 - **Active Projects** — Quick view of ongoing work with earnings
 - **Outstanding Invoices** — Unpaid invoice summary with overdue warnings
 - **Recent Transactions** — Last 5 transactions at a glance
@@ -137,13 +136,6 @@ No more setting aside random percentages. No more spreadsheet gymnastics. Just c
 - **No public sign-up** — `/setup` exists only until the first admin is created
 
 > See [docs/adr/0014](docs/adr/0014-one-business-per-install.md).
-
-### 🎯 Savings Goals
-- **Visual progress bars** — Color-coded with percentage complete
-- **Target amounts** — Set a goal and track progress
-- **Deadlines** — Know when you need to reach your target
-- **Mark as completed** — Celebrate when you hit your goal
-- **5 demo goals** — Emergency fund, laptop, vacation, tax reserve, conference
 
 ### 🔄 Recurring Transactions
 - **Schedule recurring expenses** — Weekly, monthly, quarterly, or yearly
@@ -296,7 +288,6 @@ The demo account includes a complete freelancer workspace:
 - **8 clients** with full contact info
 - **7 projects** in various states (active, completed, on hold)
 - **8 invoices** (4 paid with auto-posted income + tax reserve, 2 sent, 1 draft, 1 overdue)
-- **5 savings goals** with progress tracking
 - **7 recurring transactions** (monthly subscriptions and yearly renewals)
 - All invoices include proper tax calculations at the 30% rate
 
@@ -325,7 +316,7 @@ gigledger/                      # Repository root — may be named anything
 │   │   ├── invoices.py         # Invoice CRUD + HTML export + mark-as-paid + auto-post
 │   │   ├── clients.py          # Client CRM with detail view
 │   │   ├── projects.py         # Project tracking + hours logging
-│   │   ├── goals.py            # Savings goals with progress
+│   │   ├── goals.py            # Savings goals (parked: not registered or linked)
 │   │   ├── recurring.py        # Recurring transaction scheduling
 │   │   ├── taxes.py            # Quarterly tax estimator
 │   │   ├── reports.py          # Yearly financial reports
@@ -356,7 +347,7 @@ gigledger/                      # Repository root — may be named anything
 │       │   ├── redeem.html
 │       │   └── index.html
 │       ├── goals/
-│       │   └── index.html      # Savings goals tracker
+│       │   └── index.html      # Savings goals tracker (parked)
 │       ├── recurring/
 │       │   └── index.html      # Recurring transaction manager
 │       ├── taxes/
@@ -443,10 +434,6 @@ gigledger/                      # Repository root — may be named anything
 | `POST` | `/projects/log-hours/<id>` | Log hours to project |
 | `POST` | `/projects/status/<id>` | Update project status |
 | `POST` | `/projects/delete/<id>` | Delete project |
-| `GET` | `/goals` | Savings goals list |
-| `POST` | `/goals/add` | Add new goal |
-| `POST` | `/goals/update/<id>` | Update goal progress |
-| `POST` | `/goals/delete/<id>` | Delete goal |
 | `GET` | `/recurring` | Recurring transaction list |
 | `POST` | `/recurring/add` | Add recurring transaction |
 | `POST` | `/recurring/toggle/<id>` | Toggle active/paused |
@@ -522,7 +509,7 @@ When an invoice is **un-paid** (reverted to Sent), **both** auto-posted transact
 - [x] ~~**Invoice generator** — Create, send, mark as paid~~
 - [x] ~~**Client management** — Full CRM with stats~~
 - [x] ~~**Project tracking** — Hours, rates, deadlines~~
-- [x] ~~**Savings goals** — Visual progress tracking~~
+- [ ] **Savings goals** — Built, then parked (code kept, routes and nav unplugged) until it earns a place
 - [x] ~~**Recurring transactions** — Auto-generate monthly/weekly~~
 - [x] ~~**Reports & Analytics** — Yearly financial reports~~
 - [x] ~~**Dark mode** — Because freelancers work at night~~
