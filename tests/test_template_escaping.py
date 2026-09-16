@@ -87,14 +87,14 @@ def test_the_lint_actually_matches_handlers():
     "\\'; alert(1); //",
     'both \' and " quotes',
 ])
-def test_tojson_forceescape_survives_the_html_attribute_round_trip(payload):
+def test_tojson_forceescape_survives_the_html_attribute_round_trip(app, payload):
     """The property the lint relies on, checked against Flask's own Jinja
-    environment rather than a bare one - Flask installs its own tojson."""
+    environment rather than a bare one - Flask installs its own tojson.
+
+    Takes the `app` fixture rather than calling create_app() itself: a bare
+    create_app() opens the real gigledger.db and runs its migrations on it."""
     import html as html_module
 
-    from gigledger.app import create_app
-
-    app = create_app()
     rendered = app.jinja_env.from_string(
         '<button onclick="fn({{ v|tojson|forceescape }})">'
     ).render(v=payload)

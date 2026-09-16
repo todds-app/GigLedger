@@ -222,7 +222,7 @@
                         <p class="text-xs text-gray-400 font-medium">
                             {{ project.client.name if project.client else 'No client' }} &middot;
                             {{ project.rate_type }} &middot;
-                            {{ project.hours_logged }}hrs
+                            {{ project.hours_logged | decimal1 }}hrs
                         </p>
                     </div>
                     <div class="text-right">

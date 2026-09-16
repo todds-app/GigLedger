@@ -2,6 +2,7 @@
 GigLedger - Flask Application Factory
 """
 import os
+from datetime import datetime
 import uuid
 from flask import Flask, request as req, url_for as _url_for, flash, redirect
 from flask_login import LoginManager, current_user
@@ -245,6 +246,27 @@ def _migrate_db(db):
             FROM users ORDER BY id LIMIT 1
         """)
 
+    # Migrate projects table - the timer, and the old hours counter becomes a
+    # time log. `hours_logged` is no longer declared on the model, so a fresh
+    # database has no such column and only the timer columns are wanted. On an
+    # existing one, each project's total becomes a single log dated from the
+    # project's start, and the counter is zeroed so a restart adds nothing.
+    # create_all() has already made time_logs. See docs/adr/0015.
+    cursor.execute("PRAGMA table_info(projects)")
+    project_columns = {row[1] for row in cursor.fetchall()}
+    if project_columns and 'timer_seconds' not in project_columns:
+        cursor.execute("ALTER TABLE projects ADD COLUMN timer_started_at DATETIME")
+        cursor.execute("ALTER TABLE projects ADD COLUMN timer_seconds INTEGER NOT NULL DEFAULT 0")
+        cursor.execute("ALTER TABLE projects ADD COLUMN timer_since DATETIME")
+    if 'hours_logged' in project_columns:
+        stamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+        cursor.execute("""
+            INSERT INTO time_logs (user_id, project_id, hours, started_on, ended_on, created_at)
+            SELECT user_id, id, hours_logged, COALESCE(start_date, ?), ?, ?
+            FROM projects WHERE hours_logged > 0
+        """, (stamp, stamp, stamp))
+        cursor.execute("UPDATE projects SET hours_logged = 0 WHERE hours_logged > 0")
+
     # Migrate transactions table
     cursor.execute("PRAGMA table_info(transactions)")
     tx_columns = {row[1] for row in cursor.fetchall()}
@@ -300,7 +322,7 @@ def _migrate_db(db):
 
 def _seed_demo_data():
     from .models import (User, Business, Transaction, Client, Invoice, InvoiceLineItem,
-                          Project, Goal, RecurringTransaction)
+                          Project, TimeLog, Goal, RecurringTransaction)
     from flask_bcrypt import generate_password_hash
 
     # The seed only ever populates an empty database: any pre-existing user or
@@ -385,8 +407,19 @@ def _seed_demo_data():
          'start_date': datetime.now() - timedelta(days=20), 'deadline': datetime.now() + timedelta(days=40)},
     ]
     for pd in projects_data:
+        hours = pd.pop('hours_logged')
         p = Project(user_id=demo_user.id, **pd)
         db.session.add(p)
+        db.session.flush()
+        # Three logs per project, the latest a few days ago (or at the end of
+        # a finished project), so the Hours card has something for this month.
+        last_end = p.end_date or datetime.now() - timedelta(days=3)
+        for share, end in ((0.5, last_end - timedelta(days=14)),
+                           (0.3, last_end - timedelta(days=7)),
+                           (0.2, last_end)):
+            db.session.add(TimeLog(user_id=demo_user.id, project_id=p.id,
+                                   hours=round(hours * share, 2),
+                                   started_on=end - timedelta(days=4), ended_on=end))
     db.session.commit()
 
     # ---- Create Invoices ----

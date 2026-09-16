@@ -89,12 +89,12 @@ No more setting aside random percentages. No more spreadsheet gymnastics. Just c
 ### 📁 Project Tracking
 - **Project dashboard** — All projects with status, client, and earnings
 - **Rate types** — Hourly, fixed, or daily rate support
-- **Hours logging** — Track time with auto-earning calculation
+- **Timer per project** — Start/stop on the project card; one runs at a time and it survives reloads
 - **Status workflow** — Active, completed, on hold, cancelled
 - **Deadline tracking** — Visual deadline indicators
 - **Color-coded** — Custom colors per project
-- **Create transactions from hours** — Optional: auto-create income when logging hours
-- **Project detail page** — Full view of a single project with its documents
+- **Hours logged as time logs** — Each block of hours with its date range; bill a log as an income transaction in one click
+- **Project detail page** — Full view of a single project with its hours, documents and inventory
 - **7 demo projects** — Showing various states and rate types
 
 ### 📎 Project Documents
@@ -380,7 +380,8 @@ gigledger/                      # Repository root — may be named anything
 | **PortalInvite** | `portal_invites` | client_id, email, token_hash, expires_at, redeemed_at |
 | **AdminInvite** | `admin_invites` | email, token_hash, invited_by, expires_at, redeemed_at |
 | **LoginAttempt** | `login_attempts` | scope (portal/app), identifier, ip, at |
-| **Project** | `projects` | client_id, name, description, status, rate_type, rate, hours_logged, deadline, color |
+| **Project** | `projects` | client_id, name, description, status, rate_type, rate, deadline, color, timer_started_at, timer_seconds, timer_since |
+| **TimeLog** | `time_logs` | project_id, hours, started_on, ended_on, transaction_id (1:1, nullable) |
 | **ProjectDocument** | `project_documents` | project_id, kind (upload/link), title, stored_name, original_name, byte_size, external_url, provider |
 | **DocumentShare** | `document_shares` | document_id, client_id (unique pair) |
 | **DocumentAccess** | `document_accesses` | document_id, user_id or portal_account_id, ip, at |
@@ -425,13 +426,18 @@ gigledger/                      # Repository root — may be named anything
 | `GET` | `/portal/documents/<id>/download` | Download a document shared with you |
 | `POST` | `/projects/documents/<id>/share` | Set which clients a document is shared with |
 | `GET` | `/projects` | Project list |
-| `GET` | `/projects/<id>` | Project detail with documents |
+| `GET` | `/projects/<id>` | Project detail with hours logged, documents and inventory |
+| `POST` | `/projects/<id>/timer/start` | Start the project's timer (stops any other) |
+| `POST` | `/projects/<id>/timer/stop` | Stop the timer, keeping the seconds |
+| `POST` | `/projects/time-logs/<id>/edit` | Change a log's hours (unbilled only) |
+| `POST` | `/projects/time-logs/<id>/delete` | Remove a log (unbilled only) |
+| `POST` | `/projects/time-logs/<id>/create-transaction` | Book a log as income at hours × rate |
 | `POST` | `/projects/<id>/documents/upload` | Attach an uploaded file |
 | `POST` | `/projects/<id>/documents/link` | Attach a Google Drive (or other) link |
 | `GET` | `/projects/documents/<id>/download` | Download an attached file |
 | `POST` | `/projects/documents/<id>/delete` | Remove a document and its bytes |
 | `POST` | `/projects/add` | Add new project |
-| `POST` | `/projects/log-hours/<id>` | Log hours to project |
+| `POST` | `/projects/log-hours/<id>` | Turn the timer into a time log |
 | `POST` | `/projects/status/<id>` | Update project status |
 | `POST` | `/projects/delete/<id>` | Delete project |
 | `GET` | `/recurring` | Recurring transaction list |

@@ -2,6 +2,7 @@
 GigLedger - SQLAlchemy Models
 """
 from datetime import datetime
+import math
 from flask_login import UserMixin
 from flask_sqlalchemy import SQLAlchemy
 import json
@@ -428,15 +429,68 @@ class Project(db.Model):
     status = db.Column(db.String(20), default='active')  # active, completed, on_hold, cancelled
     rate_type = db.Column(db.String(20), default='hourly')  # hourly, fixed, daily
     rate = db.Column(db.Float, default=0)
-    hours_logged = db.Column(db.Float, default=0)
+    # `hours_logged` used to be a column here. It is left in place on an
+    # existing database (SQLite cannot drop a column cleanly) and simply stops
+    # being declared; the hours now live in `time_logs`. See docs/adr/0015.
     start_date = db.Column(db.DateTime, default=datetime.utcnow)
     end_date = db.Column(db.DateTime, nullable=True)
     deadline = db.Column(db.DateTime, nullable=True)
     color = db.Column(db.String(20), default='#34d399')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # The timer. `timer_seconds` is what earlier start/stop periods have
+    # accumulated and nobody has logged yet; `timer_started_at` is set while it
+    # runs; `timer_since` is the first start of that unlogged stretch, and
+    # becomes the log's default start date. Server-side so a reload, another
+    # browser or a restart never loses the count.
+    timer_started_at = db.Column(db.DateTime, nullable=True)
+    timer_seconds = db.Column(db.Integer, nullable=False, default=0)
+    timer_since = db.Column(db.DateTime, nullable=True)
+
     documents = db.relationship('ProjectDocument', backref='project', lazy=True,
                                 cascade='all, delete-orphan')
+    time_logs = db.relationship('TimeLog', backref='project', lazy=True,
+                                cascade='all, delete-orphan')
+
+    @property
+    def hours_logged(self):
+        return sum(log.hours for log in self.time_logs)
+
+    # -- timer: pure state changes, the route commits --------------------
+
+    @property
+    def timer_running(self):
+        return self.timer_started_at is not None
+
+    def elapsed_seconds(self, now):
+        seconds = self.timer_seconds or 0
+        if self.timer_running:
+            seconds += int((now - self.timer_started_at).total_seconds())
+        return max(0, seconds)
+
+    def start_timer(self, now):
+        if self.timer_running:
+            return
+        self.timer_started_at = now
+        if self.timer_since is None:
+            self.timer_since = now
+
+    def stop_timer(self, now):
+        if not self.timer_running:
+            return
+        self.timer_seconds = self.elapsed_seconds(now)
+        self.timer_started_at = None
+
+    def reset_timer(self):
+        self.timer_started_at = None
+        self.timer_seconds = 0
+        self.timer_since = None
+
+    def suggested_hours(self, now):
+        return quarter_hours(self.elapsed_seconds(now))
+
+    def timer_label(self, now):
+        return format_duration(self.elapsed_seconds(now))
 
     @property
     def earned(self):
@@ -454,6 +508,68 @@ class Project(db.Model):
         if self.rate_type == 'fixed' and self.rate > 0:
             return min(100, (self.hours_logged / 100) * 100)
         return 0
+
+
+QUARTER_HOUR = 0.25
+
+
+def round_quarter(hours):
+    """Nearest quarter hour, half up. The one rounding rule; the timer script
+    in projects/index.html mirrors it so the prefilled figure and the stored
+    figure agree."""
+    return math.floor(hours / QUARTER_HOUR + 0.5) * QUARTER_HOUR
+
+
+def quarter_hours(seconds):
+    """A started timer is never rounded away to nothing."""
+    if seconds <= 0:
+        return 0
+    return max(QUARTER_HOUR, round_quarter(seconds / 3600))
+
+
+def format_duration(seconds):
+    hours, rest = divmod(max(0, int(seconds)), 3600)
+    minutes, secs = divmod(rest, 60)
+    return f'{hours}:{minutes:02d}:{secs:02d}'
+
+
+class TimeLog(db.Model):
+    """A block of hours worked on a project, and the income it produced, if any.
+
+    `transaction_id` is the ADR-0011 shape: 1:1, optional, unique. While it is
+    NULL the log is editable and deletable; once set, the log is locked so the
+    hours and the ledger line cannot drift apart. No cascade in either
+    direction: deleting the transaction nulls the link (SQLAlchemy does that;
+    SQLite is not enforcing the foreign key), deleting the log leaves the
+    ledger alone. See docs/adr/0015.
+    """
+    __tablename__ = 'time_logs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    hours = db.Column(db.Float, nullable=False)
+    started_on = db.Column(db.DateTime, nullable=False)
+    ended_on = db.Column(db.DateTime, nullable=False)
+    transaction_id = db.Column(db.Integer, db.ForeignKey('transactions.id'),
+                               nullable=True, unique=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    transaction = db.relationship('Transaction', lazy=True,
+                                  backref=db.backref('time_log', uselist=False))
+
+    @property
+    def is_billed(self):
+        return self.transaction_id is not None
+
+    @property
+    def date_range_label(self):
+        start, end = self.started_on.date(), self.ended_on.date()
+        if start == end:
+            return end.strftime('%d %b %Y')
+        if start.year == end.year:
+            return f"{start.strftime('%d %b')} \u2013 {end.strftime('%d %b %Y')}"
+        return f"{start.strftime('%d %b %Y')} \u2013 {end.strftime('%d %b %Y')}"
 
 
 class ProjectDocument(db.Model):

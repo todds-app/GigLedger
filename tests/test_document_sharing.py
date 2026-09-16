@@ -9,13 +9,14 @@ Three properties this file exists to hold:
 1. **Default private.** A document nobody shared is visible to nobody. A
    mis-click leaks nothing because there is nothing to mis-click into.
 2. **The portal shows the project's name and nothing else about it.** A project
-   carries `rate`, `hours_logged` and `description` - pricing and internal notes
+   carries `rate`, its time logs and `description` - pricing and internal notes
    that a client granted one document must not read as a side effect.
 3. **A portal account is global, so its page mixes tenants by construction.**
    Documents from two different freelancers must never render as one
    undifferentiated list (ADR-0008).
 """
 import io
+from datetime import datetime
 import sqlite3
 import os
 
@@ -26,7 +27,7 @@ import gigledger.documents
 import gigledger.portal_auth as portal_auth
 from gigledger.app import create_app
 from gigledger.models import (Business, Client, DocumentAccess, DocumentShare, PortalAccount,
-                              Project, ProjectDocument, User, db)
+                              Project, ProjectDocument, TimeLog, User, db)
 
 
 def build_app(tmp_path, monkeypatch, **config):
@@ -242,7 +243,8 @@ def test_the_portal_shows_the_project_name_but_not_its_commercials(app):
         project = db.session.get(Project, project_id)
         project.description = 'INTERNAL-ONLY-NOTE'
         project.rate = 98765
-        project.hours_logged = 4321
+        db.session.add(TimeLog(user_id=1, project_id=project_id, hours=4321,
+                               started_on=datetime.now(), ended_on=datetime.now()))
         project_name = project.name
         db.session.commit()
     client_id = a_client_id(app)

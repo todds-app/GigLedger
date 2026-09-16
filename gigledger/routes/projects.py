@@ -9,7 +9,7 @@ from flask import (Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
 from .. import documents
 from ..models import (Business, Project, Client, ProjectDocument, DocumentShare,
-                      Transaction, InventoryItem, db, INCOME)
+                      Transaction, InventoryItem, TimeLog, db, INCOME, round_quarter)
 
 projects_bp = Blueprint('projects', __name__, url_prefix='/projects')
 
@@ -48,10 +48,9 @@ def list_projects():
     total_earned = sum(p.earned for p in all_projects)
 
     now = datetime.now()
+    first_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     hours_this_month = sum(
-        p.hours_logged for p in all_projects
-        if p.start_date and p.start_date.month == now.month and p.start_date.year == now.year
-    )
+        log.hours for log in TimeLog.query.filter(TimeLog.ended_on >= first_of_month))
 
     clients = Client.query.filter_by(is_active=True).order_by(Client.name).all()
 
@@ -65,7 +64,7 @@ def list_projects():
         total_earned=total_earned,
         hours_this_month=hours_this_month,
         status_filter=status_filter,
-        now=datetime.now(),
+        now=now,
         currency=Business.get().currency)
 
 
@@ -171,43 +170,80 @@ def edit(id):
     return redirect(url_for('projects.list_projects'))
 
 
+def _parse_day(value, default):
+    try:
+        return datetime.strptime(value, '%Y-%m-%d')
+    except (ValueError, TypeError):
+        return default
+
+
 @projects_bp.route('/log-hours/<int:id>', methods=['POST'])
 @login_required
 def log_hours(id):
-    project = Project.query.filter_by(id=id).first()
-    if not project:
-        flash('Project not found.', 'error')
-        return redirect(url_for('projects.list_projects'))
+    """Bank the timer as a TimeLog. The posted hours are authoritative - the
+    modal's prefill is a suggestion - and are rounded by the one rule. Nothing
+    is booked to the ledger here; that is a separate, deliberate click on the
+    project page (ADR-0015)."""
+    project = _owned_project(id)
+    now = datetime.now()
+    back = redirect(url_for('projects.list_projects'))
 
     try:
-        hours = float(request.form.get('hours', '0'))
+        hours = round_quarter(float(request.form.get('hours', '0')))
     except ValueError:
         flash('Invalid hours value.', 'error')
-        return redirect(url_for('projects.list_projects'))
-
+        return back
     if hours <= 0:
         flash('Hours must be greater than zero.', 'error')
-        return redirect(url_for('projects.list_projects'))
+        return back
 
-    project.hours_logged = (project.hours_logged or 0) + hours
+    ended_on = _parse_day(request.form.get('ended_on'), now)
+    started_on = _parse_day(request.form.get('started_on'),
+                            project.timer_since or ended_on)
+    if started_on.date() > ended_on.date():
+        flash('The hours cannot start after they end.', 'error')
+        return back
 
-    # Optionally create a transaction for the earned amount
-    create_transaction = request.form.get('create_transaction') == 'on'
-    if create_transaction and project.earned > 0:
-        earned = project.earned
-        tx = Transaction(
-            user_id=current_user.id,
-            amount=earned,
-            date=datetime.now(),
-            kind=INCOME,
-            category='Freelance Project',
-            description=f'Hours logged on project: {project.name}',
-            is_tax_deductible=False,
-            source='project')
-        db.session.add(tx)
-
+    project.stop_timer(now)
+    db.session.add(TimeLog(
+        user_id=current_user.id,
+        project_id=project.id,
+        hours=hours,
+        started_on=started_on,
+        ended_on=ended_on))
+    project.reset_timer()
     db.session.commit()
-    flash(f'{hours}h logged on "{project.name}"!', 'success')
+
+    flash(f'{hours:g}h logged on "{project.name}".', 'success')
+    return back
+
+
+# --- Timer -----------------------------------------------------------------
+#
+# One clock for the whole business: a person works on one thing at a time, so
+# starting a project's timer stops whichever other one is running and banks
+# its seconds there. State lives on the project row (ADR-0015); these routes
+# only move it and commit.
+
+@projects_bp.route('/<int:id>/timer/start', methods=['POST'])
+@login_required
+def timer_start(id):
+    project = _owned_project(id)
+    now = datetime.now()
+    for other in Project.query.filter(Project.timer_started_at.isnot(None),
+                                      Project.id != project.id).all():
+        other.stop_timer(now)
+    project.start_timer(now)
+    db.session.commit()
+    return redirect(url_for('projects.list_projects'))
+
+
+@projects_bp.route('/<int:id>/timer/stop', methods=['POST'])
+@login_required
+def timer_stop(id):
+    project = _owned_project(id)
+    project.stop_timer(datetime.now())
+    db.session.commit()
     return redirect(url_for('projects.list_projects'))
 
 
@@ -228,6 +264,10 @@ def update_status(id):
     project.status = new_status
     if new_status == 'completed':
         project.end_date = datetime.now()
+    if new_status != 'active':
+        # Nothing counts unseen: a project put on hold or finished stops its
+        # clock. The seconds are kept for the next Log Hours.
+        project.stop_timer(datetime.now())
 
     db.session.commit()
     flash(f'Project "{project.name}" marked as {new_status.replace("_", " ").title()}.', 'success')
@@ -255,6 +295,83 @@ def delete(id):
     return redirect(url_for('projects.list_projects'))
 
 
+# --- Time logs -------------------------------------------------------------
+#
+# A log is editable and deletable until it has been billed. Once a transaction
+# hangs off it the hours are what the ledger says they are, so both refuse.
+
+@projects_bp.route('/time-logs/<int:log_id>/edit', methods=['POST'])
+@login_required
+def edit_time_log(log_id):
+    log = _owned_time_log(log_id)
+    back = redirect(url_for('projects.detail', id=log.project_id))
+    if log.is_billed:
+        flash('These hours already have a transaction. Delete it to edit them.', 'error')
+        return back
+
+    try:
+        hours = round_quarter(float(request.form.get('hours', '0')))
+    except ValueError:
+        flash('Invalid hours value.', 'error')
+        return back
+    if hours <= 0:
+        flash('Hours must be greater than zero.', 'error')
+        return back
+
+    log.hours = hours
+    db.session.commit()
+    flash('Hours updated.', 'success')
+    return back
+
+
+@projects_bp.route('/time-logs/<int:log_id>/delete', methods=['POST'])
+@login_required
+def delete_time_log(log_id):
+    log = _owned_time_log(log_id)
+    back = redirect(url_for('projects.detail', id=log.project_id))
+    if log.is_billed:
+        flash('These hours already have a transaction. Delete it first.', 'error')
+        return back
+
+    db.session.delete(log)
+    db.session.commit()
+    flash('Hours removed.', 'success')
+    return back
+
+
+@projects_bp.route('/time-logs/<int:log_id>/create-transaction', methods=['POST'])
+@login_required
+def create_time_log_transaction(log_id):
+    """Book a log as income: hours x the project's hourly rate, dated when the
+    hours ended. The amount is derived here, never posted (ADR-0011's rule),
+    and linking the row is what locks the log."""
+    log = _owned_time_log(log_id)
+    project = log.project
+    back = redirect(url_for('projects.detail', id=project.id))
+    if log.is_billed:
+        flash('These hours already have a transaction.', 'error')
+        return back
+    if project.rate_type != 'hourly':
+        flash('Only hourly projects bill by the hour.', 'error')
+        return back
+    if not project.rate or project.rate <= 0:
+        flash('Set an hourly rate on the project first.', 'error')
+        return back
+
+    log.transaction = Transaction(
+        user_id=current_user.id,
+        amount=log.hours * project.rate,
+        date=log.ended_on,
+        kind=INCOME,
+        category='Freelance Project',
+        description=f'{log.hours:g}h on {project.name} ({log.date_range_label})',
+        is_tax_deductible=False,
+        source='project')
+    db.session.commit()
+    flash(f'Income of {log.hours * project.rate:.2f} booked for {log.hours:g}h.', 'success')
+    return back
+
+
 # --- Documents -----------------------------------------------------------
 #
 # There is no per-admin ownership check here: @login_required is the whole
@@ -278,6 +395,14 @@ def _owned_document(doc_id):
     return doc
 
 
+def _owned_time_log(log_id):
+    """found or 404; every admin sees every project (ADR-0014)."""
+    log = db.session.get(TimeLog, log_id)
+    if not log:
+        abort(404)
+    return log
+
+
 @projects_bp.route('/<int:id>')
 @login_required
 def detail(id):
@@ -287,6 +412,11 @@ def detail(id):
                        .order_by(Transaction.date.desc()).all())
     return render_template('projects/detail.html',
         project=project,
+        # By day, then by entry: ended_on carries a time only for migrated
+        # rows, so the clock must not decide the order within a day.
+        time_logs=TimeLog.query.filter_by(project_id=project.id)
+                              .order_by(db.func.date(TimeLog.ended_on).desc(),
+                                        TimeLog.id.desc()).all(),
         inventory_items=inventory_items,
         inventory_total=sum(i.total_cost for i in inventory_items),
         documents=ProjectDocument.query.filter_by(project_id=project.id)

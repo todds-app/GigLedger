@@ -311,6 +311,22 @@ NULL`, not as a sentinel project. Items whose project is deleted return here.
 project; a reusable is placed on a project and comes back, staying an asset
 throughout. Both are piece 3 behaviour; piece 2 only records the flag.
 
+### Time Log
+
+`TimeLog` — a block of hours worked on a project: the hours, the date range
+they cover, who logged them, and optionally the income `Transaction` they were
+billed as (1:1, unique). `Project.hours_logged` is the sum of its logs. A
+billed log is locked; deleting its transaction unlocks it.
+[ADR-0015](adr/0015-time-logs-with-a-server-side-timer.md).
+
+### Timer
+
+The per-project clock on the Projects page. Its state is three columns on
+`Project` - `timer_started_at`, `timer_seconds` (banked, unlogged) and
+`timer_since` (first start of the unlogged stretch) - so it survives a reload
+or restart. One runs at a time; Log Hours turns it into a Time Log and resets
+it. Seconds become hours by `round_quarter`: nearest quarter hour, half up.
+
 ---
 
 ## Deployment

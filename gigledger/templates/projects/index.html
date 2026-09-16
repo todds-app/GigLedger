@@ -170,13 +170,43 @@
                 </div>
                 {% endif %}
 
+                <!-- Timer: unlogged time, ticking while it runs. State is on the server (ADR-0015) -->
+                {% set elapsed = project.elapsed_seconds(now) %}
+                {% if project.status == 'active' or elapsed > 0 %}
+                <div class="flex items-center gap-2 mb-3 px-3 py-2 rounded-xl bg-white/50 border border-white/60">
+                    {% if project.timer_running %}
+                    <span class="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse flex-shrink-0"></span>
+                    {% endif %}
+                    <span id="timer-{{ project.id }}" class="font-mono text-sm font-bold tabular-nums {% if project.timer_running %}text-gray-800{% else %}text-gray-400{% endif %}" data-project-id="{{ project.id }}" data-elapsed="{{ elapsed }}"{% if project.timer_running %} data-timer-running="1"{% endif %}>{{ project.timer_label(now) }}</span>
+                    <div class="ml-auto flex items-center gap-1.5">
+                        {% if project.timer_running %}
+                        <form method="POST" action="{{ url_port('projects.timer_stop', id=project.id) }}" class="inline">
+                            {{ csrf_field() }}
+                            <button type="submit" class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-red-400 hover:bg-red-500 transition-all" title="Stop timer">
+                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
+                                Stop
+                            </button>
+                        </form>
+                        {% elif project.status == 'active' %}
+                        <form method="POST" action="{{ url_port('projects.timer_start', id=project.id) }}" class="inline">
+                            {{ csrf_field() }}
+                            <button type="submit" class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 transition-all" title="Start timer">
+                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                                Start
+                            </button>
+                        </form>
+                        {% endif %}
+                        <button onclick="openLogHoursModal({{ project.id|tojson|forceescape }}, {{ (project.name or '')|tojson|forceescape }}, {{ elapsed|tojson|forceescape }}, {{ project.timer_running|tojson|forceescape }}, {{ (project.timer_since.strftime('%Y-%m-%d') if project.timer_since else '')|tojson|forceescape }})" class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-brand-600 hover:bg-brand-50 transition-all" title="Log Hours">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            Log Hours
+                        </button>
+                    </div>
+                </div>
+                {% endif %}
+
                 <!-- Quick Actions -->
                 <div class="flex items-center gap-1.5 pt-2 border-t border-gray-100/50">
                     {% if project.status == 'active' %}
-                    <button onclick="openLogHoursModal({{ project.id|tojson|forceescape }}, {{ (project.name or '')|tojson|forceescape }})" class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-brand-600 hover:bg-brand-50 transition-all" title="Log Hours">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        Log
-                    </button>
                     <form method="POST" action="{{ url_port('projects.update_status', id=project.id) }}" class="inline">
                         {{ csrf_field() }}
                         <input type="hidden" name="status" value="completed">
@@ -323,7 +353,8 @@
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
         </div>
-        <p class="text-sm text-gray-400 mb-4 font-medium">Logging hours for: <span id="logProjectName" class="text-gray-700 font-bold"></span></p>
+        <p class="text-sm text-gray-400 mb-1 font-medium">Logging hours for: <span id="logProjectName" class="text-gray-700 font-bold"></span></p>
+        <p id="logTimerHint" class="text-xs text-gray-400 mb-4"></p>
         <form method="POST" id="logHoursForm" class="space-y-4">
             {{ csrf_field() }}
             <div>
@@ -333,12 +364,17 @@
                     <span class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 font-medium text-sm">hrs</span>
                 </div>
             </div>
-            <div>
-                <div class="flex items-center gap-2">
-                    <input type="checkbox" name="create_transaction" id="log_create_tx" class="h-4 w-4 text-brand-600 border-gray-300 rounded focus:ring-brand-500">
-                    <label for="log_create_tx" class="text-sm font-medium text-gray-600">Create income transaction for earned amount &#x1F4B0;</label>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-600 mb-1.5">Worked from</label>
+                    <input type="date" name="started_on" id="log_started_on" class="candy-input block w-full px-3 py-2.5 text-gray-900 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-600 mb-1.5">To</label>
+                    <input type="date" name="ended_on" id="log_ended_on" class="candy-input block w-full px-3 py-2.5 text-gray-900 focus:outline-none">
                 </div>
             </div>
+            <p class="text-[11px] text-gray-400">Logging resets the timer. You can bill the hours from the project page afterwards.</p>
             <div class="flex gap-3 pt-2">
                 <button type="button" onclick="closeLogHoursModal()" class="flex-1 py-3 px-4 glass-card rounded-xl text-sm font-semibold text-gray-600 hover:bg-white/80 transition-all">Cancel</button>
                 <button type="submit" class="candy-btn flex-1 py-3 px-4 text-sm">Log Hours &#x23F0;</button>
@@ -447,13 +483,50 @@
         document.getElementById('addModal').classList.add('hidden');
     }
 
+    // ===== TIMER =====
+    // The server renders each running timer's elapsed seconds; this only
+    // keeps the display moving until the next page load. Date.now() deltas,
+    // not a counter, so a throttled background tab still shows the truth.
+    var TODAY = {{ now.strftime('%Y-%m-%d')|tojson }};
+    var timers = {};
+    document.querySelectorAll('[data-timer-running]').forEach(function (el) {
+        timers[el.dataset.projectId] = {base: parseInt(el.dataset.elapsed, 10) || 0, t0: Date.now()};
+    });
+    function formatDuration(seconds) {
+        seconds = Math.max(0, Math.floor(seconds));
+        var h = Math.floor(seconds / 3600), m = Math.floor((seconds % 3600) / 60), s = seconds % 60;
+        return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+    // Mirrors models.quarter_hours: nearest quarter, half up, never zero once started.
+    function quarterHours(seconds) {
+        if (seconds <= 0) return 0;
+        return Math.max(0.25, Math.floor(seconds / 3600 / 0.25 + 0.5) * 0.25);
+    }
+    function elapsedNow(projectId, fallback) {
+        var t = timers[projectId];
+        return t ? t.base + Math.floor((Date.now() - t.t0) / 1000) : fallback;
+    }
+    function tickTimers() {
+        Object.keys(timers).forEach(function (id) {
+            var el = document.getElementById('timer-' + id);
+            if (el) el.textContent = formatDuration(elapsedNow(id, 0));
+        });
+    }
+    if (Object.keys(timers).length) setInterval(tickTimers, 1000);
+
     // ===== LOG HOURS MODAL =====
-    function openLogHoursModal(projectId, projectName) {
+    function openLogHoursModal(projectId, projectName, elapsedSeconds, running, sinceDate) {
+        var seconds = running ? elapsedNow(projectId, elapsedSeconds) : elapsedSeconds;
+        var hours = quarterHours(seconds);
         document.getElementById('logHoursModal').classList.remove('hidden');
         document.getElementById('logProjectName').textContent = projectName;
         document.getElementById('logHoursForm').action = '{{ url_port("projects.log_hours", id=0) }}'.replace('/0', '/' + projectId);
-        document.getElementById('log_hours').value = '';
-        document.getElementById('log_create_tx').checked = false;
+        document.getElementById('log_hours').value = hours ? hours : '';
+        document.getElementById('log_started_on').value = sinceDate || TODAY;
+        document.getElementById('log_ended_on').value = TODAY;
+        var hint = document.getElementById('logTimerHint');
+        hint.textContent = seconds > 0 ? 'Timer: ' + formatDuration(seconds) + ' \u2192 ' + hours + 'h, rounded to the quarter hour. Adjust if needed.' : 'The timer is at zero; enter the hours yourself.';
+        document.getElementById('log_hours').focus();
     }
     function closeLogHoursModal() {
         document.getElementById('logHoursModal').classList.add('hidden');

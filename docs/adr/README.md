@@ -47,3 +47,4 @@ the failure modes the decision does *not* protect against.
 | [0012](0012-document-freshness-is-since-last-visit.md) | Flag a document as new by recency for the owner and by last visit for the client | Accepted |
 | [0013](0013-accept-documents-from-portal-clients.md) | Accept documents from portal clients as the owner's, attributed to the client | Accepted |
 | [0014](0014-one-business-per-install.md) | One business per install | Accepted |
+| [0015](0015-time-logs-with-a-server-side-timer.md) | Hours are time logs, counted by a timer on the project row | Accepted |
