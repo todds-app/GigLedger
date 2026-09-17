@@ -25,3 +25,7 @@ env/
 
 # Local test logins (plaintext passwords — never commit)
 TEST_CREDENTIALS.md
+
+# Design handoff reference material (kept locally, not part of the app)
+design_handoff_dani_smith_design_system/
+Invoice template creation.zip
