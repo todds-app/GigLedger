@@ -1,0 +1,36 @@
+{#
+  One category chip with its Edit and Delete controls, rendered for every
+  category of every kind. `tone` is the Tailwind colour family that styles the
+  section (green / red / amber). The rename form starts hidden and swaps in
+  for the chip when the pencil is clicked.
+#}
+{% macro category_chip(kind, cat, idx, tone, icon_path=None) %}
+{% set chip_id = 'cat-' ~ kind ~ '-' ~ idx %}
+<div id="{{ chip_id }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-{{ tone }}-50/80 text-{{ tone }}-700 rounded-xl text-sm font-bold whitespace-nowrap">
+    {% if icon_path %}<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ icon_path }}" /></svg>{% endif %}
+    {{ cat }}
+    {% if cat in locked_categories %}
+    <svg class="w-3.5 h-3.5 text-{{ tone }}-300 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="Locked: filed automatically when an invoice is paid"><title>Filed automatically when an invoice is paid</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+    {% else %}
+    <button type="button" class="text-{{ tone }}-300 hover:text-{{ tone }}-700 transition-colors ml-1" title="Edit" aria-label="Edit {{ cat }}" onclick="toggleCategoryEdit({{ chip_id|tojson|forceescape }}, true)">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+    </button>
+    <form method="POST" action="{{ url_port('settings.delete_' ~ kind ~ '_category') }}" class="inline" onsubmit="return confirm({{ ('Remove ' ~ cat ~ '?')|tojson|forceescape }})">
+        {{ csrf_field() }}
+        <input type="hidden" name="category_name" value="{{ cat }}">
+        <button type="submit" class="text-{{ tone }}-300 hover:text-red-500 transition-colors" title="Delete" aria-label="Delete {{ cat }}">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+    </form>
+    {% endif %}
+</div>
+{% if cat not in locked_categories %}
+<form id="{{ chip_id }}-edit" method="POST" action="{{ url_port('settings.rename_' ~ kind ~ '_category') }}" class="hidden items-center gap-1.5">
+    {{ csrf_field() }}
+    <input type="hidden" name="category_name" value="{{ cat }}">
+    <input type="text" name="new_name" value="{{ cat }}" required maxlength="50" class="candy-input px-3 py-1.5 text-gray-900 focus:outline-none text-sm w-44" onkeydown="if (event.key === 'Escape') toggleCategoryEdit({{ chip_id|tojson|forceescape }}, false)">
+    <button type="submit" class="candy-btn px-3 py-1.5 text-xs">Save</button>
+    <button type="button" class="px-3 py-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700" onclick="toggleCategoryEdit({{ chip_id|tojson|forceescape }}, false)">Cancel</button>
+</form>
+{% endif %}
+{% endmacro %}

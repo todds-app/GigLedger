@@ -547,18 +547,6 @@ def test_an_inventory_category_can_be_added_and_removed(app):
         assert 'Appliances' not in Business.get().get_inventory_categories()
 
 
-@pytest.mark.parametrize('kind,default', [
-    ('income', 'Client Payment'), ('expense', 'Software'), ('inventory', 'Seating')])
-def test_a_default_category_cannot_be_removed(app, kind, default):
-    body = authenticated_client(app).post(
-        f'/settings/categories/{kind}/delete', data={'category_name': default},
-        follow_redirects=True).get_data(as_text=True)
-    assert 'Default categories' in body
-    with app.app_context():
-        business = Business.get()
-        assert default in business.get_all_categories()
-
-
 def test_reset_clears_the_inventory_list_too(app):
     client = authenticated_client(app)
     client.post('/settings/categories/inventory/add', data={'category_name': 'Appliances'})

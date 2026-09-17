@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from 'settings/_category_chip.html' import category_chip with context %}
 {% block title %}Settings - GigLedger{% endblock %}
 {% block head %}
 <style>
@@ -107,7 +108,7 @@
             <h2 class="text-lg font-extrabold text-gray-900">Income Categories</h2>
             <span class="text-xs text-gray-300 font-medium">Quick Add & Transaction forms</span>
         </div>
-        <p class="text-sm text-gray-400 mb-4 font-medium">Add or remove categories for your income sources.</p>
+        <p class="text-sm text-gray-400 mb-4 font-medium">Add, rename, or remove categories for your income sources.</p>
         <form method="POST" action="{{ url_port('settings.add_income_category') }}" class="flex gap-2 mb-4">
             {{ csrf_field() }}
             <input type="text" name="category_name" placeholder="New income category..." required class="candy-input flex-1 px-4 py-2.5 text-gray-900 focus:outline-none text-sm">
@@ -115,21 +116,7 @@
         </form>
         <div class="flex flex-wrap gap-2">
             {% for cat in income_categories %}
-            <div class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50/80 text-green-700 rounded-xl text-sm font-bold">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12" /></svg>
-                {{ cat }}
-                {% if cat not in default_income_categories %}
-                <form method="POST" action="{{ url_port('settings.delete_income_category') }}" class="inline" onsubmit="return confirm({{ ('Remove ' ~ cat ~ '?')|tojson|forceescape }})">
-                    {{ csrf_field() }}
-                    <input type="hidden" name="category_name" value="{{ cat }}">
-                    <button type="submit" class="text-green-300 hover:text-red-500 transition-colors ml-1">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                </form>
-                {% else %}
-                <span class="text-green-200 ml-1">&#8226;</span>
-                {% endif %}
-            </div>
+            {{ category_chip('income', cat, loop.index, 'green', 'M7 11l5-5m0 0l5 5m-5-5v12') }}
             {% endfor %}
         </div>
     </div>
@@ -140,7 +127,7 @@
             <h2 class="text-lg font-extrabold text-gray-900">Expense Categories</h2>
             <span class="text-xs text-gray-300 font-medium">Tax-deductible expenses reduce tax</span>
         </div>
-        <p class="text-sm text-gray-400 mb-4 font-medium">Add or remove categories for your business expenses.</p>
+        <p class="text-sm text-gray-400 mb-4 font-medium">Add, rename, or remove categories for your business expenses. Tax Reserve is locked: the app files the reserve there when an invoice is paid.</p>
         <form method="POST" action="{{ url_port('settings.add_expense_category') }}" class="flex gap-2 mb-4">
             {{ csrf_field() }}
             <input type="text" name="category_name" placeholder="New expense category..." required class="candy-input flex-1 px-4 py-2.5 text-gray-900 focus:outline-none text-sm">
@@ -148,21 +135,7 @@
         </form>
         <div class="flex flex-wrap gap-2">
             {% for cat in expense_categories %}
-            <div class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50/80 text-red-600 rounded-xl text-sm font-bold">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 13l-5 5m0 0l-5-5m5 5V6" /></svg>
-                {{ cat }}
-                {% if cat not in default_expense_categories %}
-                <form method="POST" action="{{ url_port('settings.delete_expense_category') }}" class="inline" onsubmit="return confirm({{ ('Remove ' ~ cat ~ '?')|tojson|forceescape }})">
-                    {{ csrf_field() }}
-                    <input type="hidden" name="category_name" value="{{ cat }}">
-                    <button type="submit" class="text-red-300 hover:text-red-700 transition-colors ml-1">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                </form>
-                {% else %}
-                <span class="text-red-200 ml-1">&#8226;</span>
-                {% endif %}
-            </div>
+            {{ category_chip('expense', cat, loop.index, 'red', 'M17 13l-5 5m0 0l-5-5m5 5V6') }}
             {% endfor %}
         </div>
     </div>
@@ -173,7 +146,7 @@
             <h2 class="text-lg font-extrabold text-gray-900">Inventory Categories</h2>
             <span class="text-xs text-gray-300 font-medium">Assets, not expenses</span>
         </div>
-        <p class="text-sm text-gray-400 mb-4 font-medium">Add or remove categories for inventory you buy and hold. The notes under each default say what belongs there.</p>
+        <p class="text-sm text-gray-400 mb-4 font-medium">Add, rename, or remove categories for inventory you buy and hold. The notes under each default say what belongs there.</p>
         <form method="POST" action="{{ url_port('settings.add_inventory_category') }}" class="flex gap-2 mb-4">
             {{ csrf_field() }}
             <input type="text" name="category_name" placeholder="New inventory category..." required class="candy-input flex-1 px-4 py-2.5 text-gray-900 focus:outline-none text-sm">
@@ -182,20 +155,7 @@
         <div class="space-y-2">
             {% for cat in inventory_categories %}
             <div class="flex flex-col items-start gap-1">
-                <div class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50/80 text-amber-700 rounded-xl text-sm font-bold whitespace-nowrap">
-                    {{ cat }}
-                    {% if cat not in default_inventory_categories %}
-                    <form method="POST" action="{{ url_port('settings.delete_inventory_category') }}" class="inline" onsubmit="return confirm({{ ('Remove ' ~ cat ~ '?')|tojson|forceescape }})">
-                        {{ csrf_field() }}
-                        <input type="hidden" name="category_name" value="{{ cat }}">
-                        <button type="submit" class="text-amber-300 hover:text-amber-700 transition-colors ml-1">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-                    </form>
-                    {% else %}
-                    <span class="text-amber-200 ml-1">&#8226;</span>
-                    {% endif %}
-                </div>
+                {{ category_chip('inventory', cat, loop.index, 'amber') }}
                 {% if inventory_guidance[cat] %}<p class="text-xs text-gray-400 leading-relaxed pl-1">{{ inventory_guidance[cat] }}</p>{% endif %}
             </div>
             {% endfor %}
@@ -296,4 +256,15 @@
         </a>
     </div>
 </div>
+<script>
+    function toggleCategoryEdit(chipId, editing) {
+        const chip = document.getElementById(chipId);
+        const form = document.getElementById(chipId + '-edit');
+        chip.classList.toggle('hidden', editing);
+        chip.classList.toggle('inline-flex', !editing);
+        form.classList.toggle('hidden', !editing);
+        form.classList.toggle('inline-flex', editing);
+        if (editing) { const box = form.querySelector('input[name=new_name]'); box.focus(); box.select(); }
+    }
+</script>
 {% endblock %}

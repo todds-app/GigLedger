@@ -1,7 +1,8 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash, session
 from flask_login import login_required, current_user
-from ..models import (db, AdminInvite, Business, User, DEFAULT_INCOME_CATEGORIES,
-                      DEFAULT_EXPENSE_CATEGORIES, DEFAULT_INVENTORY_CATEGORIES)
+from ..models import (db, AdminInvite, Business, RecurringTransaction, Transaction, User,
+                      DEFAULT_INCOME_CATEGORIES, DEFAULT_EXPENSE_CATEGORIES,
+                      DEFAULT_INVENTORY_CATEGORIES, TAX_RESERVE_CATEGORY)
 
 settings_bp = Blueprint('settings', __name__)
 
@@ -26,6 +27,7 @@ def index():
         default_expense_categories=DEFAULT_EXPENSE_CATEGORIES,
         inventory_categories=business.get_inventory_categories(),
         default_inventory_categories=DEFAULT_INVENTORY_CATEGORIES,
+        locked_categories={TAX_RESERVE_CATEGORY},
         available_themes=AVAILABLE_THEMES,
         current_theme=current_user.theme or 'emerald',
         dark_mode=current_user.dark_mode or False,
@@ -93,19 +95,50 @@ def _add_category(kind):
 
 
 def _delete_category(kind):
-    label, column, defaults = CATEGORY_LISTS[kind]
+    label, column, _ = CATEGORY_LISTS[kind]
     name = request.form.get('category_name', '').strip()
     cats = _current(kind)
-    if name in defaults:
-        # The UI offers no button for these; the route agrees.
-        flash('Default categories cannot be removed.', 'error')
-    elif name in cats:
+    if name not in cats:
+        flash(f'Category "{name}" not found.', 'error')
+    elif name == TAX_RESERVE_CATEGORY:
+        flash(f'"{name}" is filed by the app when an invoice is paid, so it stays.', 'error')
+    elif len(cats) == 1:
+        # '' in the column means "use the defaults", so emptying the list
+        # would bring every default back rather than leave it empty.
+        flash('Keep at least one category. Use Reset to Defaults to start over.', 'error')
+    else:
         cats.remove(name)
-        setattr(Business.get(), column, ','.join(cats) if cats else '')
+        setattr(Business.get(), column, ','.join(cats))
         db.session.commit()
         flash(f'{label} category "{name}" removed.', 'success')
+    return redirect(url_for('settings.index'))
+
+
+def _rename_category(kind):
+    label, column, _ = CATEGORY_LISTS[kind]
+    old = request.form.get('category_name', '').strip()
+    new = request.form.get('new_name', '').strip()
+    cats = _current(kind)
+    if old not in cats:
+        flash(f'Category "{old}" not found.', 'error')
+    elif old == TAX_RESERVE_CATEGORY:
+        flash(f'"{old}" is filed by the app when an invoice is paid, so it stays.', 'error')
+    elif not new:
+        flash('Category name cannot be empty.', 'error')
+    elif new == old:
+        pass
+    elif new in cats:
+        flash(f'Category "{new}" already exists.', 'error')
     else:
-        flash(f'Category "{name}" not found.', 'error')
+        cats[cats.index(old)] = new
+        setattr(Business.get(), column, ','.join(cats))
+        # Rows are filed by name, so follow the rename or the filters and
+        # reports would split one category in two. Scoped by kind: the same
+        # word can be an income category and an expense category.
+        for model in (Transaction, RecurringTransaction):
+            model.query.filter_by(kind=kind, category=old).update({'category': new})
+        db.session.commit()
+        flash(f'{label} category "{old}" renamed to "{new}".', 'success')
     return redirect(url_for('settings.index'))
 
 
@@ -121,6 +154,12 @@ def delete_income_category():
     return _delete_category('income')
 
 
+@settings_bp.route('/settings/categories/income/rename', methods=['POST'])
+@login_required
+def rename_income_category():
+    return _rename_category('income')
+
+
 @settings_bp.route('/settings/categories/expense/add', methods=['POST'])
 @login_required
 def add_expense_category():
@@ -133,6 +172,12 @@ def delete_expense_category():
     return _delete_category('expense')
 
 
+@settings_bp.route('/settings/categories/expense/rename', methods=['POST'])
+@login_required
+def rename_expense_category():
+    return _rename_category('expense')
+
+
 @settings_bp.route('/settings/categories/inventory/add', methods=['POST'])
 @login_required
 def add_inventory_category():
@@ -143,6 +188,12 @@ def add_inventory_category():
 @login_required
 def delete_inventory_category():
     return _delete_category('inventory')
+
+
+@settings_bp.route('/settings/categories/inventory/rename', methods=['POST'])
+@login_required
+def rename_inventory_category():
+    return _rename_category('inventory')
 
 
 @settings_bp.route('/settings/theme', methods=['POST'])

@@ -13,6 +13,9 @@ db = SQLAlchemy()
 DEFAULT_INCOME_CATEGORIES = ['Client Payment', 'Consulting', 'Freelance Project', 'Royalty']
 DEFAULT_EXPENSE_CATEGORIES = ['Software', 'Internet', 'Office Supplies', 'Marketing',
                                'Travel', 'Equipment', 'Meal', 'Entertainment', 'Tax Reserve']
+# Written by the app, not the user: marking an invoice Paid files the reserve
+# under this name, so Settings does not let it be renamed or removed.
+TAX_RESERVE_CATEGORY = 'Tax Reserve'
 
 DEFAULT_INVENTORY_CATEGORIES = ['Casegoods & Storage', 'Seating', 'Lighting',
                                 'Soft Goods & Textiles', 'Wall Decor & Art',
