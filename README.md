@@ -73,6 +73,7 @@ No more setting aside random percentages. No more spreadsheet gymnastics. Just c
 - **Status workflow** — Draft → Sent → Paid / Overdue / Cancelled
 - **One-click status updates** — Mark as sent, paid, overdue, or cancel
 - **Bill from the ledger** — Add income and inventory transactions to a draft as line items; a billed transaction is locked until its line is removed
+- **Editable drafts** — Change the client, dates, notes and line items of a draft until it is sent
 - **Auto tax reserve** — Marking an invoice as paid creates a tax reserve expense transaction for the tax portion (no income row: the income is already in the ledger)
 - **Revert support** — Un-paying an invoice removes the auto-posted tax reserve
 - **Printable download** — Self-contained, styled HTML invoice; open it and use your browser's Print to PDF
@@ -332,7 +333,7 @@ gigledger/                      # Repository root — may be named anything
 │       │   └── index.html      # Transaction table + filters + export
 │       ├── invoices/
 │       │   ├── index.html      # Invoice list with status filters
-│       │   ├── create.html     # Invoice creation form
+│       │   ├── create.html     # Invoice create / edit-draft form
 │       │   └── detail.html     # Invoice preview with actions
 │       ├── clients/
 │       │   ├── index.html      # Client list
@@ -408,6 +409,8 @@ gigledger/                      # Repository root — may be named anything
 | `GET` | `/invoices` | Invoice list with status filter |
 | `GET` | `/invoices/create` | Invoice creation form |
 | `POST` | `/invoices/create` | Create invoice with line items |
+| `GET` | `/invoices/<id>/edit` | Edit form for a draft |
+| `POST` | `/invoices/<id>/edit` | Rewrite a draft: client, dates, notes, line items (drafts only) |
 | `POST` | `/invoices/status/<id>` | Update invoice status (posts the tax reserve on paid) |
 | `POST` | `/invoices/delete/<id>` | Delete invoice + its tax reserve |
 | `POST` | `/invoices/<id>/lines/<line_id>/remove` | Remove a line from a draft (unlocks its transaction) |

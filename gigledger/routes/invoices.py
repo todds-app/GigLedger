@@ -41,103 +41,168 @@ def list_invoices():
         currency=Business.get().currency)
 
 
+def _form_context(invoice=None):
+    """What invoices/create.html needs, for a blank form or a draft to edit."""
+    business = Business.get()
+    return dict(
+        invoice=invoice,
+        clients=Client.query.filter_by(is_active=True).order_by(Client.name).all(),
+        today=datetime.now().strftime('%Y-%m-%d'),
+        default_due=(datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d'),
+        tax_rate=business.default_tax_rate,
+        currency=business.currency)
+
+
+def _parse_invoice_form(form):
+    """The create and edit forms post the same fields; read them once.
+
+    Returns (client, issue_date, due_date, notes, action, lines). Each line
+    is the InvoiceLineItem kwargs plus 'line_id' - the existing line it
+    updates, or None for a row typed fresh. Rows without a description are
+    dropped, so `lines` empty means "nothing to bill".
+    """
+    try:
+        issue_date = datetime.strptime(form.get('issue_date', ''), '%Y-%m-%d')
+    except ValueError:
+        issue_date = datetime.now()
+    try:
+        due_date = datetime.strptime(form.get('due_date', ''), '%Y-%m-%d')
+    except ValueError:
+        due_date = issue_date + timedelta(days=30)
+
+    # Resolve the client, ensuring the id is a real one. Referencing an id that
+    # is not a client at all would leak whatever is at that id onto the invoice/PDF (IDOR).
+    client_id = form.get('client_id', '')
+    client = db.session.get(Client, int(client_id)) if client_id.isdigit() else None
+
+    descriptions = form.getlist('description[]')
+    quantities = form.getlist('quantity[]')
+    rates = form.getlist('rate[]')
+    line_ids = form.getlist('line_id[]')
+    lines = []
+    for i, desc in enumerate(descriptions):
+        desc = desc.strip()
+        if not desc:
+            continue
+        try:
+            qty = float(quantities[i]) if i < len(quantities) else 1
+        except ValueError:
+            qty = 1
+        try:
+            rate = float(rates[i]) if i < len(rates) else 0
+        except ValueError:
+            rate = 0
+        line_id = line_ids[i] if i < len(line_ids) else ''
+        lines.append({'line_id': int(line_id) if line_id.isdigit() else None,
+                      'description': desc, 'quantity': qty, 'rate': rate, 'amount': qty * rate})
+
+    return client, issue_date, due_date, form.get('notes', ''), form.get('action', 'draft'), lines
+
+
 @invoices_bp.route('/invoices/create', methods=['GET'])
 @login_required
 def create_form():
-    business = Business.get()
-    clients = Client.query.filter_by(is_active=True).order_by(Client.name).all()
-    today = datetime.now().strftime('%Y-%m-%d')
-    default_due = (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
-
-    return render_template('invoices/create.html',
-        clients=clients,
-        today=today,
-        default_due=default_due,
-        tax_rate=business.default_tax_rate,
-        currency=business.currency)
+    return render_template('invoices/create.html', **_form_context())
 
 
 @invoices_bp.route('/invoices/create', methods=['POST'])
 @login_required
 def create_invoice():
     business = Business.get()
-    client_id = request.form.get('client_id', '')
-    issue_date_str = request.form.get('issue_date', '')
-    due_date_str = request.form.get('due_date', '')
-    notes = request.form.get('notes', '')
-    action = request.form.get('action', 'draft')
-
-    # Parse dates
-    try:
-        issue_date = datetime.strptime(issue_date_str, '%Y-%m-%d') if issue_date_str else datetime.now()
-    except ValueError:
-        issue_date = datetime.now()
-
-    try:
-        due_date = datetime.strptime(due_date_str, '%Y-%m-%d') if due_date_str else issue_date + timedelta(days=30)
-    except ValueError:
-        due_date = issue_date + timedelta(days=30)
-
-    # Parse line items
-    descriptions = request.form.getlist('description[]')
-    quantities = request.form.getlist('quantity[]')
-    rates = request.form.getlist('rate[]')
-
-    if not descriptions or not descriptions[0]:
-        flash('Please add at least one line item.', 'error')
-        return redirect(url_for('invoices.create_form'))
-
-    line_items_data = []
-    for i in range(len(descriptions)):
-        desc = descriptions[i].strip()
-        if not desc:
-            continue
-        try:
-            qty = float(quantities[i]) if i < len(quantities) else 1
-        except (ValueError, IndexError):
-            qty = 1
-        try:
-            rate = float(rates[i]) if i < len(rates) else 0
-        except (ValueError, IndexError):
-            rate = 0
-        line_items_data.append({'description': desc, 'quantity': qty, 'rate': rate, 'amount': qty * rate})
-
-    if not line_items_data:
+    client, issue_date, due_date, notes, action, lines = _parse_invoice_form(request.form)
+    if not lines:
         flash('Please add at least one line item with a description.', 'error')
         return redirect(url_for('invoices.create_form'))
 
-    # Resolve the client, ensuring the id is a real one. Referencing an id that
-    # is not a client at all would leak whatever is at that id onto the invoice/PDF (IDOR).
-    client_obj = None
-    if client_id and client_id.isdigit():
-        client_obj = db.session.get(Client, int(client_id))
-
-    # Generate invoice number
-    invoice_number = business.get_next_invoice_number()
-
-    # Set status
     status = 'sent' if action == 'send' else 'draft'
-
-    # Create invoice
     invoice = Invoice(
         user_id=current_user.id,
-        client_id=client_obj.id if client_obj else None,
-        invoice_number=invoice_number,
+        client_id=client.id if client else None,
+        invoice_number=business.get_next_invoice_number(),
         status=status,
         issue_date=issue_date,
         due_date=due_date,
         notes=notes)
-    for item in line_items_data:
-        invoice.line_items.append(InvoiceLineItem(**item))
+    for line in lines:
+        line.pop('line_id')
+        invoice.line_items.append(InvoiceLineItem(**line))
     invoice.recalculate(business.default_tax_rate)
     db.session.add(invoice)
     db.session.commit()
 
     if status == 'sent':
-        flash(f'Invoice {invoice_number} created and marked as sent!', 'success')
+        flash(f'Invoice {invoice.invoice_number} created and marked as sent!', 'success')
     else:
-        flash(f'Invoice {invoice_number} saved as draft.', 'success')
+        flash(f'Invoice {invoice.invoice_number} saved as draft.', 'success')
 
+    return redirect(url_for('invoices.detail', id=invoice.id))
+
+
+def _editable_draft(id):
+    """The draft to edit, or the redirect that explains why not."""
+    invoice = db.session.get(Invoice, id)
+    if not invoice:
+        flash('Invoice not found.', 'error')
+        return None, redirect(url_for('invoices.list_invoices'))
+    if invoice.status != 'draft':
+        flash('Only a draft can be edited.', 'error')
+        return None, redirect(url_for('invoices.detail', id=id))
+    return invoice, None
+
+
+@invoices_bp.route('/invoices/<int:id>/edit', methods=['GET'])
+@login_required
+def edit_form(id):
+    invoice, refusal = _editable_draft(id)
+    if refusal:
+        return refusal
+    return render_template('invoices/create.html', **_form_context(invoice))
+
+
+@invoices_bp.route('/invoices/<int:id>/edit', methods=['POST'])
+@login_required
+def edit_invoice(id):
+    """Rewrite a draft from the form. Lines posted with a line_id update that
+    line in place - a line billing a transaction keeps its link - new rows
+    become new lines, and lines left off the form are deleted, which unlocks
+    whatever they billed (docs/adr/0016)."""
+    invoice, refusal = _editable_draft(id)
+    if refusal:
+        return refusal
+    business = Business.get()
+    client, issue_date, due_date, notes, action, lines = _parse_invoice_form(request.form)
+    if not lines:
+        flash('Please add at least one line item with a description.', 'error')
+        return redirect(url_for('invoices.edit_form', id=id))
+
+    invoice.client_id = client.id if client else None
+    invoice.issue_date, invoice.due_date, invoice.notes = issue_date, due_date, notes
+
+    # A posted line_id must be one of this invoice's own lines; anything
+    # else is treated as a new row rather than reaching into another invoice.
+    existing = {li.id: li for li in invoice.line_items}
+    kept = []
+    for line in lines:
+        current = existing.get(line.pop('line_id'))
+        if current is None:
+            current = InvoiceLineItem()
+            invoice.line_items.append(current)
+        for field, value in line.items():
+            setattr(current, field, value)
+        kept.append(current)
+    for line in list(invoice.line_items):
+        if line not in kept:
+            invoice.line_items.remove(line)
+
+    invoice.recalculate(business.default_tax_rate)
+    if action == 'send':
+        invoice.status = 'sent'
+    db.session.commit()
+
+    if invoice.status == 'sent':
+        flash(f'Invoice {invoice.invoice_number} updated and marked as sent!', 'success')
+    else:
+        flash(f'Invoice {invoice.invoice_number} updated.', 'success')
     return redirect(url_for('invoices.detail', id=invoice.id))
 
 

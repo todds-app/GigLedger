@@ -54,14 +54,17 @@ call. `finance.py` and Reports still read them, so a database that relied on
 invoices for its income record keeps its totals until those rows are removed
 by hand.
 
-**A draft is the only editable invoice.** There is still no invoice edit
-page; a draft's lines change only by Add to Invoice and Remove. Sent and later
-invoices are fixed, which is what a sent bill should be.
+**A draft is the only editable invoice.** The create form doubles as the
+edit form for a draft: client, dates, notes and lines can all change until
+it is sent. Sent and later invoices are fixed, which is what a sent bill
+should be.
 
-**The line copies the transaction.** Description, quantity and rate are
-copied when the line is made. Editing the transaction is refused while
-linked, so the copy cannot drift; removing the line and adding again is how
-to refresh it.
+**The line is the invoice's own.** Description, quantity and rate are
+copied from the transaction when the line is made and may then be edited on
+the draft - marking up an inventory purchase is the usual reason. The link
+survives the edit, so the transaction stays locked; taking the row off the
+form deletes the line and unlocks it. Editing the transaction itself is
+refused while linked, so the ledger side cannot drift underneath the bill.
 
 **Every ledger line still has one meaning.** `source='invoice'` continues to
 mean "posted by paying an invoice"; a billed transaction keeps whatever

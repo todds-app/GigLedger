@@ -323,8 +323,9 @@ billed log is locked; deleting its transaction unlocks it.
 
 An income or inventory `Transaction` that an `InvoiceLineItem` points at
 (`transaction_id`, 1:1, unique). Shown in the Invoiced column on the
-Transactions page. Locked - no edit, no delete - until the line is removed
-from its draft or the invoice is deleted. Marking an invoice Paid posts only
+Transactions page. Locked - no edit, no delete - until its row is removed
+from the draft (on the invoice page or its edit form) or the invoice is
+deleted; the line itself may be edited on the draft. Marking an invoice Paid posts only
 the Tax Reserve expense; the income is the line already in the ledger.
 [ADR-0016](adr/0016-bill-transactions-on-invoices.md).
 

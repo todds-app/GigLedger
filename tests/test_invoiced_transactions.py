@@ -483,3 +483,155 @@ def test_the_modal_script_holds_the_route_as_plain_json(app):
     JSON, not HTML-escaped JSON (which is a JS syntax error)."""
     body = login_as(app).get('/transactions').get_data(as_text=True)
     assert 'var invoiceAction = "/transactions/0/invoice";' in body
+
+
+# --- Editing a draft ------------------------------------------------------
+
+def a_typed_line(app, invoice_id, description='Typed', quantity=1, rate=50):
+    with app.app_context():
+        line = InvoiceLineItem(invoice_id=invoice_id, description=description,
+                               quantity=quantity, rate=rate, amount=quantity * rate)
+        db.session.add(line)
+        db.session.commit()
+        return line.id
+
+
+def line_id_for(app, tx_id):
+    with app.app_context():
+        return InvoiceLineItem.query.filter_by(transaction_id=tx_id).one().id
+
+
+def edit_form(**lines):
+    """Build the edit POST. `lines` is a list of (line_id, description, qty, rate)."""
+    rows = lines.pop('rows', [])
+    data = {'client_id': lines.pop('client_id', ''), 'issue_date': lines.pop('issue_date', '2026-09-01'),
+            'due_date': lines.pop('due_date', '2026-10-01'), 'notes': lines.pop('notes', ''),
+            'action': lines.pop('action', 'draft'),
+            'line_id[]': [str(r[0]) if r[0] else '' for r in rows],
+            'description[]': [r[1] for r in rows],
+            'quantity[]': [str(r[2]) for r in rows],
+            'rate[]': [str(r[3]) for r in rows]}
+    return data
+
+
+def test_the_edit_form_prefills_a_draft(app):
+    iid = a_draft(app, client_id=1, notes='Net 30', invoice_number='INV-EDIT')
+    tid = a_tx(app, amount=400, description='Billed work')
+    put_on(app, tid, iid)
+    lid = line_id_for(app, tid)
+    body = login_as(app).get(f'/invoices/{iid}/edit').get_data(as_text=True)
+    assert 'INV-EDIT' in body
+    assert f'action="/invoices/{iid}/edit"' in body
+    assert f'name="line_id[]" value="{lid}"' in body
+    assert 'value="Billed work"' in body
+    assert 'Net 30' in body
+    assert '<option value="1" selected' in body
+    assert 'from ledger' in body
+
+
+def test_only_a_draft_has_an_edit_form(app):
+    iid = a_draft(app, status='sent')
+    resp = login_as(app).get(f'/invoices/{iid}/edit')
+    assert resp.status_code == 302 and resp.location.endswith(f'/invoices/{iid}')
+
+
+def test_editing_saves_client_dates_and_notes(app):
+    iid = a_draft(app)
+    login_as(app).post(f'/invoices/{iid}/edit', data=edit_form(
+        client_id='1', issue_date='2026-09-05', due_date='2026-09-20', notes='Thanks!',
+        rows=[(None, 'Typed', 1, 50)]))
+    with app.app_context():
+        inv = db.session.get(Invoice, iid)
+        assert inv.client_id == 1
+        assert inv.issue_date.date().isoformat() == '2026-09-05'
+        assert inv.due_date.date().isoformat() == '2026-09-20'
+        assert inv.notes == 'Thanks!'
+        assert inv.status == 'draft'
+
+
+def test_editing_a_linked_line_keeps_its_link_and_the_lock(app):
+    iid = a_draft(app)
+    tid = a_purchase(app, quantity=4, unit_cost=25)
+    put_on(app, tid, iid)
+    lid = line_id_for(app, tid)
+    login_as(app).post(f'/invoices/{iid}/edit', data=edit_form(
+        rows=[(lid, 'Folding chairs (marked up)', 4, 40)]))
+    with app.app_context():
+        line = db.session.get(InvoiceLineItem, lid)
+        assert (line.description, line.quantity, line.rate, line.amount) == ('Folding chairs (marked up)', 4, 40, 160)
+        assert line.transaction_id == tid
+        assert db.session.get(Transaction, tid).is_invoiced is True
+        assert db.session.get(Invoice, iid).subtotal == 160
+
+
+def test_dropping_a_linked_line_on_the_form_unlocks_the_transaction(app):
+    iid = a_draft(app)
+    tid = a_tx(app)
+    put_on(app, tid, iid)
+    keep = a_typed_line(app, iid)
+    login_as(app).post(f'/invoices/{iid}/edit', data=edit_form(rows=[(keep, 'Typed', 1, 50)]))
+    with app.app_context():
+        assert db.session.get(Transaction, tid).is_invoiced is False
+        assert db.session.get(Transaction, tid) is not None
+        assert [li.id for li in db.session.get(Invoice, iid).line_items] == [keep]
+
+
+def test_editing_adds_new_lines_and_recomputes(app):
+    iid = a_draft(app)
+    keep = a_typed_line(app, iid, rate=100)
+    with app.app_context():
+        from gigledger.models import Business
+        Business.get().default_tax_rate = 0.25
+        db.session.commit()
+    login_as(app).post(f'/invoices/{iid}/edit', data=edit_form(
+        rows=[(keep, 'Typed', 1, 100), (None, 'Extra', 2, 200)]))
+    with app.app_context():
+        inv = db.session.get(Invoice, iid)
+        assert sorted((li.description, li.amount) for li in inv.line_items) == [('Extra', 400), ('Typed', 100)]
+        assert (inv.subtotal, inv.tax_amount, inv.total) == (500, 125, 625)
+
+
+def test_a_line_id_from_another_invoice_is_ignored(app):
+    iid = a_draft(app)
+    other = a_draft(app, invoice_number='INV-T2')
+    foreign = a_typed_line(app, other, description='Theirs')
+    login_as(app).post(f'/invoices/{iid}/edit', data=edit_form(rows=[(foreign, 'Hijacked', 1, 1)]))
+    with app.app_context():
+        assert db.session.get(InvoiceLineItem, foreign).description == 'Theirs'
+        assert db.session.get(InvoiceLineItem, foreign).invoice_id == other
+        assert [li.description for li in db.session.get(Invoice, iid).line_items] == ['Hijacked']
+
+
+def test_save_and_send_from_the_edit_form_sends(app):
+    iid = a_draft(app)
+    login_as(app).post(f'/invoices/{iid}/edit', data=edit_form(action='send', rows=[(None, 'Typed', 1, 50)]))
+    with app.app_context():
+        assert db.session.get(Invoice, iid).status == 'sent'
+
+
+def test_an_edit_with_no_lines_is_refused(app):
+    iid = a_draft(app)
+    keep = a_typed_line(app, iid)
+    resp = login_as(app).post(f'/invoices/{iid}/edit', data=edit_form(rows=[]), follow_redirects=True)
+    with app.app_context():
+        assert [li.id for li in db.session.get(Invoice, iid).line_items] == [keep]
+    assert 'line item' in resp.get_data(as_text=True)
+
+
+def test_a_sent_invoice_refuses_the_edit_post(app):
+    iid = a_draft(app, status='sent', notes='Original')
+    login_as(app).post(f'/invoices/{iid}/edit', data=edit_form(notes='Changed', rows=[(None, 'X', 1, 1)]))
+    with app.app_context():
+        inv = db.session.get(Invoice, iid)
+        assert inv.notes == 'Original'
+        assert inv.line_items == []
+
+
+def test_a_draft_offers_edit_and_a_sent_invoice_does_not(app):
+    iid = a_draft(app)
+    client = login_as(app)
+    assert f'/invoices/{iid}/edit' in client.get(f'/invoices/{iid}').get_data(as_text=True)
+    with app.app_context():
+        db.session.get(Invoice, iid).status = 'sent'
+        db.session.commit()
+    assert f'/invoices/{iid}/edit' not in client.get(f'/invoices/{iid}').get_data(as_text=True)
