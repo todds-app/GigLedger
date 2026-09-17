@@ -507,7 +507,7 @@ def test_creating_a_transaction_from_a_log(app):
         assert tx.user_id == 1
         assert tx.date == log.ended_on
         assert '1.5h' in tx.description and 'Retainer' in tx.description
-        assert tx.time_log is log
+        assert tx.time_logs == [log]
 
 
 def test_a_second_create_is_refused(app):
@@ -566,4 +566,128 @@ def test_deleting_a_project_leaves_the_transaction(app):
     with app.app_context():
         tx = db.session.get(Transaction, tx_id)
         assert tx is not None
-        assert tx.time_log is None
+        assert tx.time_logs == []
+
+
+# --- Bill all unbilled hours as one transaction ------------------------------
+
+def bill_all(client, pid):
+    return client.post(f'/projects/{pid}/time-logs/bill-all', follow_redirects=True)
+
+
+def test_bill_all_books_every_unbilled_log_as_one_transaction(app):
+    pid = a_project(app, name='Retainer', rate=100)
+    first = a_log(app, pid, 1.5, ended_days_ago=5)
+    second = a_log(app, pid, 2.25, ended_days_ago=1)
+    resp = bill_all(login_as(app), pid)
+    with app.app_context():
+        logs = [db.session.get(TimeLog, first), db.session.get(TimeLog, second)]
+        assert all(log.is_billed for log in logs)
+        assert logs[0].transaction_id == logs[1].transaction_id
+        tx = logs[0].transaction
+        assert tx.amount == 375
+        assert tx.kind == INCOME and tx.category == 'Freelance Project' and tx.source == 'project'
+        assert tx.date == logs[1].ended_on
+        assert tx.description.startswith('3.75h on Retainer (')
+        assert sorted(l.id for l in tx.time_logs) == sorted([first, second])
+    assert '375.00' in resp.get_data(as_text=True)
+
+
+def test_bill_all_leaves_billed_logs_on_their_own_transaction(app):
+    pid = a_project(app, rate=100)
+    old = a_log(app, pid, 1)
+    old_tx = bill(app, old)
+    new = a_log(app, pid, 2)
+    bill_all(login_as(app), pid)
+    with app.app_context():
+        assert db.session.get(TimeLog, old).transaction_id == old_tx
+        assert db.session.get(TimeLog, new).transaction_id not in (None, old_tx)
+        assert db.session.get(TimeLog, new).transaction.amount == 200
+
+
+def test_bill_all_with_nothing_unbilled_creates_nothing(app):
+    pid = a_project(app)
+    bill(app, a_log(app, pid, 1))
+    with app.app_context():
+        before = Transaction.query.count()
+    resp = bill_all(login_as(app), pid)
+    with app.app_context():
+        assert Transaction.query.count() == before
+    assert 'No unbilled hours' in resp.get_data(as_text=True)
+
+
+@pytest.mark.parametrize('rate_type', ['fixed', 'daily'])
+def test_bill_all_is_refused_for_non_hourly_projects(app, rate_type):
+    pid = a_project(app, rate_type=rate_type, rate=5000)
+    a_log(app, pid, 4)
+    a_log(app, pid, 4)
+    with app.app_context():
+        before = Transaction.query.count()
+    bill_all(login_as(app), pid)
+    with app.app_context():
+        assert Transaction.query.count() == before
+
+
+def test_bill_all_is_refused_without_a_rate(app):
+    pid = a_project(app, rate=0)
+    a_log(app, pid, 4)
+    a_log(app, pid, 4)
+    with app.app_context():
+        before = Transaction.query.count()
+    bill_all(login_as(app), pid)
+    with app.app_context():
+        assert Transaction.query.count() == before
+
+
+def test_bill_all_on_a_missing_project_is_a_404(app):
+    assert login_as(app).post('/projects/9999/time-logs/bill-all').status_code == 404
+
+
+def test_the_bill_all_button_needs_two_unbilled_hourly_logs(app):
+    pid = a_project(app, rate=100)
+    client = login_as(app)
+    a_log(app, pid, 1)
+    assert f'/projects/{pid}/time-logs/bill-all' not in client.get(f'/projects/{pid}').get_data(as_text=True)
+    a_log(app, pid, 2.5)
+    body = client.get(f'/projects/{pid}').get_data(as_text=True)
+    assert f'/projects/{pid}/time-logs/bill-all' in body
+    assert '3.5h' in body and '350.00' in body
+
+
+def test_the_bill_all_button_is_absent_on_a_daily_project(app):
+    pid = a_project(app, rate_type='daily', rate=800)
+    a_log(app, pid, 1)
+    a_log(app, pid, 2)
+    assert 'bill-all' not in login_as(app).get(f'/projects/{pid}').get_data(as_text=True)
+
+
+def test_a_legacy_time_logs_table_loses_its_unique_link(tmp_path, monkeypatch):
+    """Two logs may share a transaction now; the table create_all made under
+    ADR-0015 forbade that, and SQLite cannot drop the constraint in place."""
+    monkeypatch.delenv('SEED_DEMO', raising=False)
+    path = str(tmp_path / 'legacy.db')
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, email VARCHAR(120), "
+                 "password_hash VARCHAR(200))")
+    conn.execute("""CREATE TABLE time_logs (
+        id INTEGER NOT NULL, user_id INTEGER NOT NULL, project_id INTEGER NOT NULL,
+        hours FLOAT NOT NULL, started_on DATETIME NOT NULL, ended_on DATETIME NOT NULL,
+        transaction_id INTEGER, created_at DATETIME,
+        PRIMARY KEY (id), UNIQUE (transaction_id),
+        FOREIGN KEY(transaction_id) REFERENCES transactions (id))""")
+    conn.execute("INSERT INTO time_logs VALUES (1, 7, 3, 2.0, '2026-08-01', '2026-08-02', 9, '2026-08-02')")
+    conn.execute("INSERT INTO time_logs VALUES (2, 7, 3, 1.0, '2026-08-03', '2026-08-04', NULL, '2026-08-04')")
+    conn.commit()
+    conn.close()
+    monkeypatch.setattr(gigledger.app, 'DB_PATH', path)
+
+    create_app()
+    create_app()  # idempotent
+
+    conn = sqlite3.connect(path)
+    assert 'UNIQUE' not in conn.execute("SELECT sql FROM sqlite_master WHERE name='time_logs'").fetchone()[0]
+    assert conn.execute("SELECT id, project_id, hours, transaction_id FROM time_logs ORDER BY id").fetchall() == [
+        (1, 3, 2.0, 9), (2, 3, 1.0, None)]
+    conn.execute("UPDATE time_logs SET transaction_id = 9 WHERE id = 2")  # now allowed
+    conn.commit()
+    conn.close()

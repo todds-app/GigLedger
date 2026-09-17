@@ -496,6 +496,14 @@ class Project(db.Model):
     def hours_logged(self):
         return sum(log.hours for log in self.time_logs)
 
+    @property
+    def unbilled_time_logs(self):
+        return [log for log in self.time_logs if not log.is_billed]
+
+    @property
+    def unbilled_hours(self):
+        return sum(log.hours for log in self.unbilled_time_logs)
+
     # -- timer: pure state changes, the route commits --------------------
 
     @property
@@ -576,12 +584,13 @@ def format_duration(seconds):
 class TimeLog(db.Model):
     """A block of hours worked on a project, and the income it produced, if any.
 
-    `transaction_id` is the ADR-0011 shape: 1:1, optional, unique. While it is
-    NULL the log is editable and deletable; once set, the log is locked so the
-    hours and the ledger line cannot drift apart. No cascade in either
-    direction: deleting the transaction nulls the link (SQLAlchemy does that;
-    SQLite is not enforcing the foreign key), deleting the log leaves the
-    ledger alone. See docs/adr/0015.
+    `transaction_id` is optional and many-to-one: a log is billed on at most
+    one transaction, and one transaction may bill several logs at once (Bill
+    all unbilled). While it is NULL the log is editable and deletable; once
+    set, the log is locked so the hours and the ledger line cannot drift
+    apart. No cascade in either direction: deleting the transaction nulls the
+    link (SQLAlchemy does that; SQLite is not enforcing the foreign key),
+    deleting the log leaves the ledger alone. See docs/adr/0015.
     """
     __tablename__ = 'time_logs'
 
@@ -592,11 +601,10 @@ class TimeLog(db.Model):
     started_on = db.Column(db.DateTime, nullable=False)
     ended_on = db.Column(db.DateTime, nullable=False)
     transaction_id = db.Column(db.Integer, db.ForeignKey('transactions.id'),
-                               nullable=True, unique=True)
+                               nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    transaction = db.relationship('Transaction', lazy=True,
-                                  backref=db.backref('time_log', uselist=False))
+    transaction = db.relationship('Transaction', lazy=True, backref='time_logs')
 
     @property
     def is_billed(self):
@@ -604,7 +612,11 @@ class TimeLog(db.Model):
 
     @property
     def date_range_label(self):
-        start, end = self.started_on.date(), self.ended_on.date()
+        return self.label_for(self.started_on, self.ended_on)
+
+    @staticmethod
+    def label_for(started_on, ended_on):
+        start, end = started_on.date(), ended_on.date()
         if start == end:
             return end.strftime('%d %b %Y')
         if start.year == end.year:

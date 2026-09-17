@@ -315,8 +315,9 @@ throughout. Both are piece 3 behaviour; piece 2 only records the flag.
 
 `TimeLog` — a block of hours worked on a project: the hours, the date range
 they cover, who logged them, and optionally the income `Transaction` they were
-billed as (1:1, unique). `Project.hours_logged` is the sum of its logs. A
-billed log is locked; deleting its transaction unlocks it.
+billed as (many logs may share one transaction: Bill all unbilled).
+`Project.hours_logged` is the sum of its logs. A billed log is locked;
+deleting its transaction unlocks it.
 [ADR-0015](adr/0015-time-logs-with-a-server-side-timer.md).
 
 ### Invoiced (transaction)

@@ -372,6 +372,44 @@ def create_time_log_transaction(log_id):
     return back
 
 
+@projects_bp.route('/<int:id>/time-logs/bill-all', methods=['POST'])
+@login_required
+def bill_all_time_logs(id):
+    """Book every unbilled log as one income transaction: the summed hours
+    x the rate, dated when the latest block ended, every log linked to it
+    and so locked. Same refusals as billing one log."""
+    project = _owned_project(id)
+    back = redirect(url_for('projects.detail', id=project.id))
+    if project.rate_type != 'hourly':
+        flash('Only hourly projects bill by the hour.', 'error')
+        return back
+    if not project.rate or project.rate <= 0:
+        flash('Set an hourly rate on the project first.', 'error')
+        return back
+    logs = project.unbilled_time_logs
+    if not logs:
+        flash('No unbilled hours on this project.', 'error')
+        return back
+
+    hours = sum(log.hours for log in logs)
+    started = min(log.started_on for log in logs)
+    ended = max(log.ended_on for log in logs)
+    tx = Transaction(
+        user_id=current_user.id,
+        amount=hours * project.rate,
+        date=ended,
+        kind=INCOME,
+        category='Freelance Project',
+        description=f'{hours:g}h on {project.name} ({TimeLog.label_for(started, ended)})',
+        is_tax_deductible=False,
+        source='project')
+    for log in logs:
+        log.transaction = tx
+    db.session.commit()
+    flash(f'Income of {hours * project.rate:.2f} booked for {hours:g}h across {len(logs)} entries.', 'success')
+    return back
+
+
 # --- Documents -----------------------------------------------------------
 #
 # There is no per-admin ownership check here: @login_required is the whole

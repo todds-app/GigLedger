@@ -94,7 +94,7 @@ No more setting aside random percentages. No more spreadsheet gymnastics. Just c
 - **Status workflow** — Active, completed, on hold, cancelled
 - **Deadline tracking** — Visual deadline indicators
 - **Color-coded** — Custom colors per project
-- **Hours logged as time logs** — Each block of hours with its date range; bill a log as an income transaction in one click
+- **Hours logged as time logs** — Each block of hours with its date range; bill a log as an income transaction in one click, or bill every unbilled entry together as one
 - **Project detail page** — Full view of a single project with its hours, documents and inventory
 - **7 demo projects** — Showing various states and rate types
 
@@ -436,6 +436,7 @@ gigledger/                      # Repository root — may be named anything
 | `POST` | `/projects/time-logs/<id>/edit` | Change a log's hours (unbilled only) |
 | `POST` | `/projects/time-logs/<id>/delete` | Remove a log (unbilled only) |
 | `POST` | `/projects/time-logs/<id>/create-transaction` | Book a log as income at hours × rate |
+| `POST` | `/projects/<id>/time-logs/bill-all` | Book every unbilled log on a project as one income transaction |
 | `POST` | `/projects/<id>/documents/upload` | Attach an uploaded file |
 | `POST` | `/projects/<id>/documents/link` | Attach a Google Drive (or other) link |
 | `GET` | `/projects/documents/<id>/download` | Download an attached file |

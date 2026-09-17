@@ -280,6 +280,35 @@ def _migrate_db(db):
         cursor.execute("UPDATE transactions SET kind = "
                        "CASE WHEN amount > 0 THEN 'income' ELSE 'expense' END")
 
+    # time_logs.transaction_id was UNIQUE (one log per transaction). Billing
+    # all unbilled hours at once puts several logs on one transaction, and
+    # SQLite cannot drop a table constraint in place, so the table is rebuilt
+    # once without it. Rows and links are copied as they are.
+    row = cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='time_logs'").fetchone()
+    if row and 'UNIQUE' in row[0].upper():
+        cursor.execute("""
+            CREATE TABLE time_logs_new (
+                id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                project_id INTEGER NOT NULL,
+                hours FLOAT NOT NULL,
+                started_on DATETIME NOT NULL,
+                ended_on DATETIME NOT NULL,
+                transaction_id INTEGER,
+                created_at DATETIME,
+                PRIMARY KEY (id),
+                FOREIGN KEY(user_id) REFERENCES users (id),
+                FOREIGN KEY(project_id) REFERENCES projects (id),
+                FOREIGN KEY(transaction_id) REFERENCES transactions (id)
+            )
+        """)
+        cursor.execute("""
+            INSERT INTO time_logs_new (id, user_id, project_id, hours, started_on, ended_on, transaction_id, created_at)
+            SELECT id, user_id, project_id, hours, started_on, ended_on, transaction_id, created_at FROM time_logs
+        """)
+        cursor.execute("DROP TABLE time_logs")
+        cursor.execute("ALTER TABLE time_logs_new RENAME TO time_logs")
+
     # Invoice line items: the ledger line a line bills. See docs/adr/0016.
     cursor.execute("PRAGMA table_info(invoice_line_items)")
     li_columns = {row[1] for row in cursor.fetchall()}

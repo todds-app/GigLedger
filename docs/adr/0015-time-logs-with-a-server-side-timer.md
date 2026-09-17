@@ -39,12 +39,19 @@ started - and the posted figure is what is stored, rounded again by the same
 rule. Logging never touches the ledger.
 
 **Billing is a separate act and locks the log.** `TimeLog.transaction_id` is
-ADR-0011's shape: 1:1, optional, unique. Create Transaction derives the amount
+optional and many-to-one: a log is billed on at most one transaction, and one
+transaction may bill several logs. Create Transaction derives the amount
 (`hours × rate`, hourly projects only), dates it when the hours ended, and
-links the row. While linked, hours cannot be edited and the log cannot be
+links the row. Bill all unbilled does the same for every unbilled log at
+once - summed hours, dated when the latest block ended, every log linked to
+the one row. While linked, hours cannot be edited and the log cannot be
 deleted. Deleting the transaction nulls the link, which unlocks the log - the
 ORM does that, the same mechanism that returns inventory to General Inventory
 when its project goes.
+
+*(Amended 2026-09-16: the link was 1:1 and unique at first; the constraint
+went when billing several logs together arrived. An existing `time_logs`
+table is rebuilt once without it on start.)*
 
 ## Consequences
 

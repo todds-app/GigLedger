@@ -49,7 +49,15 @@
                 <h2 class="text-sm font-bold text-gray-400 uppercase tracking-wider">Hours Logged</h2>
                 <p class="text-xs text-gray-400 mt-1">Time banked from the timer on the Projects page. Bill a block of hours to book it as income.</p>
             </div>
-            {% if time_logs %}<span class="text-sm font-extrabold text-gray-800 whitespace-nowrap">{{ project.hours_logged | decimal1 }}h</span>{% endif %}
+            <div class="flex items-center gap-3 shrink-0">
+                {% if project.rate_type == 'hourly' and project.rate and project.unbilled_time_logs | length > 1 %}
+                <form method="POST" action="{{ url_port('projects.bill_all_time_logs', id=project.id) }}" onsubmit="return confirm('Book all unbilled hours as one transaction?')" class="inline">
+                    {{ csrf_field() }}
+                    <button type="submit" class="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 whitespace-nowrap" title="One income transaction for every unbilled entry">Bill all unbilled &middot; {{ project.unbilled_hours | decimal1 }}h &middot; {{ currency | currency_symbol }}{{ (project.unbilled_hours * project.rate) | money }}</button>
+                </form>
+                {% endif %}
+                {% if time_logs %}<span class="text-sm font-extrabold text-gray-800 whitespace-nowrap">{{ project.hours_logged | decimal1 }}h</span>{% endif %}
+            </div>
         </div>
         {% if time_logs %}
         <div class="divide-y divide-gray-100/50">
