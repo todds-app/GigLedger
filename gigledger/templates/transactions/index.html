@@ -117,6 +117,7 @@
                         <th class="px-5 py-3 text-right text-xs font-bold text-gray-400 uppercase tracking-wider">Amount</th>
                         <th class="px-5 py-3 text-center text-xs font-bold text-gray-400 uppercase tracking-wider">Deductible</th>
                         <th class="px-5 py-3 text-right text-xs font-bold text-gray-400 uppercase tracking-wider">Tax Impact</th>
+                        <th class="px-5 py-3 text-center text-xs font-bold text-gray-400 uppercase tracking-wider">Invoiced</th>
                         <th class="px-5 py-3 text-center text-xs font-bold text-gray-400 uppercase tracking-wider">Actions</th>
                     </tr>
                 </thead>
@@ -154,7 +155,26 @@
                             <span class="text-xs text-gray-300">-</span>
                             {% endif %}
                         </td>
+                        <td class="px-5 py-3.5 text-center whitespace-nowrap">
+                            {% if tx.is_invoiced %}
+                            {% set inv = tx.invoice_line.invoice %}
+                            <a href="{{ url_port('invoices.detail', id=inv.id) }}" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-green-50 text-green-600 border border-green-200 hover:bg-green-100" title="Open invoice {{ inv.invoice_number }}">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                                {{ inv.invoice_number }} &middot; {{ inv.status | capitalize }}
+                            </a>
+                            {% elif tx.can_be_invoiced %}
+                            <button type="button" onclick="openInvoiceModal({{ tx.id|tojson|forceescape }}, {{ (tx.description or tx.category or '')|tojson|forceescape }})" class="px-3 py-1.5 rounded-lg text-xs font-bold text-brand-600 bg-brand-50 hover:bg-brand-100 border border-brand-100 transition-all">Add to Invoice</button>
+                            {% else %}
+                            <span class="text-xs text-gray-300">-</span>
+                            {% endif %}
+                        </td>
                         <td class="px-5 py-3.5 text-center">
+                            {% if tx.is_invoiced %}
+                            <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-gray-300" title="On an invoice: remove it from the invoice to edit or delete">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                                Locked
+                            </span>
+                            {% else %}
                             <div class="flex items-center justify-center gap-1">
                                 <button onclick="openEditModal({{ tx.id|tojson|forceescape }}, {{ (tx.amount|abs)|tojson|forceescape }}, {{ tx.kind|tojson|forceescape }}, {{ tx.date.strftime('%Y-%m-%d')|tojson|forceescape }}, {{ (tx.category or '')|tojson|forceescape }}, {{ (tx.description or '')|tojson|forceescape }}, {{ tx.is_tax_deductible|tojson|forceescape }}, {{ (tx.inventory_item.form_values if tx.inventory_item else none)|tojson|forceescape }})" class="text-gray-300 hover:text-brand-500 transition-all p-1 hover:scale-110" title="Edit">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
@@ -166,6 +186,7 @@
                                     </button>
                                 </form>
                             </div>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -257,6 +278,52 @@
     </div>
 </div>
 
+<!-- Add to Invoice Modal -->
+<div id="invoiceModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" onclick="document.getElementById('invoiceModal').classList.add('hidden')"></div>
+    <div class="relative glass-card rounded-3xl p-7 max-w-md w-full shadow-2xl" style="background:rgba(255,255,255,0.9)">
+        <div class="flex items-center justify-between mb-1">
+            <h2 class="text-lg font-extrabold text-gray-900">Add to Invoice</h2>
+            <button onclick="document.getElementById('invoiceModal').classList.add('hidden')" class="text-gray-300 hover:text-gray-600 transition-colors p-1">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+        </div>
+        <p id="invoiceModalDescription" class="text-sm text-gray-400 mb-5 truncate"></p>
+        <form method="POST" id="invoiceForm" class="space-y-4">
+            {{ csrf_field() }}
+            <label class="block cursor-pointer rounded-2xl border-2 border-gray-200/80 p-4 has-[:checked]:border-brand-400 has-[:checked]:bg-brand-50/60 transition-all">
+                <div class="flex items-center gap-2">
+                    <input type="radio" name="target" value="new" checked onchange="applyInvoiceTarget()" class="accent-brand-500">
+                    <span class="text-sm font-bold text-gray-800">New draft invoice</span>
+                </div>
+                <select name="client_id" id="invoice_client_id" class="candy-input block w-full mt-3 px-3 py-2.5 text-sm text-gray-900 focus:outline-none">
+                    <option value="">Choose a client (optional)</option>
+                    {% for client in clients %}
+                    <option value="{{ client.id }}">{{ client.name }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="block cursor-pointer rounded-2xl border-2 border-gray-200/80 p-4 has-[:checked]:border-brand-400 has-[:checked]:bg-brand-50/60 transition-all">
+                <div class="flex items-center gap-2">
+                    <input type="radio" name="target" value="existing" onchange="applyInvoiceTarget()" class="accent-brand-500" {% if not draft_invoices %}disabled{% endif %}>
+                    <span class="text-sm font-bold text-gray-800">Add to an existing draft</span>
+                </div>
+                <select name="invoice_id" id="invoice_invoice_id" disabled class="candy-input block w-full mt-3 px-3 py-2.5 text-sm text-gray-900 focus:outline-none disabled:opacity-50">
+                    {% for inv in draft_invoices %}
+                    <option value="{{ inv.id }}">{{ inv.invoice_number }} &mdash; {{ inv.client.name if inv.client else 'No client' }} &mdash; {{ currency | currency_symbol }}{{ inv.total | money }}</option>
+                    {% else %}
+                    <option value="">No draft invoices</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="document.getElementById('invoiceModal').classList.add('hidden')" class="flex-1 px-4 py-2.5 rounded-xl border-2 border-gray-200/80 text-sm font-semibold text-gray-600 hover:bg-white/70 transition-all">Cancel</button>
+                <button type="submit" class="flex-1 px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-bold shadow-lg shadow-brand-500/25 transition-all">Add</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 {% include 'transactions/_edit_modal.html' %}
 {% endblock %}
 
@@ -283,6 +350,20 @@
             if (chevron) chevron.style.transform = 'rotate(0deg)';
         }
     });
+
+    // Add to Invoice: the row picks the transaction, the modal picks the invoice.
+    var invoiceAction = {{ url_port('transactions.add_to_invoice', id=0)|tojson }};
+    function openInvoiceModal(txId, description) {
+        document.getElementById('invoiceForm').action = invoiceAction.replace('/0/', '/' + txId + '/');
+        document.getElementById('invoiceModalDescription').textContent = description;
+        applyInvoiceTarget();
+        document.getElementById('invoiceModal').classList.remove('hidden');
+    }
+    function applyInvoiceTarget() {
+        var existing = document.querySelector('#invoiceForm input[name="target"][value="existing"]').checked;
+        document.getElementById('invoice_client_id').disabled = existing;
+        document.getElementById('invoice_invoice_id').disabled = !existing;
+    }
 
     var modalDate = document.getElementById('modal_date');
     if (modalDate) modalDate.value = new Date().toISOString().split('T')[0];

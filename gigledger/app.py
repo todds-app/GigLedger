@@ -280,6 +280,13 @@ def _migrate_db(db):
         cursor.execute("UPDATE transactions SET kind = "
                        "CASE WHEN amount > 0 THEN 'income' ELSE 'expense' END")
 
+    # Invoice line items: the ledger line a line bills. See docs/adr/0016.
+    cursor.execute("PRAGMA table_info(invoice_line_items)")
+    li_columns = {row[1] for row in cursor.fetchall()}
+    if li_columns and 'transaction_id' not in li_columns:
+        cursor.execute("ALTER TABLE invoice_line_items ADD COLUMN transaction_id INTEGER "
+                       "REFERENCES transactions(id)")
+
     # Migrate recurring_transactions table - kind, for the transactions it generates
     cursor.execute("PRAGMA table_info(recurring_transactions)")
     rt_columns = {row[1] for row in cursor.fetchall()}
@@ -473,15 +480,10 @@ def _seed_demo_data():
             db.session.add(InvoiceLineItem(invoice_id=inv.id, description=desc, quantity=qty, rate=rate, amount=amt))
         invoice_objects.append(inv)
 
-        # Create transactions for paid invoices: income + auto tax reserve
+        # A paid invoice sets its tax aside; the income it billed is entered
+        # in the ledger by hand, never posted by the invoice (docs/adr/0016).
         if inv.status == 'paid':
             client_name = next((c.name for c in client_objects if c.id == inv.client_id), 'Unknown Client')
-            # Income transaction
-            tx = Transaction(user_id=demo_user.id, amount=inv.total, date=inv.paid_date or inv.issue_date,
-                           kind='income',
-                           category='Client Payment', description=f'Payment for Invoice {inv.invoice_number} - {client_name}',
-                           is_tax_deductible=False, source='invoice', invoice_id=inv.id)
-            db.session.add(tx)
             # Tax reserve expense transaction (auto-set-aside)
             if inv.tax_amount and inv.tax_amount > 0:
                 tax_tx = Transaction(user_id=demo_user.id, amount=-inv.tax_amount, date=inv.paid_date or inv.issue_date,

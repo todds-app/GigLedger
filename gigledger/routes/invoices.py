@@ -2,9 +2,9 @@
 GigLedger - Invoices Blueprint
 """
 from datetime import datetime, timedelta
-from flask import Blueprint, render_template, redirect, url_for, request, flash, Response
+from flask import Blueprint, render_template, redirect, url_for, request, flash, Response, abort
 from flask_login import login_required, current_user
-from ..models import db, Business, Invoice, InvoiceLineItem, Client, Transaction, INCOME, EXPENSE
+from ..models import db, Business, Invoice, InvoiceLineItem, Client, Transaction, EXPENSE
 
 invoices_bp = Blueprint('invoices', __name__)
 
@@ -87,9 +87,7 @@ def create_invoice():
         flash('Please add at least one line item.', 'error')
         return redirect(url_for('invoices.create_form'))
 
-    # Calculate totals
     line_items_data = []
-    subtotal = 0
     for i in range(len(descriptions)):
         desc = descriptions[i].strip()
         if not desc:
@@ -102,16 +100,11 @@ def create_invoice():
             rate = float(rates[i]) if i < len(rates) else 0
         except (ValueError, IndexError):
             rate = 0
-        amount = qty * rate
-        subtotal += amount
-        line_items_data.append({'description': desc, 'quantity': qty, 'rate': rate, 'amount': amount})
+        line_items_data.append({'description': desc, 'quantity': qty, 'rate': rate, 'amount': qty * rate})
 
     if not line_items_data:
         flash('Please add at least one line item with a description.', 'error')
         return redirect(url_for('invoices.create_form'))
-
-    tax_amount = subtotal * business.default_tax_rate
-    total = subtotal + tax_amount
 
     # Resolve the client, ensuring the id is a real one. Referencing an id that
     # is not a client at all would leak whatever is at that id onto the invoice/PDF (IDOR).
@@ -133,23 +126,11 @@ def create_invoice():
         status=status,
         issue_date=issue_date,
         due_date=due_date,
-        notes=notes,
-        subtotal=subtotal,
-        tax_amount=tax_amount,
-        total=total)
-    db.session.add(invoice)
-    db.session.flush()  # Get the invoice ID
-
-    # Create line items
+        notes=notes)
     for item in line_items_data:
-        li = InvoiceLineItem(
-            invoice_id=invoice.id,
-            description=item['description'],
-            quantity=item['quantity'],
-            rate=item['rate'],
-            amount=item['amount'])
-        db.session.add(li)
-
+        invoice.line_items.append(InvoiceLineItem(**item))
+    invoice.recalculate(business.default_tax_rate)
+    db.session.add(invoice)
     db.session.commit()
 
     if status == 'sent':
@@ -175,26 +156,15 @@ def update_status(id):
         flash('Invalid status.', 'error')
         return redirect(url_for('invoices.detail', id=id))
 
-    # If marking as paid, create transactions and set paid_date
+    # Marking as paid sets paid_date and sets the tax aside. It posts no
+    # income: the invoice bills lines that are already in the ledger, so a
+    # Client Payment row would count the same money twice (docs/adr/0016).
     if new_status == 'paid' and invoice.status != 'paid':
         invoice.paid_date = datetime.now()
 
         client_name = invoice.client.name if invoice.client else 'Unknown Client'
 
-        # 1. Create an income transaction for the full invoice total
-        income_transaction = Transaction(
-            user_id=current_user.id,
-            amount=invoice.total,
-            date=datetime.now(),
-            kind=INCOME,
-            category='Client Payment',
-            description=f'Payment for Invoice {invoice.invoice_number} - {client_name}',
-            is_tax_deductible=False,
-            source='invoice',
-            invoice_id=invoice.id)
-        db.session.add(income_transaction)
-
-        # 2. Auto-create a tax reserve expense transaction for the tax portion
+        # Auto-create a tax reserve expense transaction for the tax portion
         # This ensures the tax owed on this invoice is explicitly set aside
         if invoice.tax_amount and invoice.tax_amount > 0:
             tax_transaction = Transaction(
@@ -225,7 +195,7 @@ def update_status(id):
     }
     if new_status == 'paid' and invoice.tax_amount and invoice.tax_amount > 0:
         sym = {'USD':'$','EUR':'€','GBP':'£','CAD':'C$','AUD':'A$','INR':'₹','JPY':'¥'}.get(business.currency, '$')
-        flash(f'Invoice {invoice.invoice_number} marked as Paid! Income of {sym}{invoice.total:,.2f} recorded and {sym}{invoice.tax_amount:,.2f} tax reserve auto-set aside.', 'success')
+        flash(f'Invoice {invoice.invoice_number} marked as Paid! {sym}{invoice.tax_amount:,.2f} tax reserve auto-set aside.', 'success')
     else:
         flash(f'Invoice {invoice.invoice_number} marked as {status_labels.get(new_status, new_status)}.', 'success')
     return redirect(url_for('invoices.detail', id=id))
@@ -249,6 +219,25 @@ def delete(id):
     db.session.commit()
     flash(f'Invoice {inv_num} deleted.', 'success')
     return redirect(url_for('invoices.list_invoices'))
+
+
+@invoices_bp.route('/invoices/<int:id>/lines/<int:line_id>/remove', methods=['POST'])
+@login_required
+def remove_line(id, line_id):
+    """Take a line off a draft. This is how a billed transaction is unlocked
+    without deleting the whole invoice (docs/adr/0016)."""
+    line = db.session.get(InvoiceLineItem, line_id)
+    if not line or line.invoice_id != id:
+        abort(404)
+    invoice = line.invoice
+    if invoice.status != 'draft':
+        flash('Only a draft invoice can lose a line.', 'error')
+        return redirect(url_for('invoices.detail', id=id))
+    invoice.line_items.remove(line)
+    invoice.recalculate(Business.get().default_tax_rate)
+    db.session.commit()
+    flash('Line removed.', 'success')
+    return redirect(url_for('invoices.detail', id=id))
 
 
 @invoices_bp.route('/invoices/<int:id>')

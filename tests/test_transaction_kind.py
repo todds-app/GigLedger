@@ -266,7 +266,9 @@ def test_a_generated_recurring_transaction_inherits_its_kind(app):
         assert generated.is_expense
 
 
-def test_marking_an_invoice_paid_writes_income_and_a_tax_expense(app):
+def test_marking_an_invoice_paid_writes_a_tax_expense_with_a_kind(app):
+    """Paid posts only the tax reserve since docs/adr/0016; that row still
+    needs a kind."""
     from gigledger.models import Invoice
     with app.app_context():
         invoice = Invoice.query.filter(Invoice.tax_amount > 0).first()
@@ -279,7 +281,7 @@ def test_marking_an_invoice_paid_writes_income_and_a_tax_expense(app):
 
     with app.app_context():
         linked = Transaction.query.filter_by(invoice_id=invoice_id).all()
-        assert {t.kind for t in linked} == {INCOME, EXPENSE}
+        assert {t.kind for t in linked} == {EXPENSE}
         assert all(t.kind in KINDS for t in linked), number
 
 

@@ -55,7 +55,8 @@ No more setting aside random percentages. No more spreadsheet gymnastics. Just c
 - **Edit & Delete** — Full CRUD with inline actions
 - **Three kinds** — Income, Expense, and Inventory: purchases held as assets that never touch your expense totals
 - **Export to CSV or printable HTML** — Filtered reports with full detail and summary rows
-- **Auto-Posted from Invoices** — Income and tax reserve transactions created automatically when invoices are paid
+- **Invoiced column** — See which income and inventory lines are on an invoice; **Add to Invoice** puts a line on a new draft or an existing one
+- **Tax reserve from invoices** — A tax reserve expense is created automatically when an invoice is paid
 
 ### 📦 Inventory
 - **Asset pool** — Purchases recorded as Inventory stay out of expenses, deductions and profit while their cash still leaves the balance
@@ -71,10 +72,9 @@ No more setting aside random percentages. No more spreadsheet gymnastics. Just c
 - **Invoice number auto-generation** — Configurable prefix (default: INV-0001)
 - **Status workflow** — Draft → Sent → Paid / Overdue / Cancelled
 - **One-click status updates** — Mark as sent, paid, overdue, or cancel
-- **Auto-post payment** — Marking an invoice as paid automatically creates:
-  - An income transaction for the invoice total
-  - A tax reserve expense transaction for the tax portion
-- **Revert support** — Un-paying an invoice removes the auto-posted transactions
+- **Bill from the ledger** — Add income and inventory transactions to a draft as line items; a billed transaction is locked until its line is removed
+- **Auto tax reserve** — Marking an invoice as paid creates a tax reserve expense transaction for the tax portion (no income row: the income is already in the ledger)
+- **Revert support** — Un-paying an invoice removes the auto-posted tax reserve
 - **Printable download** — Self-contained, styled HTML invoice; open it and use your browser's Print to PDF
 - **Print-friendly** — Clean print layout for physical copies
 - **Invoice detail view** — Full preview with line items, totals, and client info
@@ -199,10 +199,9 @@ Tells you how many months you can survive at your current spending rate. Color-c
 ### 4. Auto Tax Reserve (New)
 ```
 When invoice is paid:
-  → Income transaction: +invoice.total
   → Tax reserve transaction: -invoice.tax_amount
 ```
-When you mark an invoice as paid, GigLedger automatically creates two transactions: the income you received (the full invoice total including tax), and a tax reserve expense (the tax portion) that sets aside what you owe. This ensures your "Safe to Spend" accurately reflects that the tax money is already spoken for. If you revert an invoice back to "Sent", both auto-posted transactions are removed.
+When you mark an invoice as paid, GigLedger automatically creates a tax reserve expense (the tax portion) that sets aside what you owe. This ensures your "Safe to Spend" accurately reflects that the tax money is already spoken for. No income row is posted: the income an invoice bills is the transaction you already entered in the ledger. If you revert an invoice back to "Sent", the tax reserve is removed.
 
 ---
 
@@ -284,10 +283,10 @@ in instantly with pre-loaded data:
 | **Password** | `demo1234` |
 
 The demo account includes a complete freelancer workspace:
-- **~55 transactions** across 6 months (income, deductible expenses, non-deductible expenses, auto-posted invoice payments, and tax reserve entries)
+- **~50 transactions** across 6 months (income, deductible expenses, non-deductible expenses, and tax reserve entries)
 - **8 clients** with full contact info
 - **7 projects** in various states (active, completed, on hold)
-- **8 invoices** (4 paid with auto-posted income + tax reserve, 2 sent, 1 draft, 1 overdue)
+- **8 invoices** (4 paid with auto-posted tax reserve, 2 sent, 1 draft, 1 overdue)
 - **7 recurring transactions** (monthly subscriptions and yearly renewals)
 - All invoices include proper tax calculations at the 30% rate
 
@@ -313,7 +312,7 @@ gigledger/                      # Repository root — may be named anything
 │   │   ├── team.py             # /setup, Settings → Team invite/cancel/remove, /join/<token>
 │   │   ├── dashboard.py        # Main dashboard + Quick Add
 │   │   ├── transactions.py     # CRUD + CSV/HTML export
-│   │   ├── invoices.py         # Invoice CRUD + HTML export + mark-as-paid + auto-post
+│   │   ├── invoices.py         # Invoice CRUD + HTML export + mark-as-paid + tax reserve
 │   │   ├── clients.py          # Client CRM with detail view
 │   │   ├── projects.py         # Project tracking + hours logging
 │   │   ├── goals.py            # Savings goals (parked: not registered or linked)
@@ -374,7 +373,7 @@ gigledger/                      # Repository root — may be named anything
 | **User** | `users` | email, password_hash, theme, dark_mode, created_at, last_login_at |
 | **Transaction** | `transactions` | amount (+income/-expense), date, category, description, is_tax_deductible, source (manual/invoice/project/recurring), invoice_id |
 | **Invoice** | `invoices` | client_id, invoice_number, status, issue_date, due_date, subtotal, tax_amount, total, paid_date |
-| **InvoiceLineItem** | `invoice_line_items` | invoice_id, description, quantity, rate, amount |
+| **InvoiceLineItem** | `invoice_line_items` | invoice_id, description, quantity, rate, amount, transaction_id (1:1, nullable) |
 | **Client** | `clients` | name, email, phone, company, address, notes, is_active, portal_account_id |
 | **PortalAccount** | `portal_accounts` | email (global, unique), password_hash, session_epoch, last_login_at |
 | **PortalInvite** | `portal_invites` | client_id, email, token_hash, expires_at, redeemed_at |
@@ -403,13 +402,15 @@ gigledger/                      # Repository root — may be named anything
 | `POST` | `/transactions/add` | Add new transaction |
 | `POST` | `/transactions/edit/<id>` | Edit existing transaction |
 | `POST` | `/transactions/delete/<id>` | Delete a transaction |
+| `POST` | `/transactions/<id>/invoice` | Add a transaction to a new draft invoice or an existing one |
 | `GET` | `/transactions/export/csv` | Export filtered transactions as CSV |
 | `GET` | `/transactions/export/pdf` | Export filtered transactions as printable HTML |
 | `GET` | `/invoices` | Invoice list with status filter |
 | `GET` | `/invoices/create` | Invoice creation form |
 | `POST` | `/invoices/create` | Create invoice with line items |
-| `POST` | `/invoices/status/<id>` | Update invoice status (auto-posts transactions on paid) |
-| `POST` | `/invoices/delete/<id>` | Delete invoice + linked transactions |
+| `POST` | `/invoices/status/<id>` | Update invoice status (posts the tax reserve on paid) |
+| `POST` | `/invoices/delete/<id>` | Delete invoice + its tax reserve |
+| `POST` | `/invoices/<id>/lines/<line_id>/remove` | Remove a line from a draft (unlocks its transaction) |
 | `GET` | `/invoices/<id>` | Invoice detail view |
 | `GET` | `/invoices/<id>/pdf` | Download invoice as printable HTML |
 | `GET` | `/clients` | Client list |
@@ -471,28 +472,26 @@ Dark mode uses CSS custom properties with `[data-dark="true"]` attribute selecto
 
 ---
 
-## 🔄 Invoice → Transaction Flow
+## 🔄 Transaction → Invoice Flow
 
-Understanding how invoices and transactions work together:
+Understanding how transactions and invoices work together:
 
 ```
-Create Invoice (Draft)
+Enter income (or an inventory purchase) in Transactions
        ↓
-Mark as Sent
+Add to Invoice ── new draft, or an existing draft
+       ↓                (line item linked to the transaction;
+Mark as Sent             transaction locked while linked)
        ↓
-Mark as Paid ──────────────────────┐
-       ↓                           ↓
-  Auto-create:              Auto-create:
-  ✓ Income transaction      ✓ Income transaction (+total)
-  (old behavior)            ✓ Tax Reserve expense (-tax_amount)
-                                    ↓
-                            Both linked via invoice_id
-                                    ↓
-                     "Safe to Spend" correctly accounts
-                     for the tax portion being reserved
+Mark as Paid
+       ↓
+  Auto-create:
+  ✓ Tax Reserve expense (-tax_amount), linked via invoice_id
+       ↓
+"Safe to Spend" correctly accounts for the tax portion being reserved
 ```
 
-When an invoice is **un-paid** (reverted to Sent), **both** auto-posted transactions are automatically removed. When an invoice is **deleted**, all linked transactions are also removed. This keeps your books clean and consistent.
+No income row is posted when an invoice is paid: the income is the line already in the ledger. When an invoice is **un-paid** (reverted to Sent), the auto-posted tax reserve is removed. When an invoice is **deleted**, its tax reserve is removed and the transactions it billed are unlocked, not deleted. Remove a line from a draft to unlock its transaction without deleting the invoice.
 
 ---
 ## Screenshots

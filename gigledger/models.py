@@ -197,6 +197,32 @@ class Transaction(KindMixin, db.Model):
     inventory_item = db.relationship('InventoryItem', back_populates='transaction',
                                      uselist=False, cascade='all, delete-orphan')
 
+    # Billing on an invoice (docs/adr/0016). The link is `invoice_line`, a
+    # backref from InvoiceLineItem.transaction_id - not `invoice_id` above,
+    # which means "posted by paying this invoice" and is what a revert deletes.
+    @property
+    def is_invoiced(self):
+        return self.invoice_line is not None
+
+    @property
+    def can_be_invoiced(self):
+        return self.kind in (INCOME, INVENTORY) and not self.is_invoiced
+
+    def as_line_item(self):
+        """The line this transaction becomes on an invoice.
+
+        A purchase bills as quantity x unit cost so the client sees the
+        pieces; income is one unit at its amount.
+        """
+        description = self.description or self.category or 'Item'
+        if self.inventory_item:
+            item = self.inventory_item
+            quantity, rate = item.quantity, item.unit_cost
+        else:
+            quantity, rate = 1, abs(self.amount)
+        return {'description': description, 'quantity': quantity,
+                'rate': rate, 'amount': quantity * rate}
+
 
 class InventoryItem(db.Model):
     """The asset half of an inventory purchase.
@@ -406,6 +432,14 @@ class Invoice(db.Model):
     line_items = db.relationship('InvoiceLineItem', backref='invoice', lazy=True, cascade='all, delete-orphan')
     transactions = db.relationship('Transaction', backref='invoice_ref', lazy=True)
 
+    def recalculate(self, tax_rate):
+        """Rewrite the stored totals from the lines. Totals are denormalised
+        (the PDF and the reports read them), so every change to the lines
+        must come through here."""
+        self.subtotal = sum(li.amount or 0 for li in self.line_items)
+        self.tax_amount = self.subtotal * (tax_rate or 0)
+        self.total = self.subtotal + self.tax_amount
+
 
 class InvoiceLineItem(db.Model):
     __tablename__ = 'invoice_line_items'
@@ -416,6 +450,12 @@ class InvoiceLineItem(db.Model):
     quantity = db.Column(db.Float, default=1)
     rate = db.Column(db.Float, default=0)
     amount = db.Column(db.Float, default=0)
+    # The ledger line this bills, if any. Unique: a transaction is on at most
+    # one invoice. Nullable: lines typed on the create form bill nothing.
+    transaction_id = db.Column(db.Integer, db.ForeignKey('transactions.id'),
+                               nullable=True, unique=True)
+    transaction = db.relationship('Transaction', lazy=True,
+                                  backref=db.backref('invoice_line', uselist=False))
 
 
 class Project(db.Model):

@@ -1,9 +1,9 @@
 import math
-from datetime import datetime
-from flask import Blueprint, render_template, redirect, url_for, request, flash
+from datetime import datetime, timedelta
+from flask import Blueprint, render_template, redirect, url_for, request, flash, abort
 from flask_login import login_required, current_user
-from ..models import (Transaction, InventoryItem, Project, Business, db, clean_kind,
-                      INCOME, INVENTORY, KINDS)
+from ..models import (Transaction, InventoryItem, Project, Business, Client, Invoice,
+                      InvoiceLineItem, db, clean_kind, INCOME, INVENTORY, KINDS)
 
 transactions_bp = Blueprint('transactions', __name__)
 
@@ -16,6 +16,12 @@ def _filtered_transactions(args):
     """
     transactions = Transaction.query\
         .order_by(Transaction.date.desc()).all()
+
+    # Income posted by paying an invoice is the same money as the lines the
+    # invoice billed; the ledger, not the invoice, is the income record
+    # (docs/adr/0016). Its tax reserve row stays: that is a real set-aside.
+    transactions = [t for t in transactions
+                    if not (t.source == 'invoice' and t.kind == INCOME)]
 
     category = args.get('category', '')
     if category:
@@ -125,7 +131,9 @@ def list_transactions():
         user_categories=business.get_all_categories(),
         total_income=total_income, total_expenses=total_expenses,
         total_deductible=total_deductible, net=net, tax_saving=tax_saving,
-        projects=Project.query.order_by(Project.name).all())
+        projects=Project.query.order_by(Project.name).all(),
+        draft_invoices=Invoice.query.filter_by(status='draft').order_by(Invoice.created_at.desc()).all(),
+        clients=Client.query.filter_by(is_active=True).order_by(Client.name).all())
 
 
 @transactions_bp.route('/transactions/add', methods=['POST'])
@@ -194,6 +202,9 @@ def edit(id):
         return redirect(url_for('transactions.list_transactions'))
 
     back = request.referrer or url_for('transactions.list_transactions')
+    if tx.is_invoiced:
+        flash(_locked_message(tx), 'error')
+        return redirect(back)
     kind = clean_kind(request.form.get('type', tx.kind), fallback=tx.kind)
 
     # A purchase cannot become an expense, or an expense a purchase, by
@@ -256,13 +267,67 @@ def edit(id):
 @login_required
 def delete(id):
     tx = Transaction.query.filter_by(id=id).first()
-    if tx:
+    if not tx:
+        flash('Transaction not found.', 'error')
+    elif tx.is_invoiced:
+        flash(_locked_message(tx), 'error')
+    else:
         db.session.delete(tx)
         db.session.commit()
         flash('Transaction deleted. Tax estimates will update on next calculation.', 'success')
-    else:
-        flash('Transaction not found.', 'error')
     return redirect(url_for('transactions.list_transactions'))
+
+
+def _locked_message(tx):
+    return (f'This transaction is on invoice {tx.invoice_line.invoice.invoice_number}. '
+            f'Remove it from the invoice first.')
+
+
+@transactions_bp.route('/transactions/<int:id>/invoice', methods=['POST'])
+@login_required
+def add_to_invoice(id):
+    """Bill a ledger line: on a new draft, or appended to an existing one.
+
+    The link lives on the line item (docs/adr/0016), so the transaction the
+    user typed is never touched by paying, reverting or deleting the invoice.
+    """
+    tx = db.session.get(Transaction, id) or abort(404)
+    business = Business.get()
+    back = redirect(request.referrer or url_for('transactions.list_transactions'))
+
+    if tx.is_invoiced:
+        flash(f'This transaction is already on invoice '
+              f'{tx.invoice_line.invoice.invoice_number}.', 'error')
+        return back
+    if not tx.can_be_invoiced:
+        flash('Only income and inventory transactions can be invoiced.', 'error')
+        return back
+
+    if request.form.get('target') == 'existing':
+        invoice_id = request.form.get('invoice_id', '')
+        invoice = db.session.get(Invoice, int(invoice_id)) if invoice_id.isdigit() else None
+        if not invoice or invoice.status != 'draft':
+            flash('Pick a draft invoice; only drafts take new lines.', 'error')
+            return back
+    else:
+        # Same id check as invoices.create_invoice: a stray id must not
+        # attach whatever row sits there to the invoice (IDOR).
+        client_id = request.form.get('client_id', '')
+        client = db.session.get(Client, int(client_id)) if client_id.isdigit() else None
+        today = datetime.now()
+        invoice = Invoice(user_id=current_user.id,
+                          client_id=client.id if client else None,
+                          invoice_number=business.get_next_invoice_number(),
+                          status='draft', issue_date=today,
+                          due_date=today + timedelta(days=30))
+        db.session.add(invoice)
+        db.session.flush()
+
+    invoice.line_items.append(InvoiceLineItem(transaction_id=tx.id, **tx.as_line_item()))
+    invoice.recalculate(business.default_tax_rate)
+    db.session.commit()
+    flash(f'Added to {invoice.invoice_number}.', 'success')
+    return redirect(url_for('invoices.detail', id=invoice.id))
 
 
 @transactions_bp.route('/transactions/export/csv')
@@ -275,7 +340,7 @@ def export_csv():
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(['Date', 'Type', 'Category', 'Description', 'Amount', 'Tax Deductible'])
+    writer.writerow(['Date', 'Type', 'Category', 'Description', 'Amount', 'Tax Deductible', 'Invoiced'])
 
     for tx in transactions:
         writer.writerow([
@@ -284,7 +349,8 @@ def export_csv():
             tx.category or 'Other',
             tx.description or '',
             f"{abs(tx.amount):.2f}",
-            'Yes' if tx.is_tax_deductible else 'No'
+            'Yes' if tx.is_tax_deductible else 'No',
+            tx.invoice_line.invoice.invoice_number if tx.is_invoiced else ''
         ])
 
     # Add summary rows

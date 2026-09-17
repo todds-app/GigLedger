@@ -319,6 +319,15 @@ billed as (1:1, unique). `Project.hours_logged` is the sum of its logs. A
 billed log is locked; deleting its transaction unlocks it.
 [ADR-0015](adr/0015-time-logs-with-a-server-side-timer.md).
 
+### Invoiced (transaction)
+
+An income or inventory `Transaction` that an `InvoiceLineItem` points at
+(`transaction_id`, 1:1, unique). Shown in the Invoiced column on the
+Transactions page. Locked - no edit, no delete - until the line is removed
+from its draft or the invoice is deleted. Marking an invoice Paid posts only
+the Tax Reserve expense; the income is the line already in the ledger.
+[ADR-0016](adr/0016-bill-transactions-on-invoices.md).
+
 ### Timer
 
 The per-project clock on the Projects page. Its state is three columns on

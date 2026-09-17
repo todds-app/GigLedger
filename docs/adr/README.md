@@ -48,3 +48,4 @@ the failure modes the decision does *not* protect against.
 | [0013](0013-accept-documents-from-portal-clients.md) | Accept documents from portal clients as the owner's, attributed to the client | Accepted |
 | [0014](0014-one-business-per-install.md) | One business per install | Accepted |
 | [0015](0015-time-logs-with-a-server-side-timer.md) | Hours are time logs, counted by a timer on the project row | Accepted |
+| [0016](0016-bill-transactions-on-invoices.md) | The ledger is the income record; an invoice bills lines already in it | Accepted |
