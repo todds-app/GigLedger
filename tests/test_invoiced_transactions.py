@@ -635,3 +635,11 @@ def test_a_draft_offers_edit_and_a_sent_invoice_does_not(app):
         db.session.get(Invoice, iid).status = 'sent'
         db.session.commit()
     assert f'/invoices/{iid}/edit' not in client.get(f'/invoices/{iid}').get_data(as_text=True)
+
+
+def test_the_invoice_list_offers_edit_on_draft_rows_only(app):
+    draft = a_draft(app, invoice_number='INV-LIST-D')
+    sent = a_draft(app, invoice_number='INV-LIST-S', status='sent')
+    body = login_as(app).get('/invoices').get_data(as_text=True)
+    assert f'/invoices/{draft}/edit' in body
+    assert f'/invoices/{sent}/edit' not in body
