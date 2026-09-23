@@ -1,0 +1,122 @@
+{#
+  Add to Invoice / Sell modal. The row picks the transaction; the modal picks
+  the invoice (a new draft, or an existing one) and, for an inventory
+  purchase, the sale: price for the whole item and any sales tax collected.
+  A sale is the invoice line that bills the purchase (docs/adr/0017).
+
+  Needs `clients`, `draft_invoices`, `currency` in context. Open it with
+  openInvoiceModal(txId, description) for income, or
+  openInvoiceModal(txId, description, item.sale_values) to sell.
+#}
+<div id="invoiceModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" onclick="document.getElementById('invoiceModal').classList.add('hidden')"></div>
+    <div class="relative glass-card rounded-3xl p-7 max-w-md w-full shadow-2xl" style="background:rgba(255,255,255,0.9)">
+        <div class="flex items-center justify-between mb-1">
+            <h2 id="invoiceModalTitle" class="text-lg font-extrabold text-gray-900">Add to Invoice</h2>
+            <button onclick="document.getElementById('invoiceModal').classList.add('hidden')" class="text-gray-300 hover:text-gray-600 transition-colors p-1">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+        </div>
+        <p id="invoiceModalDescription" class="text-sm text-gray-400 mb-5 truncate"></p>
+        <form method="POST" id="invoiceForm" class="space-y-4">
+            {{ csrf_field() }}
+
+            <div id="invoiceSaleFields" class="hidden space-y-3 rounded-2xl border-2 border-amber-200/80 bg-amber-50/40 p-4">
+                <div>
+                    <label for="invoice_sale_price" class="block text-sm font-semibold text-gray-600 mb-1.5">Sale price <span class="text-gray-400 font-medium">(whole item)</span></label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">{{ currency | currency_symbol }}</span>
+                        <input type="number" name="sale_price" id="invoice_sale_price" step="0.01" min="0.01" disabled class="candy-input block w-full pl-7 pr-3 py-2.5 text-sm text-gray-900 focus:outline-none" placeholder="0.00">
+                    </div>
+                    <p id="invoiceSaleCost" class="text-[11px] text-gray-400 mt-1"></p>
+                </div>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="sales_tax_collected" id="invoice_sales_tax_collected" disabled onchange="applyInvoiceSalesTax()" class="accent-brand-500">
+                    <span class="text-sm font-semibold text-gray-700">Sales tax collected</span>
+                </label>
+                <div id="invoiceSalesTaxAmount" class="hidden">
+                    <label for="invoice_sales_tax" class="block text-sm font-semibold text-gray-600 mb-1.5">How much?</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">{{ currency | currency_symbol }}</span>
+                        <input type="number" name="sales_tax" id="invoice_sales_tax" step="0.01" min="0" disabled class="candy-input block w-full pl-7 pr-3 py-2.5 text-sm text-gray-900 focus:outline-none" placeholder="0.00">
+                    </div>
+                    <p class="text-[11px] text-gray-400 mt-1">Added to the invoice total. Kept out of your income - it is owed to the state.</p>
+                </div>
+            </div>
+
+            <label class="block cursor-pointer rounded-2xl border-2 border-gray-200/80 p-4 has-[:checked]:border-brand-400 has-[:checked]:bg-brand-50/60 transition-all">
+                <div class="flex items-center gap-2">
+                    <input type="radio" name="target" value="new" checked onchange="applyInvoiceTarget()" class="accent-brand-500">
+                    <span class="text-sm font-bold text-gray-800">New draft invoice</span>
+                </div>
+                <select name="client_id" id="invoice_client_id" class="candy-input block w-full mt-3 px-3 py-2.5 text-sm text-gray-900 focus:outline-none">
+                    <option value="">Choose a client (optional)</option>
+                    {% for client in clients %}
+                    <option value="{{ client.id }}">{{ client.name }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="block cursor-pointer rounded-2xl border-2 border-gray-200/80 p-4 has-[:checked]:border-brand-400 has-[:checked]:bg-brand-50/60 transition-all">
+                <div class="flex items-center gap-2">
+                    <input type="radio" name="target" value="existing" onchange="applyInvoiceTarget()" class="accent-brand-500" {% if not draft_invoices %}disabled{% endif %}>
+                    <span class="text-sm font-bold text-gray-800">Add to an existing draft</span>
+                </div>
+                <select name="invoice_id" id="invoice_invoice_id" disabled class="candy-input block w-full mt-3 px-3 py-2.5 text-sm text-gray-900 focus:outline-none disabled:opacity-50">
+                    {% for inv in draft_invoices %}
+                    <option value="{{ inv.id }}">{{ inv.invoice_number }} &mdash; {{ inv.client.name if inv.client else 'No client' }} &mdash; {{ currency | currency_symbol }}{{ inv.total | money }}</option>
+                    {% else %}
+                    <option value="">No draft invoices</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="document.getElementById('invoiceModal').classList.add('hidden')" class="flex-1 px-4 py-2.5 rounded-xl border-2 border-gray-200/80 text-sm font-semibold text-gray-600 hover:bg-white/70 transition-all">Cancel</button>
+                <button type="submit" id="invoiceModalSubmit" class="flex-1 px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-bold shadow-lg shadow-brand-500/25 transition-all">Add</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Add to Invoice: the row picks the transaction, the modal picks the
+    // invoice. Passing `sale` ({total_cost, client_id}) turns it into Sell:
+    // the price and sales-tax fields appear and the client defaults to the
+    // one on the item's project.
+    var invoiceAction = {{ url_port('transactions.add_to_invoice', id=0)|tojson }};
+    var invoiceCurrency = {{ (currency | currency_symbol)|tojson }};
+    function openInvoiceModal(txId, description, sale) {
+        var selling = !!sale;
+        document.getElementById('invoiceForm').action = invoiceAction.replace('/0/', '/' + txId + '/');
+        document.getElementById('invoiceModalDescription').textContent = description;
+        document.getElementById('invoiceModalTitle').textContent = selling ? 'Sell to a client' : 'Add to Invoice';
+        document.getElementById('invoiceModalSubmit').textContent = selling ? 'Sell' : 'Add';
+        document.getElementById('invoiceSaleFields').classList.toggle('hidden', !selling);
+        var price = document.getElementById('invoice_sale_price');
+        var collected = document.getElementById('invoice_sales_tax_collected');
+        price.disabled = collected.disabled = !selling;
+        price.required = selling;
+        if (selling) {
+            price.value = Number(sale.total_cost).toFixed(2);
+            document.getElementById('invoiceSaleCost').textContent =
+                'Cost ' + invoiceCurrency + Number(sale.total_cost).toFixed(2) + ' - anything above it is profit.';
+            document.getElementById('invoice_client_id').value = sale.client_id == null ? '' : String(sale.client_id);
+        }
+        collected.checked = false;
+        applyInvoiceSalesTax();
+        applyInvoiceTarget();
+        document.getElementById('invoiceModal').classList.remove('hidden');
+    }
+    function applyInvoiceSalesTax() {
+        var on = document.getElementById('invoice_sales_tax_collected').checked;
+        var amount = document.getElementById('invoice_sales_tax');
+        document.getElementById('invoiceSalesTaxAmount').classList.toggle('hidden', !on);
+        amount.disabled = !on;
+        amount.required = on;
+        if (!on) amount.value = '';
+    }
+    function applyInvoiceTarget() {
+        var existing = document.querySelector('#invoiceForm input[name="target"][value="existing"]').checked;
+        document.getElementById('invoice_client_id').disabled = existing;
+        document.getElementById('invoice_invoice_id').disabled = !existing;
+    }
+</script>

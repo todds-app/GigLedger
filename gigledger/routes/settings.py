@@ -2,7 +2,8 @@ from flask import Blueprint, render_template, redirect, url_for, request, flash,
 from flask_login import login_required, current_user
 from ..models import (db, AdminInvite, Business, RecurringTransaction, Transaction, User,
                       DEFAULT_INCOME_CATEGORIES, DEFAULT_EXPENSE_CATEGORIES,
-                      DEFAULT_INVENTORY_CATEGORIES, TAX_RESERVE_CATEGORY)
+                      DEFAULT_INVENTORY_CATEGORIES, TAX_RESERVE_CATEGORY,
+                      INVENTORY_SALES_CATEGORY)
 
 settings_bp = Blueprint('settings', __name__)
 
@@ -27,7 +28,7 @@ def index():
         default_expense_categories=DEFAULT_EXPENSE_CATEGORIES,
         inventory_categories=business.get_inventory_categories(),
         default_inventory_categories=DEFAULT_INVENTORY_CATEGORIES,
-        locked_categories={TAX_RESERVE_CATEGORY},
+        locked_categories={TAX_RESERVE_CATEGORY, INVENTORY_SALES_CATEGORY},
         available_themes=AVAILABLE_THEMES,
         current_theme=current_user.theme or 'emerald',
         dark_mode=current_user.dark_mode or False,
@@ -94,13 +95,19 @@ def _add_category(kind):
     return redirect(url_for('settings.index'))
 
 
+# Written by the app when an invoice is paid: the tax reserve, and the profit
+# or loss on a sold inventory item. Renaming one would split the category the
+# next payment files into. See docs/adr/0016 and 0017.
+LOCKED_CATEGORIES = {TAX_RESERVE_CATEGORY, INVENTORY_SALES_CATEGORY}
+
+
 def _delete_category(kind):
     label, column, _ = CATEGORY_LISTS[kind]
     name = request.form.get('category_name', '').strip()
     cats = _current(kind)
     if name not in cats:
         flash(f'Category "{name}" not found.', 'error')
-    elif name == TAX_RESERVE_CATEGORY:
+    elif name in LOCKED_CATEGORIES:
         flash(f'"{name}" is filed by the app when an invoice is paid, so it stays.', 'error')
     elif len(cats) == 1:
         # '' in the column means "use the defaults", so emptying the list
@@ -121,7 +128,7 @@ def _rename_category(kind):
     cats = _current(kind)
     if old not in cats:
         flash(f'Category "{old}" not found.', 'error')
-    elif old == TAX_RESERVE_CATEGORY:
+    elif old in LOCKED_CATEGORIES:
         flash(f'"{old}" is filed by the app when an invoice is paid, so it stays.', 'error')
     elif not new:
         flash('Category name cannot be empty.', 'error')

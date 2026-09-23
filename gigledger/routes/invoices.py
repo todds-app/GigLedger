@@ -1,11 +1,13 @@
 """
 GigLedger - Invoices Blueprint
 """
+import math
 from datetime import datetime, timedelta
 from flask import Blueprint, render_template, redirect, url_for, request, flash, Response, abort
 from flask_login import login_required, current_user
 from ..models import (db, Business, Invoice, InvoiceLineItem, Client, Transaction, EXPENSE,
-                      TAX_RESERVE_CATEGORY)
+                      INCOME, INVENTORY, TAX_RESERVE_CATEGORY, INVENTORY_SALES_CATEGORY,
+                      SALE_SOURCE)
 
 invoices_bp = Blueprint('invoices', __name__)
 
@@ -30,6 +32,12 @@ def list_invoices():
     total_overdue = sum(inv.total for inv in Invoice.query.filter_by(
         status='overdue').all())
 
+    # Sales tax collected on sold inventory: the client has paid it and the
+    # state is owed it. It is never in the ledger, so this is the one place
+    # that says how much to remit (docs/adr/0017).
+    sales_tax_collected = sum(inv.sales_tax or 0 for inv in Invoice.query.filter_by(
+        status='paid').all())
+
     clients = Client.query.filter_by(is_active=True).order_by(Client.name).all()
 
     return render_template('invoices/index.html',
@@ -38,6 +46,7 @@ def list_invoices():
         total_outstanding=total_outstanding,
         paid_this_month=paid_this_month,
         total_overdue=total_overdue,
+        sales_tax_collected=sales_tax_collected,
         clients=clients,
         currency=Business.get().currency)
 
@@ -79,6 +88,7 @@ def _parse_invoice_form(form):
     descriptions = form.getlist('description[]')
     quantities = form.getlist('quantity[]')
     rates = form.getlist('rate[]')
+    sales_taxes = form.getlist('sales_tax[]')
     line_ids = form.getlist('line_id[]')
     lines = []
     for i, desc in enumerate(descriptions):
@@ -93,9 +103,18 @@ def _parse_invoice_form(form):
             rate = float(rates[i]) if i < len(rates) else 0
         except ValueError:
             rate = 0
+        # Sales tax on a sold item. Anything that is not a finite amount of
+        # money is zero; `edit_invoice` zeroes it again on a line that sells nothing.
+        try:
+            sales_tax = float(sales_taxes[i]) if i < len(sales_taxes) else 0
+        except ValueError:
+            sales_tax = 0
+        if not math.isfinite(sales_tax) or sales_tax < 0:
+            sales_tax = 0
         line_id = line_ids[i] if i < len(line_ids) else ''
         lines.append({'line_id': int(line_id) if line_id.isdigit() else None,
-                      'description': desc, 'quantity': qty, 'rate': rate, 'amount': qty * rate})
+                      'description': desc, 'quantity': qty, 'rate': rate, 'amount': qty * rate,
+                      'sales_tax': sales_tax})
 
     return client, issue_date, due_date, form.get('notes', ''), form.get('action', 'draft'), lines
 
@@ -126,6 +145,7 @@ def create_invoice():
         notes=notes)
     for line in lines:
         line.pop('line_id')
+        line['sales_tax'] = 0   # a typed line sells nothing (docs/adr/0017)
         invoice.line_items.append(InvoiceLineItem(**line))
     invoice.recalculate(business.default_tax_rate)
     db.session.add(invoice)
@@ -188,6 +208,8 @@ def edit_invoice(id):
         if current is None:
             current = InvoiceLineItem()
             invoice.line_items.append(current)
+        if not (current.transaction and current.transaction.is_inventory):
+            line['sales_tax'] = 0   # only a sold item carries sales tax
         for field, value in line.items():
             setattr(current, field, value)
         kept.append(current)
@@ -225,10 +247,20 @@ def update_status(id):
     # Marking as paid sets paid_date and sets the tax aside. It posts no
     # income: the invoice bills lines that are already in the ledger, so a
     # Client Payment row would count the same money twice (docs/adr/0016).
+    # The exception is a sold inventory item, whose money is not in the
+    # ledger yet: its purchase was cash out for an asset, so paying posts the
+    # cost basis back and the profit as income (docs/adr/0017).
+    sold = []
     if new_status == 'paid' and invoice.status != 'paid':
         invoice.paid_date = datetime.now()
 
         client_name = invoice.client.name if invoice.client else 'Unknown Client'
+
+        for line in invoice.line_items:
+            if line.transaction and line.transaction.is_inventory:
+                rows = _sale_rows(invoice, line)
+                db.session.add_all(rows)
+                sold.append(rows)
 
         # Auto-create a tax reserve expense transaction for the tax portion
         # This ensures the tax owed on this invoice is explicitly set aside
@@ -259,12 +291,50 @@ def update_status(id):
         'draft': 'Draft', 'sent': 'Sent', 'paid': 'Paid',
         'overdue': 'Overdue', 'cancelled': 'Cancelled'
     }
+    sym = {'USD':'$','EUR':'€','GBP':'£','CAD':'C$','AUD':'A$','INR':'₹','JPY':'¥'}.get(business.currency, '$')
+    notes = []
     if new_status == 'paid' and invoice.tax_amount and invoice.tax_amount > 0:
-        sym = {'USD':'$','EUR':'€','GBP':'£','CAD':'C$','AUD':'A$','INR':'₹','JPY':'¥'}.get(business.currency, '$')
-        flash(f'Invoice {invoice.invoice_number} marked as Paid! {sym}{invoice.tax_amount:,.2f} tax reserve auto-set aside.', 'success')
+        notes.append(f'{sym}{invoice.tax_amount:,.2f} tax reserve auto-set aside.')
+    if sold:
+        profit = sum(row.amount for rows in sold for row in rows if row.kind != INVENTORY)
+        word = 'profit' if profit >= 0 else 'loss'
+        notes.append(f'{len(sold)} inventory item{"s" if len(sold) != 1 else ""} sold, '
+                     f'{sym}{abs(profit):,.2f} {word} booked.')
+    if notes:
+        flash(f'Invoice {invoice.invoice_number} marked as Paid! ' + ' '.join(notes), 'success')
     else:
         flash(f'Invoice {invoice.invoice_number} marked as {status_labels.get(new_status, new_status)}.', 'success')
     return redirect(url_for('invoices.detail', id=id))
+
+
+def _sale_rows(invoice, line):
+    """The ledger rows paying `invoice` posts for the item `line` sells.
+
+    Always the cost basis back as a positive inventory row - the asset has
+    left the pool - then the difference: profit as income, a shortfall as a
+    deductible expense, nothing at cost. Sales tax is on the invoice, not
+    here: it is the client's money passing through to the state. All carry
+    `invoice_id`, so reverting or deleting the invoice removes them.
+    """
+    tx = line.transaction
+    item = tx.inventory_item
+    cost, price = item.total_cost, line.amount or 0
+    what = f'{tx.description or tx.category or "Item"} (Invoice {invoice.invoice_number})'
+    common = dict(user_id=invoice.user_id, date=datetime.now(),
+                  source=SALE_SOURCE, invoice_id=invoice.id)
+    rows = [Transaction(kind=INVENTORY, amount=cost, category=tx.category,
+                        description=f'Sold: {what}', is_tax_deductible=False, **common)]
+    if price > cost:
+        rows.append(Transaction(kind=INCOME, amount=price - cost,
+                                category=INVENTORY_SALES_CATEGORY,
+                                description=f'Profit on {what}',
+                                is_tax_deductible=False, **common))
+    elif price < cost:
+        rows.append(Transaction(kind=EXPENSE, amount=-(cost - price),
+                                category=INVENTORY_SALES_CATEGORY,
+                                description=f'Loss on {what}',
+                                is_tax_deductible=True, **common))
+    return rows
 
 
 @invoices_bp.route('/invoices/delete/<int:id>', methods=['POST'])

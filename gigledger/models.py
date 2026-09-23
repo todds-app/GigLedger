@@ -10,12 +10,22 @@ import json
 db = SQLAlchemy()
 
 # Default categories that ship with the app
-DEFAULT_INCOME_CATEGORIES = ['Client Payment', 'Consulting', 'Freelance Project', 'Royalty']
+DEFAULT_INCOME_CATEGORIES = ['Client Payment', 'Consulting', 'Freelance Project', 'Royalty',
+                             'Inventory Sales']
 DEFAULT_EXPENSE_CATEGORIES = ['Software', 'Internet', 'Office Supplies', 'Marketing',
-                               'Travel', 'Equipment', 'Meal', 'Entertainment', 'Tax Reserve']
+                               'Travel', 'Equipment', 'Meal', 'Entertainment', 'Tax Reserve',
+                               'Inventory Sales']
 # Written by the app, not the user: marking an invoice Paid files the reserve
 # under this name, so Settings does not let it be renamed or removed.
 TAX_RESERVE_CATEGORY = 'Tax Reserve'
+# Also app-written, and locked for the same reason: paying an invoice that
+# sells an inventory item files the profit (income) or the loss (expense)
+# here. See docs/adr/0017.
+INVENTORY_SALES_CATEGORY = 'Inventory Sales'
+# `source` of every row that paying such an invoice posts. Not 'invoice':
+# the Transactions page hides income rows with that source, the legacy
+# Client Payment rows ADR-0016 stopped posting.
+SALE_SOURCE = 'sale'
 
 DEFAULT_INVENTORY_CATEGORIES = ['Casegoods & Storage', 'Seating', 'Lighting',
                                 'Soft Goods & Textiles', 'Wall Decor & Art',
@@ -207,20 +217,32 @@ class Transaction(KindMixin, db.Model):
     def is_invoiced(self):
         return self.invoice_line is not None
 
+    # Posted by paying an invoice (the tax reserve, a sale's rows). Reverting
+    # the invoice is what removes these; editing one by hand would leave the
+    # invoice claiming something the ledger no longer says.
+    @property
+    def is_posted_by_invoice(self):
+        return self.invoice_id is not None
+
     @property
     def can_be_invoiced(self):
-        return self.kind in (INCOME, INVENTORY) and not self.is_invoiced
+        # A row an invoice posted is that invoice's money already; billing
+        # it again would ask the client for the same money twice.
+        return (self.kind in (INCOME, INVENTORY) and not self.is_invoiced
+                and not self.is_posted_by_invoice)
 
-    def as_line_item(self):
+    def as_line_item(self, sale_price=None):
         """The line this transaction becomes on an invoice.
 
-        A purchase bills as quantity x unit cost so the client sees the
-        pieces; income is one unit at its amount.
+        A purchase bills as quantity x rate so the client sees the pieces:
+        at unit cost, or at `sale_price` spread over the quantity when the
+        item is being sold (docs/adr/0017). Income is one unit at its amount.
         """
         description = self.description or self.category or 'Item'
         if self.inventory_item:
             item = self.inventory_item
-            quantity, rate = item.quantity, item.unit_cost
+            quantity = item.quantity
+            rate = item.unit_cost if sale_price is None else sale_price / quantity
         else:
             quantity, rate = 1, abs(self.amount)
         return {'description': description, 'quantity': quantity,
@@ -274,6 +296,41 @@ class InventoryItem(db.Model):
         """What the edit modal needs to prefill its inventory block."""
         return {'quantity': self.quantity, 'unit_cost': self.unit_cost,
                 'is_consumable': self.is_consumable, 'project_id': self.project_id}
+
+    # The sale is the invoice line that bills the purchase (docs/adr/0017):
+    # its amount is the price, its sales_tax what was collected on top. No
+    # line, no sale - removing the line or deleting the invoice un-sells.
+    @property
+    def sale_line(self):
+        return self.transaction.invoice_line
+
+    @property
+    def is_sold(self):
+        return self.sale_line is not None
+
+    @property
+    def sale_invoice(self):
+        return self.sale_line.invoice if self.sale_line else None
+
+    @property
+    def sale_price(self):
+        return self.sale_line.amount if self.sale_line else None
+
+    @property
+    def sales_tax(self):
+        return self.sale_line.sales_tax if self.sale_line else None
+
+    @property
+    def profit(self):
+        """Sale price less cost basis; negative when sold at a loss."""
+        return None if self.sale_line is None else self.sale_price - self.total_cost
+
+    @property
+    def sale_values(self):
+        """What the Sell modal needs to prefill."""
+        project = self.project
+        return {'total_cost': self.total_cost,
+                'client_id': project.client_id if project else None}
 
 
 class TaxEstimate(db.Model):
@@ -428,6 +485,10 @@ class Invoice(db.Model):
     notes = db.Column(db.Text, default='')
     subtotal = db.Column(db.Float, default=0)
     tax_amount = db.Column(db.Float, default=0)
+    # Sales tax collected on sold inventory items, summed from the lines. Part
+    # of what the client pays and not the business's money, so it is on the
+    # invoice and never in the ledger (docs/adr/0017).
+    sales_tax = db.Column(db.Float, default=0)
     total = db.Column(db.Float, default=0)
     paid_date = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -441,7 +502,8 @@ class Invoice(db.Model):
         must come through here."""
         self.subtotal = sum(li.amount or 0 for li in self.line_items)
         self.tax_amount = self.subtotal * (tax_rate or 0)
-        self.total = self.subtotal + self.tax_amount
+        self.sales_tax = sum(li.sales_tax or 0 for li in self.line_items)
+        self.total = self.subtotal + self.tax_amount + self.sales_tax
 
 
 class InvoiceLineItem(db.Model):
@@ -453,6 +515,9 @@ class InvoiceLineItem(db.Model):
     quantity = db.Column(db.Float, default=1)
     rate = db.Column(db.Float, default=0)
     amount = db.Column(db.Float, default=0)
+    # Sales tax collected on this line. Only ever non-zero on a line that
+    # sells an inventory item (docs/adr/0017); the routes zero it elsewhere.
+    sales_tax = db.Column(db.Float, nullable=False, default=0)
     # The ledger line this bills, if any. Unique: a transaction is on at most
     # one invoice. Nullable: lines typed on the create form bill nothing.
     transaction_id = db.Column(db.Integer, db.ForeignKey('transactions.id'),

@@ -108,7 +108,7 @@
             <h2 class="text-lg font-extrabold text-gray-900">Income Categories</h2>
             <span class="text-xs text-gray-300 font-medium">Quick Add & Transaction forms</span>
         </div>
-        <p class="text-sm text-gray-400 mb-4 font-medium">Add, rename, or remove categories for your income sources.</p>
+        <p class="text-sm text-gray-400 mb-4 font-medium">Add, rename, or remove categories for your income sources. Inventory Sales is locked: the app files the profit on a sold item there when its invoice is paid.</p>
         <form method="POST" action="{{ url_port('settings.add_income_category') }}" class="flex gap-2 mb-4">
             {{ csrf_field() }}
             <input type="text" name="category_name" placeholder="New income category..." required class="candy-input flex-1 px-4 py-2.5 text-gray-900 focus:outline-none text-sm">
@@ -127,7 +127,7 @@
             <h2 class="text-lg font-extrabold text-gray-900">Expense Categories</h2>
             <span class="text-xs text-gray-300 font-medium">Tax-deductible expenses reduce tax</span>
         </div>
-        <p class="text-sm text-gray-400 mb-4 font-medium">Add, rename, or remove categories for your business expenses. Tax Reserve is locked: the app files the reserve there when an invoice is paid.</p>
+        <p class="text-sm text-gray-400 mb-4 font-medium">Add, rename, or remove categories for your business expenses. Tax Reserve and Inventory Sales are locked: the app files the reserve, and the profit or loss on a sold item, there when an invoice is paid.</p>
         <form method="POST" action="{{ url_port('settings.add_expense_category') }}" class="flex gap-2 mb-4">
             {{ csrf_field() }}
             <input type="text" name="category_name" placeholder="New expense category..." required class="candy-input flex-1 px-4 py-2.5 text-gray-900 focus:outline-none text-sm">

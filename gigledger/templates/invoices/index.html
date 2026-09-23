@@ -14,7 +14,7 @@
     </div>
 
     <!-- Summary Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 fade-up fade-up-delay-1">
+    <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 fade-up fade-up-delay-1">
         <div class="glass-card rounded-2xl px-4 py-3 text-center border border-amber-200/50">
             <p class="text-xs text-amber-500 font-semibold">Total Outstanding</p>
             <p class="text-lg font-extrabold text-amber-600">{{ currency | currency_symbol }}{{ total_outstanding | money }}</p>
@@ -29,6 +29,11 @@
             <p class="text-xs text-red-400 font-semibold">Overdue</p>
             <p class="text-lg font-extrabold text-red-500">{{ currency | currency_symbol }}{{ total_overdue | money }}</p>
             <p class="text-[10px] text-red-400 font-medium">needs attention</p>
+        </div>
+        <div class="glass-card rounded-2xl px-4 py-3 text-center border border-purple-200/50" title="Sales tax on inventory sold on paid invoices. Not income - it is owed to the state.">
+            <p class="text-xs text-purple-500 font-semibold">Sales tax collected</p>
+            <p class="text-lg font-extrabold text-purple-600">{{ currency | currency_symbol }}{{ sales_tax_collected | money }}</p>
+            <p class="text-[10px] text-purple-400 font-medium">to remit</p>
         </div>
     </div>
 

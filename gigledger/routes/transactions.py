@@ -106,6 +106,35 @@ def _inventory_fields(form):
     return quantity, unit_cost, form.get('is_consumable') == 'on', project_id
 
 
+class InvalidSale(ValueError):
+    """A sale form the route will not write. str() is the flash text."""
+
+
+def _sale_fields(form):
+    """(sale_price, sales_tax) from the Sell form.
+
+    The price is the total for the whole item; tax is what was collected on
+    top, zero unless the box is ticked. Raises InvalidSale rather than
+    writing a line the invoice would then bill.
+    """
+    try:
+        price = float(form.get('sale_price', ''))
+    except ValueError:
+        raise InvalidSale('A sale price is required to sell an inventory item.')
+    if not math.isfinite(price) or price <= 0:
+        raise InvalidSale('The sale price must be greater than zero.')
+
+    sales_tax = 0.0
+    if form.get('sales_tax_collected') == 'on':
+        try:
+            sales_tax = float(form.get('sales_tax', ''))
+        except ValueError:
+            raise InvalidSale('Enter the sales tax collected on this sale, or untick the box.')
+        if not math.isfinite(sales_tax) or sales_tax < 0:
+            raise InvalidSale('Sales tax collected on a sale cannot be negative.')
+    return price, sales_tax
+
+
 @transactions_bp.route('/transactions')
 @login_required
 def list_transactions():
@@ -202,7 +231,7 @@ def edit(id):
         return redirect(url_for('transactions.list_transactions'))
 
     back = request.referrer or url_for('transactions.list_transactions')
-    if tx.is_invoiced:
+    if tx.is_invoiced or tx.is_posted_by_invoice:
         flash(_locked_message(tx), 'error')
         return redirect(back)
     kind = clean_kind(request.form.get('type', tx.kind), fallback=tx.kind)
@@ -269,7 +298,7 @@ def delete(id):
     tx = Transaction.query.filter_by(id=id).first()
     if not tx:
         flash('Transaction not found.', 'error')
-    elif tx.is_invoiced:
+    elif tx.is_invoiced or tx.is_posted_by_invoice:
         flash(_locked_message(tx), 'error')
     else:
         db.session.delete(tx)
@@ -279,6 +308,9 @@ def delete(id):
 
 
 def _locked_message(tx):
+    if tx.is_posted_by_invoice:
+        return (f'This transaction was posted by paying invoice '
+                f'{tx.invoice_ref.invoice_number}. Revert the invoice to remove it.')
     return (f'This transaction is on invoice {tx.invoice_line.invoice.invoice_number}. '
             f'Remove it from the invoice first.')
 
@@ -303,6 +335,16 @@ def add_to_invoice(id):
         flash('Only income and inventory transactions can be invoiced.', 'error')
         return back
 
+    # An inventory purchase goes on an invoice by being sold: the line is the
+    # sale, at the sale price, with the sales tax collected (docs/adr/0017).
+    sale_price, sales_tax = None, 0.0
+    if tx.is_inventory:
+        try:
+            sale_price, sales_tax = _sale_fields(request.form)
+        except InvalidSale as why:
+            flash(str(why), 'error')
+            return back
+
     if request.form.get('target') == 'existing':
         invoice_id = request.form.get('invoice_id', '')
         invoice = db.session.get(Invoice, int(invoice_id)) if invoice_id.isdigit() else None
@@ -323,10 +365,11 @@ def add_to_invoice(id):
         db.session.add(invoice)
         db.session.flush()
 
-    invoice.line_items.append(InvoiceLineItem(transaction_id=tx.id, **tx.as_line_item()))
+    invoice.line_items.append(InvoiceLineItem(transaction_id=tx.id, sales_tax=sales_tax,
+                                              **tx.as_line_item(sale_price)))
     invoice.recalculate(business.default_tax_rate)
     db.session.commit()
-    flash(f'Added to {invoice.invoice_number}.', 'success')
+    flash(f'{"Sold on" if tx.is_inventory else "Added to"} {invoice.invoice_number}.', 'success')
     return redirect(url_for('invoices.detail', id=invoice.id))
 
 

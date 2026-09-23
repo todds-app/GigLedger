@@ -310,6 +310,17 @@ NULL`, not as a sentinel project. Items whose project is deleted return here.
 `InventoryItem.is_consumable`. A consumable becomes a cost when used on a
 project; a reusable is placed on a project and comes back, staying an asset
 throughout. Both are piece 3 behaviour; piece 2 only records the flag.
+Selling is neither: see Sale.
+
+### Sale (of an inventory item)
+
+The `InvoiceLineItem` that bills the purchase: its `amount` is the sale
+price, its `sales_tax` what was collected on top. `InventoryItem.is_sold`,
+`sale_price`, `sales_tax`, `profit` read through it. Removing the line
+un-sells. Paying the invoice posts the cost basis back (a positive
+inventory-kind row) and the profit as income under `Inventory Sales`
+(`source='sale'`); sales tax stays on the invoice and out of the ledger.
+[ADR-0017](adr/0017-sell-inventory-on-an-invoice.md).
 
 ### Time Log
 

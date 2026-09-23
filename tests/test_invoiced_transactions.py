@@ -207,11 +207,13 @@ def test_adding_to_an_existing_draft_appends_and_recomputes(app):
     assert resp.status_code == 302 and resp.location.endswith(f'/invoices/{iid}')
 
 
-def test_an_inventory_purchase_lands_as_quantity_times_unit_cost(app):
+def test_an_inventory_purchase_lands_as_a_sale_at_its_price(app):
+    # An inventory purchase goes on an invoice by being sold, so it needs a
+    # price; the pieces are still shown as quantity x rate (docs/adr/0017).
     iid = a_draft(app)
     tid = a_purchase(app, quantity=4, unit_cost=25)
     login_as(app).post(f'/transactions/{tid}/invoice',
-                       data={'target': 'existing', 'invoice_id': str(iid)})
+                       data={'target': 'existing', 'invoice_id': str(iid), 'sale_price': '100'})
     line = a_line_for(app, tid)
     assert (line.quantity, line.rate, line.amount) == (4, 25, 100)
 

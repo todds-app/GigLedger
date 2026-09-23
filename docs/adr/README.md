@@ -49,3 +49,4 @@ the failure modes the decision does *not* protect against.
 | [0014](0014-one-business-per-install.md) | One business per install | Accepted |
 | [0015](0015-time-logs-with-a-server-side-timer.md) | Hours are time logs, counted by a timer on the project row | Accepted |
 | [0016](0016-bill-transactions-on-invoices.md) | The ledger is the income record; an invoice bills lines already in it | Accepted |
+| [0017](0017-sell-inventory-on-an-invoice.md) | A sale is the invoice line that bills the purchase; paying posts the cost back and the profit | Accepted |

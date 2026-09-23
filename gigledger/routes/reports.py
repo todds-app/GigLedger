@@ -139,6 +139,11 @@ def index():
     ).all()
     avg_invoice_size = (sum(inv.total for inv in paid_invoices) / len(paid_invoices)) if paid_invoices else 0
 
+    # Sales tax collected on inventory sold this year: owed to the state and
+    # never in the ledger, so the report is where it is totalled (docs/adr/0017).
+    sales_tax_collected = sum(inv.sales_tax or 0 for inv in paid_invoices
+                              if inv.paid_date and inv.paid_date.year == selected_year)
+
     # Most profitable client (all-time, not just this year)
     most_profitable = db.session.query(
         Client.name,
@@ -154,6 +159,7 @@ def index():
 
     return render_template('reports/index.html',
         selected_year=selected_year,
+        sales_tax_collected=sales_tax_collected,
         available_years=available_years,
         yearly_income=yearly_income,
         yearly_expenses=yearly_expenses,

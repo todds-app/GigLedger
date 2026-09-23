@@ -352,6 +352,17 @@
                     <p class="text-sm font-extrabold text-green-600">{{ currency | currency_symbol }}{{ yearly_deductible | money }}</p>
                 </div>
             </div>
+
+            <!-- Sales tax collected on sold inventory: owed to the state, not income -->
+            <div class="flex items-center gap-3 p-3 rounded-xl bg-white/50 backdrop-blur">
+                <div class="w-9 h-9 rounded-xl bg-purple-50 flex items-center justify-center icon-bounce">
+                    <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-400 font-medium">Sales tax collected (to remit)</p>
+                    <p class="text-sm font-extrabold text-purple-600">{{ currency | currency_symbol }}{{ sales_tax_collected | money }}</p>
+                </div>
+            </div>
         </div>
     </div>
 </div>

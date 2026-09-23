@@ -9,7 +9,7 @@ from flask import (Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
 from .. import documents
 from ..models import (Business, Project, Client, ProjectDocument, DocumentShare,
-                      Transaction, InventoryItem, TimeLog, db, INCOME, round_quarter)
+                      Transaction, InventoryItem, TimeLog, Invoice, db, INCOME, round_quarter)
 
 projects_bp = Blueprint('projects', __name__, url_prefix='/projects')
 
@@ -456,7 +456,10 @@ def detail(id):
                               .order_by(db.func.date(TimeLog.ended_on).desc(),
                                         TimeLog.id.desc()).all(),
         inventory_items=inventory_items,
-        inventory_total=sum(i.total_cost for i in inventory_items),
+        # Sold items have left the pool; only what is still owned is an asset here.
+        inventory_total=sum(i.total_cost for i in inventory_items if not i.is_sold),
+        draft_invoices=Invoice.query.filter_by(status='draft')
+                                    .order_by(Invoice.created_at.desc()).all(),
         documents=ProjectDocument.query.filter_by(project_id=project.id)
                                        .order_by(ProjectDocument.created_at.desc()).all(),
         clients=Client.query.filter_by(is_active=True)

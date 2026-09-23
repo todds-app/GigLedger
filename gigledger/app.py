@@ -315,6 +315,16 @@ def _migrate_db(db):
     if li_columns and 'transaction_id' not in li_columns:
         cursor.execute("ALTER TABLE invoice_line_items ADD COLUMN transaction_id INTEGER "
                        "REFERENCES transactions(id)")
+    # Sales tax collected on a sold inventory item, on the line and summed on
+    # the invoice. A line that already billed a purchase is a sale at its
+    # current amount with no tax. See docs/adr/0017.
+    if li_columns and 'sales_tax' not in li_columns:
+        cursor.execute("ALTER TABLE invoice_line_items ADD COLUMN sales_tax FLOAT "
+                       "NOT NULL DEFAULT 0")
+    cursor.execute("PRAGMA table_info(invoices)")
+    invoice_columns = {row[1] for row in cursor.fetchall()}
+    if invoice_columns and 'sales_tax' not in invoice_columns:
+        cursor.execute("ALTER TABLE invoices ADD COLUMN sales_tax FLOAT DEFAULT 0")
 
     # Migrate recurring_transactions table - kind, for the transactions it generates
     cursor.execute("PRAGMA table_info(recurring_transactions)")
