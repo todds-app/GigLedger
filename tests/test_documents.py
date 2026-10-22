@@ -23,21 +23,21 @@ import os
 
 import pytest
 
-import gigledger.app
-import gigledger.documents
-from gigledger.app import create_app
-from gigledger.models import Project, ProjectDocument, User, db
+import design_portal.app
+import design_portal.documents
+from design_portal.app import create_app
+from design_portal.models import Project, ProjectDocument, User, db
 
 
 def build_app(tmp_path, monkeypatch, **config):
     """An app backed by a throwaway database and a throwaway upload root.
 
-    Both matter: create_app() otherwise resolves to the real gigledger.db, and
+    Both matter: create_app() otherwise resolves to the real design_portal.db, and
     a failing run - one that wrongly writes or deletes - would act on the
     user's own data and documents.
     """
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', str(tmp_path / 'test.db'))
-    monkeypatch.setattr(gigledger.documents, 'UPLOAD_ROOT', str(tmp_path / 'uploads'))
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', str(tmp_path / 'test.db'))
+    monkeypatch.setattr(design_portal.documents, 'UPLOAD_ROOT', str(tmp_path / 'uploads'))
     app = create_app()
     app.config.update(TESTING=True, SECRET_KEY='test-key',
                       WTF_CSRF_ENABLED=False, **config)
@@ -55,7 +55,7 @@ def clear_documents(app):
     with app.app_context():
         for doc in ProjectDocument.query.all():
             if doc.stored_name:
-                gigledger.documents.delete(doc.stored_name)
+                design_portal.documents.delete(doc.stored_name)
             db.session.delete(doc)
         db.session.commit()
     return app
@@ -150,7 +150,7 @@ def test_the_name_on_disk_is_opaque(app):
         doc = ProjectDocument.query.one()
         assert doc.original_name == 'Q3 budget (final) v2.pdf'
         assert 'budget' not in doc.stored_name
-        assert os.listdir(gigledger.documents.UPLOAD_ROOT) == [doc.stored_name]
+        assert os.listdir(design_portal.documents.UPLOAD_ROOT) == [doc.stored_name]
 
 
 def test_upload_records_the_byte_size(app):
@@ -166,8 +166,8 @@ def test_upload_records_the_byte_size(app):
 def test_the_upload_cap_is_wired_to_the_configured_limit(app):
     """The cap has to be enforced by Flask rather than checked in the route:
     a route-level check runs after the body has already been read."""
-    assert app.config['MAX_CONTENT_LENGTH'] == gigledger.documents.MAX_UPLOAD_BYTES
-    assert gigledger.documents.MAX_UPLOAD_BYTES == 50 * 1024 * 1024
+    assert app.config['MAX_CONTENT_LENGTH'] == design_portal.documents.MAX_UPLOAD_BYTES
+    assert design_portal.documents.MAX_UPLOAD_BYTES == 50 * 1024 * 1024
 
 
 def test_an_oversized_upload_is_refused_before_it_reaches_disk(tmp_path, monkeypatch):
@@ -175,7 +175,7 @@ def test_an_oversized_upload_is_refused_before_it_reaches_disk(tmp_path, monkeyp
     the test app: setting the config directly would prove Flask enforces a cap,
     which was never in doubt, while saying nothing about whether this app sets
     one. Patched before create_app so the real wiring is what carries it."""
-    monkeypatch.setattr(gigledger.documents, 'MAX_UPLOAD_BYTES', 500)
+    monkeypatch.setattr(design_portal.documents, 'MAX_UPLOAD_BYTES', 500)
     app = clear_documents(build_app(tmp_path, monkeypatch))
     client = login(app)
     pid = a_project(app)
@@ -185,7 +185,7 @@ def test_an_oversized_upload_is_refused_before_it_reaches_disk(tmp_path, monkeyp
     assert response.status_code == 413
     with app.app_context():
         assert ProjectDocument.query.count() == 0
-    assert os.listdir(gigledger.documents.UPLOAD_ROOT) == []
+    assert os.listdir(design_portal.documents.UPLOAD_ROOT) == []
 
 
 # --- serving -------------------------------------------------------------
@@ -234,7 +234,7 @@ def test_bytes_missing_from_disk_are_a_404_not_a_500(app):
     with app.app_context():
         doc = ProjectDocument.query.one()
         doc_id = doc.id
-        os.remove(os.path.join(gigledger.documents.UPLOAD_ROOT, doc.stored_name))
+        os.remove(os.path.join(design_portal.documents.UPLOAD_ROOT, doc.stored_name))
 
     assert client.get(f'/projects/documents/{doc_id}/download').status_code == 404
 
@@ -281,7 +281,7 @@ def test_deleting_a_project_deletes_its_documents_and_their_bytes(app):
     upload(client, pid, 'contract.pdf')
 
     with app.app_context():
-        path = os.path.join(gigledger.documents.UPLOAD_ROOT,
+        path = os.path.join(design_portal.documents.UPLOAD_ROOT,
                             ProjectDocument.query.one().stored_name)
     assert os.path.exists(path)
 
@@ -299,7 +299,7 @@ def test_deleting_a_document_deletes_its_bytes(app):
 
     with app.app_context():
         doc = ProjectDocument.query.one()
-        doc_id, path = doc.id, os.path.join(gigledger.documents.UPLOAD_ROOT,
+        doc_id, path = doc.id, os.path.join(design_portal.documents.UPLOAD_ROOT,
                                             doc.stored_name)
 
     client.post(f'/projects/documents/{doc_id}/delete', follow_redirects=True)
@@ -326,7 +326,7 @@ def test_delete_removes_a_document_uploaded_by_another_admin(app):
 
     with app.app_context():
         assert ProjectDocument.query.count() == 0
-    assert not os.path.exists(gigledger.documents.path_for(stored))
+    assert not os.path.exists(design_portal.documents.path_for(stored))
 
 
 # --- demo data -----------------------------------------------------------
@@ -342,7 +342,7 @@ def test_the_demo_seeds_both_kinds_of_document(seeded_app):
 def test_the_seeded_upload_has_bytes_on_disk(seeded_app):
     with seeded_app.app_context():
         doc = ProjectDocument.query.filter_by(kind='upload').first()
-        assert os.path.exists(gigledger.documents.path_for(doc.stored_name))
+        assert os.path.exists(design_portal.documents.path_for(doc.stored_name))
         assert doc.byte_size > 0
 
 
@@ -350,7 +350,7 @@ def test_the_demo_does_not_seed_a_working_portal_login(seeded_app):
     """The demo password is public. A seeded portal credential would be a second
     known password on an externally-facing login - and making the explorer
     redeem an invite demonstrates the flow they most need to understand."""
-    from gigledger.models import Client, PortalAccount
+    from design_portal.models import Client, PortalAccount
 
     with seeded_app.app_context():
         assert PortalAccount.query.count() == 0

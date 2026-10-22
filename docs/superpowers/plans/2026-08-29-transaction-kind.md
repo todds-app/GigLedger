@@ -25,21 +25,21 @@
 | File | Responsibility | Task |
 |---|---|---|
 | `tests/test_finance_characterization.py` | Create. Pins today's numbers across every aggregation and both exports. The safety net. | 1 |
-| `gigledger/models.py` | Modify. The kind vocabulary, `clean_kind`, `KindMixin`, and the column on two models. | 2 |
-| `gigledger/app.py` | Modify. `_migrate_db` gains the ALTER + backfill; seed blocks set kind. | 3, 4 |
+| `design_portal/models.py` | Modify. The kind vocabulary, `clean_kind`, `KindMixin`, and the column on two models. | 2 |
+| `design_portal/app.py` | Modify. `_migrate_db` gains the ALTER + backfill; seed blocks set kind. | 3, 4 |
 | `tests/test_transaction_kind.py` | Create. Seam behaviour, migration, creation sites, and the foundation test. | 2, 3, 4, 10 |
-| `gigledger/finance.py` | Modify. Three aggregations convert at `_get_tx_range`. | 5 |
-| `gigledger/routes/reports.py`, `routes/dashboard.py` | Modify. Display aggregations. | 6 |
-| `gigledger/routes/transactions.py` | Modify. Filters, exports, labels; gains two small shared helpers. | 7 |
-| `gigledger/routes/recurring.py` | Modify. Commitment sum, sign coercion, generation. | 8 |
-| `gigledger/templates/transactions/index.html`, `templates/recurring/index.html` | Modify. Type badges and edit-modal kind arguments. | 9 |
+| `design_portal/finance.py` | Modify. Three aggregations convert at `_get_tx_range`. | 5 |
+| `design_portal/routes/reports.py`, `routes/dashboard.py` | Modify. Display aggregations. | 6 |
+| `design_portal/routes/transactions.py` | Modify. Filters, exports, labels; gains two small shared helpers. | 7 |
+| `design_portal/routes/recurring.py` | Modify. Commitment sum, sign coercion, generation. | 8 |
+| `design_portal/templates/transactions/index.html`, `templates/recurring/index.html` | Modify. Type badges and edit-modal kind arguments. | 9 |
 | `docs/adr/0010-classify-transactions-by-kind.md`, `docs/adr/README.md` | Create/modify. The decision record. | 10 |
 
 ---
 
 ### Task 1: Characterization tests
 
-Pins every number the app currently computes, *before* any production code changes. Nothing in this task touches `gigledger/`. If a later task breaks a number, this is what says so.
+Pins every number the app currently computes, *before* any production code changes. Nothing in this task touches `design_portal/`. If a later task breaks a number, this is what says so.
 
 The demo seed uses `random`, so these tests build their own fixture ledger with known amounts rather than relying on seeded data.
 
@@ -71,14 +71,14 @@ from datetime import datetime
 
 import pytest
 
-import gigledger.app
-from gigledger.app import create_app
-from gigledger.models import Transaction, User, db
+import design_portal.app
+from design_portal.app import create_app
+from design_portal.models import Transaction, User, db
 
 
 def build_app(tmp_path, monkeypatch, **config):
     """An app backed by a throwaway database, never the real one."""
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', str(tmp_path / 'test.db'))
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', str(tmp_path / 'test.db'))
     app = create_app()
     app.config.update(TESTING=True, SECRET_KEY='test-key',
                       WTF_CSRF_ENABLED=False, **config)
@@ -101,7 +101,7 @@ def ledger(tmp_path, monkeypatch):
     """An app whose only transactions are LEDGER, owned by the demo user."""
     app = build_app(tmp_path, monkeypatch)
     with app.app_context():
-        user = User.query.filter_by(email='demo@gigledger.com').first()
+        user = User.query.filter_by(email='demo@example.com').first()
         Transaction.query.delete()
         for amount, category, deductible, day in LEDGER:
             db.session.add(Transaction(
@@ -115,7 +115,7 @@ def ledger(tmp_path, monkeypatch):
 
 def demo_user_id(app):
     with app.app_context():
-        return User.query.filter_by(email='demo@gigledger.com').first().id
+        return User.query.filter_by(email='demo@example.com').first().id
 
 
 def authenticated_client(app):
@@ -127,7 +127,7 @@ def authenticated_client(app):
 
 
 def test_monthly_summary(ledger):
-    from gigledger.finance import calculate_monthly_summary
+    from design_portal.finance import calculate_monthly_summary
     with ledger.app_context():
         income, expenses = calculate_monthly_summary(demo_user_id(ledger), 2026, 3)
     assert income == 7500.00
@@ -135,7 +135,7 @@ def test_monthly_summary(ledger):
 
 
 def test_quarterly_income_and_deductions(ledger):
-    from gigledger.finance import calculate_quarterly_income_deductions
+    from design_portal.finance import calculate_quarterly_income_deductions
     with ledger.app_context():
         income, deductions = calculate_quarterly_income_deductions(
             demo_user_id(ledger), 1, 2026)
@@ -144,7 +144,7 @@ def test_quarterly_income_and_deductions(ledger):
 
 
 def test_quarterly_tax(ledger):
-    from gigledger.finance import calculate_quarterly_tax
+    from design_portal.finance import calculate_quarterly_tax
     with ledger.app_context():
         income, deductions, net, tax = calculate_quarterly_tax(
             demo_user_id(ledger), 1, 2026, 0.30)
@@ -154,14 +154,14 @@ def test_quarterly_tax(ledger):
 
 def test_bank_balance_is_every_transaction(ledger):
     """Cash, not profit: the balance sums all transactions regardless of kind."""
-    from gigledger.finance import calculate_safe_to_spend
+    from design_portal.finance import calculate_safe_to_spend
     with ledger.app_context():
         balance, _, _ = calculate_safe_to_spend(demo_user_id(ledger), 0.30)
     assert balance == pytest.approx(5550.00)
 
 
 def test_category_breakdown_is_expenses_only(ledger):
-    from gigledger.finance import get_category_breakdown
+    from design_portal.finance import get_category_breakdown
     with ledger.app_context():
         categories, totals = get_category_breakdown(
             demo_user_id(ledger), year=2026, month=3)
@@ -253,11 +253,11 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ### Task 2: The kind vocabulary and seam
 
 **Files:**
-- Modify: `gigledger/models.py:11-15` (constants), `:65-78` (Transaction), `:386-400` (RecurringTransaction)
+- Modify: `design_portal/models.py:11-15` (constants), `:65-78` (Transaction), `:386-400` (RecurringTransaction)
 - Test: `tests/test_transaction_kind.py` (create)
 
 **Interfaces:**
-- Produces, all importable from `gigledger.models`:
+- Produces, all importable from `design_portal.models`:
   - `INCOME = 'income'`, `EXPENSE = 'expense'`, `INVENTORY = 'inventory'`
   - `KINDS: set[str]` — all three
   - `COST_KINDS: set[str]` — `{EXPENSE}`; the kinds that reduce profit
@@ -279,7 +279,7 @@ money moved.
 """
 import pytest
 
-from gigledger.models import (COST_KINDS, EXPENSE, INCOME, INVENTORY, KINDS,
+from design_portal.models import (COST_KINDS, EXPENSE, INCOME, INVENTORY, KINDS,
                               RecurringTransaction, Transaction, clean_kind)
 
 
@@ -340,11 +340,11 @@ def test_kind_does_not_follow_the_sign_of_the_amount():
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `venv/bin/python -m pytest tests/test_transaction_kind.py -q`
-Expected: FAIL at import — `ImportError: cannot import name 'COST_KINDS' from 'gigledger.models'`.
+Expected: FAIL at import — `ImportError: cannot import name 'COST_KINDS' from 'design_portal.models'`.
 
 - [ ] **Step 3: Add the vocabulary and the seam**
 
-In `gigledger/models.py`, after `DEFAULT_EXPENSE_CATEGORIES` (line 15):
+In `design_portal/models.py`, after `DEFAULT_EXPENSE_CATEGORIES` (line 15):
 
 ```python
 # Transaction kinds. The kind is stored, never derived from the sign of the
@@ -426,7 +426,7 @@ Expected: all pass, characterization included. Adding an unused column changes n
 - [ ] **Step 6: Commit**
 
 ```bash
-git add gigledger/models.py tests/test_transaction_kind.py
+git add design_portal/models.py tests/test_transaction_kind.py
 git commit -m "Give transactions an explicit kind
 
 A sign carries one bit. Classifying by \`amount > 0\` supports income and
@@ -450,7 +450,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 `db.create_all()` creates missing tables and never alters an existing one, so a database that predates Task 2 will not gain the column. `_migrate_db` at `app.py:190` already handles exactly this, including for the `transactions` table, and commits at the end.
 
 **Files:**
-- Modify: `gigledger/app.py:223-227` (the transactions block inside `_migrate_db`)
+- Modify: `design_portal/app.py:223-227` (the transactions block inside `_migrate_db`)
 - Test: `tests/test_transaction_kind.py` (append)
 
 **Interfaces:**
@@ -464,8 +464,8 @@ Append to `tests/test_transaction_kind.py`:
 ```python
 import sqlite3
 
-import gigledger.app
-from gigledger.app import create_app
+import design_portal.app
+from design_portal.app import create_app
 
 
 def legacy_database(path):
@@ -510,7 +510,7 @@ def test_an_existing_database_gains_the_column(tmp_path, monkeypatch):
     """create_all() never alters an existing table, so the migration must."""
     db_path = str(tmp_path / 'test.db')
     legacy_database(db_path)
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', db_path)
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', db_path)
 
     create_app()
 
@@ -526,7 +526,7 @@ def test_a_zero_amount_row_backfills_as_an_expense(tmp_path, monkeypatch):
     displayed number moves: a zero contributes zero to an expense total."""
     db_path = str(tmp_path / 'test.db')
     legacy_database(db_path)
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', db_path)
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', db_path)
 
     create_app()
 
@@ -538,7 +538,7 @@ def test_the_migration_is_a_no_op_the_second_time(tmp_path, monkeypatch):
     has since been edited away from what the sign implies."""
     db_path = str(tmp_path / 'test.db')
     legacy_database(db_path)
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', db_path)
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', db_path)
 
     create_app()
     conn = sqlite3.connect(db_path)
@@ -558,7 +558,7 @@ Expected: FAIL with `sqlite3.OperationalError: no such column: kind`.
 
 - [ ] **Step 3: Extend the migration**
 
-In `gigledger/app.py`, replace the transactions block inside `_migrate_db` (currently lines 223-227) with:
+In `design_portal/app.py`, replace the transactions block inside `_migrate_db` (currently lines 223-227) with:
 
 ```python
     # Migrate transactions table
@@ -596,7 +596,7 @@ Expected: all pass.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add gigledger/app.py tests/test_transaction_kind.py
+git add design_portal/app.py tests/test_transaction_kind.py
 git commit -m "Backfill kind on databases that predate the column
 
 db.create_all() creates missing tables and never alters an existing one, so
@@ -619,11 +619,11 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 Eight places write a `Transaction`; two write a `RecurringTransaction`. Each sets a kind explicitly. Classification logic is untouched in this task — only writes.
 
 **Files:**
-- Modify: `gigledger/routes/transactions.py:57-70`, `:99-101`
-- Modify: `gigledger/routes/invoices.py:185-208`
-- Modify: `gigledger/routes/projects.py:197-205`
-- Modify: `gigledger/routes/recurring.py:76`, `:100-110`, `:219-226`
-- Modify: `gigledger/app.py:388`, `:394`, `:436`, `:450`, `:464`
+- Modify: `design_portal/routes/transactions.py:57-70`, `:99-101`
+- Modify: `design_portal/routes/invoices.py:185-208`
+- Modify: `design_portal/routes/projects.py:197-205`
+- Modify: `design_portal/routes/recurring.py:76`, `:100-110`, `:219-226`
+- Modify: `design_portal/app.py:388`, `:394`, `:436`, `:450`, `:464`
 - Test: `tests/test_transaction_kind.py` (append)
 
 **Interfaces:**
@@ -635,7 +635,7 @@ Eight places write a `Transaction`; two write a `RecurringTransaction`. Each set
 Append to `tests/test_transaction_kind.py`:
 
 ```python
-from gigledger.models import User, db
+from design_portal.models import User, db
 from tests.test_finance_characterization import (authenticated_client,
                                                  build_app, demo_user_id)
 
@@ -716,7 +716,7 @@ def test_a_generated_recurring_transaction_inherits_its_kind(app):
 
 
 def test_marking_an_invoice_paid_writes_income_and_a_tax_expense(app):
-    from gigledger.models import Invoice
+    from design_portal.models import Invoice
     with app.app_context():
         invoice = Invoice.query.filter(Invoice.tax_amount > 0).first()
         invoice_id, number = invoice.id, invoice.invoice_number
@@ -739,7 +739,7 @@ Expected: FAIL — seeded and route-created rows carry the column default rather
 
 - [ ] **Step 3: Set the kind at every write**
 
-`gigledger/routes/transactions.py` — import the seam and drive coercion from the kind. Replace lines 57-70 in `add()`:
+`design_portal/routes/transactions.py` — import the seam and drive coercion from the kind. Replace lines 57-70 in `add()`:
 
 ```python
     kind = clean_kind(request.form.get('type', 'income'), fallback=INCOME)
@@ -769,11 +769,11 @@ and lines 99-101 in `edit()`:
 
 Update its import line to `from ..models import Transaction, db, clean_kind, EXPENSE, INCOME`.
 
-`gigledger/routes/invoices.py` — add `kind=INCOME` to the `Transaction(...)` at line 185 and `kind=EXPENSE` to the one at line 199; import `INCOME, EXPENSE` from `..models`.
+`design_portal/routes/invoices.py` — add `kind=INCOME` to the `Transaction(...)` at line 185 and `kind=EXPENSE` to the one at line 199; import `INCOME, EXPENSE` from `..models`.
 
-`gigledger/routes/projects.py` — add `kind=INCOME` to the `Transaction(...)` at line 197; import `INCOME` from `..models`.
+`design_portal/routes/projects.py` — add `kind=INCOME` to the `Transaction(...)` at line 197; import `INCOME` from `..models`.
 
-`gigledger/routes/recurring.py` — in `add()`, replace the coercion at line 76 with:
+`design_portal/routes/recurring.py` — in `add()`, replace the coercion at line 76 with:
 
 ```python
     kind = clean_kind(tx_type, fallback=EXPENSE)
@@ -783,7 +783,7 @@ Update its import line to `from ..models import Transaction, db, clean_kind, EXP
 
 add `kind=kind,` to the `RecurringTransaction(...)` at line 100, and add `kind=rt.kind,` to the `Transaction(...)` at line 219. Import `clean_kind, EXPENSE` from `..models`.
 
-`gigledger/app.py` — in `_seed_demo_data`, add `kind='income'` to the invoice income transaction (line 388) and the income block (line 436); `kind='expense'` to the tax reserve (line 394) and both expense blocks (lines 450, 464). Add `kind='expense'` to the recurring seed data at line 562 if its dicts do not already carry one — check each entry's sign and set the matching kind.
+`design_portal/app.py` — in `_seed_demo_data`, add `kind='income'` to the invoice income transaction (line 388) and the income block (line 436); `kind='expense'` to the tax reserve (line 394) and both expense blocks (lines 450, 464). Add `kind='expense'` to the recurring seed data at line 562 if its dicts do not already carry one — check each entry's sign and set the matching kind.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
@@ -798,7 +798,7 @@ Expected: all pass, characterization included — no classification logic has ch
 - [ ] **Step 6: Commit**
 
 ```bash
-git add gigledger/ tests/test_transaction_kind.py
+git add design_portal/ tests/test_transaction_kind.py
 git commit -m "Set a kind at every site that writes a transaction
 
 Ten writes across routes and the demo seed. A row written without a kind is
@@ -818,7 +818,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 `_get_tx_range` is a single funnel feeding three aggregations, so widening its tuple converts them at the source.
 
 **Files:**
-- Modify: `gigledger/finance.py:10` (import), `:31-39`, `:50-51`, `:88-89`, `:185`
+- Modify: `design_portal/finance.py:10` (import), `:31-39`, `:50-51`, `:88-89`, `:185`
 - Test: `tests/test_finance_characterization.py` must keep passing unchanged.
 
 **Interfaces:**
@@ -827,7 +827,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 - [ ] **Step 1: Widen the funnel**
 
-In `gigledger/finance.py`, change the import at line 10 to:
+In `design_portal/finance.py`, change the import at line 10 to:
 
 ```python
 from .models import COST_KINDS, EXPENSE, INCOME, Transaction, db
@@ -893,7 +893,7 @@ Expected: all pass.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add gigledger/finance.py
+git add design_portal/finance.py
 git commit -m "Classify by kind in the financial aggregations
 
 _get_tx_range turns out to be a single funnel feeding the monthly summary,
@@ -913,8 +913,8 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ### Task 6: Convert `reports.py` and `dashboard.py`
 
 **Files:**
-- Modify: `gigledger/routes/reports.py:46-49`, `:102`, `:123-124`
-- Modify: `gigledger/routes/dashboard.py:47`, `:69`
+- Modify: `design_portal/routes/reports.py:46-49`, `:102`, `:123-124`
+- Modify: `design_portal/routes/dashboard.py:47`, `:69`
 - Test: `tests/test_finance_characterization.py` must keep passing unchanged.
 
 **Interfaces:**
@@ -981,7 +981,7 @@ Expected: all pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add gigledger/routes/reports.py gigledger/routes/dashboard.py
+git add design_portal/routes/reports.py design_portal/routes/dashboard.py
 git commit -m "Classify by kind in the reports and dashboard totals
 
 Seven sites that asked the sign what a transaction was now ask the row. The
@@ -999,7 +999,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 The same filter block appears three times (list, CSV export, PDF export) and the same three totals twice. Converting each copy separately would leave three places for a fourth kind to be forgotten, so this task extracts both into helpers as it converts them.
 
 **Files:**
-- Modify: `gigledger/routes/transactions.py` — imports, `:9-46`, `:130-199`, `:202-257`
+- Modify: `design_portal/routes/transactions.py` — imports, `:9-46`, `:130-199`, `:202-257`
 - Test: `tests/test_finance_characterization.py` must keep passing unchanged.
 
 **Interfaces:**
@@ -1010,7 +1010,7 @@ The same filter block appears three times (list, CSV export, PDF export) and the
 
 - [ ] **Step 1: Add the shared helpers**
 
-In `gigledger/routes/transactions.py`, update the import to
+In `design_portal/routes/transactions.py`, update the import to
 `from ..models import Transaction, db, clean_kind, EXPENSE, INCOME, KINDS`
 and add, above `list_transactions`:
 
@@ -1100,7 +1100,7 @@ Expected: all pass, including `tests/test_no_handbuilt_html.py`, which lints thi
 - [ ] **Step 5: Commit**
 
 ```bash
-git add gigledger/routes/transactions.py
+git add design_portal/routes/transactions.py
 git commit -m "Classify by kind in the transaction list and exports
 
 The filter block existed in three copies and the totals in two, so
@@ -1119,7 +1119,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ### Task 8: Convert `recurring.py`
 
 **Files:**
-- Modify: `gigledger/routes/recurring.py:44`, `:126-135`
+- Modify: `design_portal/routes/recurring.py:44`, `:126-135`
 - Test: `tests/test_transaction_kind.py` (append)
 
 **Interfaces:**
@@ -1189,7 +1189,7 @@ Expected: all pass.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add gigledger/routes/recurring.py tests/test_transaction_kind.py
+git add design_portal/routes/recurring.py tests/test_transaction_kind.py
 git commit -m "Classify recurring transactions by kind
 
 The edit path re-derived direction from the stored sign, so the sign was
@@ -1206,8 +1206,8 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 Templates classify by sign in two distinct ways, and only one of them is wrong. `+`/`-` and red/green describe the **amount** and stay sign tests. The type badge and the kind handed to an edit modal describe **what the row is** and become kind tests.
 
 **Files:**
-- Modify: `gigledger/templates/transactions/index.html:131`, `:152`, `:161`
-- Modify: `gigledger/templates/recurring/index.html:72`, `:112`
+- Modify: `design_portal/templates/transactions/index.html:131`, `:152`, `:161`
+- Modify: `design_portal/templates/recurring/index.html:72`, `:112`
 - Test: `tests/test_transaction_kind.py` (append)
 
 **Interfaces:**
@@ -1245,7 +1245,7 @@ Expected: FAIL — the template renders `'income' if tx.amount > 0 else 'expense
 
 - [ ] **Step 3: Convert the type labels**
 
-In `gigledger/templates/transactions/index.html`, line 131, replace the badge's content with `{{ tx.kind_label }}` and key its colour off `tx.is_income`:
+In `design_portal/templates/transactions/index.html`, line 131, replace the badge's content with `{{ tx.kind_label }}` and key its colour off `tx.is_income`:
 
 ```jinja
                             <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold {% if tx.is_income %}bg-green-50 text-green-600{% else %}bg-gray-100/80 text-gray-600{% endif %}">
@@ -1259,7 +1259,7 @@ At line 161, replace the third argument to `openEditModal`:
 {{ tx.kind|tojson|forceescape }}
 ```
 
-In `gigledger/templates/recurring/index.html`, apply the same three changes at lines 72 and 112 (`rt.is_income`, `rt.kind_label`, `rt.kind|tojson|forceescape`).
+In `design_portal/templates/recurring/index.html`, apply the same three changes at lines 72 and 112 (`rt.is_income`, `rt.kind_label`, `rt.kind|tojson|forceescape`).
 
 Leave lines 127, 135-136, 139, 149 in the transactions template and 60, 68-69 in the recurring one exactly as they are: those are direction and deductibility, not classification.
 
@@ -1276,7 +1276,7 @@ Expected: all pass, including `tests/test_template_escaping.py` — the modal ar
 - [ ] **Step 6: Commit**
 
 ```bash
-git add gigledger/templates/
+git add design_portal/templates/
 git commit -m "Label transaction type from the kind, not the sign
 
 Templates read the sign for two different purposes and only one of them was
@@ -1317,7 +1317,7 @@ def with_inventory(tmp_path, monkeypatch):
     from tests.test_finance_characterization import LEDGER
     app = build_app(tmp_path, monkeypatch)
     with app.app_context():
-        user_id = User.query.filter_by(email='demo@gigledger.com').first().id
+        user_id = User.query.filter_by(email='demo@example.com').first().id
         Transaction.query.delete()
         for amount, category, deductible, day in LEDGER:
             db.session.add(Transaction(
@@ -1338,7 +1338,7 @@ def with_inventory(tmp_path, monkeypatch):
 def test_an_inventory_purchase_is_not_an_expense(with_inventory):
     """The whole reason for the kind column. Compare against the
     characterization figures: expenses are unchanged by 980 of inventory."""
-    from gigledger.finance import calculate_monthly_summary
+    from design_portal.finance import calculate_monthly_summary
     with with_inventory.app_context():
         income, expenses = calculate_monthly_summary(
             demo_user_id(with_inventory), 2026, 3)
@@ -1347,7 +1347,7 @@ def test_an_inventory_purchase_is_not_an_expense(with_inventory):
 
 
 def test_an_inventory_purchase_does_not_reduce_taxable_income(with_inventory):
-    from gigledger.finance import calculate_quarterly_tax
+    from design_portal.finance import calculate_quarterly_tax
     with with_inventory.app_context():
         income, deductions, net, _ = calculate_quarterly_tax(
             demo_user_id(with_inventory), 1, 2026, 0.30)
@@ -1357,7 +1357,7 @@ def test_an_inventory_purchase_does_not_reduce_taxable_income(with_inventory):
 def test_an_inventory_purchase_does_leave_the_bank(with_inventory):
     """Cash is not profit. The money is gone even though the cost is not
     recognised, so the balance falls by the full purchase price."""
-    from gigledger.finance import calculate_safe_to_spend
+    from design_portal.finance import calculate_safe_to_spend
     with with_inventory.app_context():
         balance, _, _ = calculate_safe_to_spend(
             demo_user_id(with_inventory), 0.30)
@@ -1365,7 +1365,7 @@ def test_an_inventory_purchase_does_leave_the_bank(with_inventory):
 
 
 def test_an_inventory_purchase_is_absent_from_expense_categories(with_inventory):
-    from gigledger.finance import get_category_breakdown
+    from design_portal.finance import get_category_breakdown
     with with_inventory.app_context():
         categories, _ = get_category_breakdown(
             demo_user_id(with_inventory), year=2026, month=3)

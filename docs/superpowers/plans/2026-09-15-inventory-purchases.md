@@ -15,44 +15,44 @@
 - Run tests with `source venv/bin/activate && python -m pytest -q` from the repo root. Baseline before this plan: 153 passed.
 - `tests/test_finance_characterization.py` must stay green and unedited: income and expense behaviour does not move.
 - `tests/test_template_escaping.py` lints every `{{ }}` inside an `on*=` attribute: each must carry `|tojson|forceescape`. Every new `onclick` argument in templates follows this.
-- `tests/test_no_handbuilt_html.py` forbids HTML string literals in `gigledger/routes/*.py`. All markup goes in templates.
+- `tests/test_no_handbuilt_html.py` forbids HTML string literals in `design_portal/routes/*.py`. All markup goes in templates.
 - `tests/test_csrf.py` walks the url_map: every new POST route is covered automatically; every POST form in a template needs `{{ csrf_field() }}`.
 - Templates build URLs with `url_port('blueprint.endpoint', ...)`, never `url_for`.
 - Form field names are fixed by the spec and shared by every task: `type`, `amount`, `date`, `category`, `description`, `is_tax_deductible`, `quantity`, `unit_cost`, `is_consumable`, `project_id` (empty string = General Inventory).
 - The inventory kind is styled amber (`amber-400`/`amber-50`/`amber-700`), matching the Monthly Commitments card.
 - Commit messages: imperative subject, body explains why, end with `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`.
-- Do not touch `gigledger.db` in the repo root. Tests use `tmp_path` databases via `build_app`.
+- Do not touch `design_portal.db` in the repo root. Tests use `tmp_path` databases via `build_app`.
 
 ## File Structure
 
 | File | Responsibility |
 |---|---|
-| `gigledger/models.py` | `InventoryItem`; `Transaction.inventory_item`; `DEFAULT_INVENTORY_CATEGORIES`, `INVENTORY_CATEGORY_GUIDANCE`; `User.custom_inventory_categories`, `get_inventory_categories()`, kind-aware `get_all_categories()` |
-| `gigledger/app.py` | migration for the new `users` column; register `inventory_bp`; expose `inventory_guidance` to templates |
-| `gigledger/routes/transactions.py` | the only writer of inventory rows: sign rule, `_inventory_fields`, add/edit/delete |
-| `gigledger/routes/inventory.py` (new) | read-only `/inventory` |
-| `gigledger/routes/dashboard.py`, `routes/recurring.py` | monthly commitment as cash |
-| `gigledger/routes/projects.py` | project detail passes its items |
-| `gigledger/routes/settings.py` | third category block, shared add/delete helpers |
-| `gigledger/templates/transactions/_edit_modal.html` (new) | the edit modal + shared kind/category JS, included by two pages |
-| `gigledger/templates/transactions/index.html` | third radio, inventory block, filter option, include the partial |
-| `gigledger/templates/transactions/export.html` | Type column |
-| `gigledger/templates/inventory/index.html` (new) | the pool page |
-| `gigledger/templates/projects/detail.html` | Inventory section |
-| `gigledger/templates/settings/index.html` | Inventory Categories block |
-| `gigledger/templates/base.html` | nav entry |
+| `design_portal/models.py` | `InventoryItem`; `Transaction.inventory_item`; `DEFAULT_INVENTORY_CATEGORIES`, `INVENTORY_CATEGORY_GUIDANCE`; `User.custom_inventory_categories`, `get_inventory_categories()`, kind-aware `get_all_categories()` |
+| `design_portal/app.py` | migration for the new `users` column; register `inventory_bp`; expose `inventory_guidance` to templates |
+| `design_portal/routes/transactions.py` | the only writer of inventory rows: sign rule, `_inventory_fields`, add/edit/delete |
+| `design_portal/routes/inventory.py` (new) | read-only `/inventory` |
+| `design_portal/routes/dashboard.py`, `routes/recurring.py` | monthly commitment as cash |
+| `design_portal/routes/projects.py` | project detail passes its items |
+| `design_portal/routes/settings.py` | third category block, shared add/delete helpers |
+| `design_portal/templates/transactions/_edit_modal.html` (new) | the edit modal + shared kind/category JS, included by two pages |
+| `design_portal/templates/transactions/index.html` | third radio, inventory block, filter option, include the partial |
+| `design_portal/templates/transactions/export.html` | Type column |
+| `design_portal/templates/inventory/index.html` (new) | the pool page |
+| `design_portal/templates/projects/detail.html` | Inventory section |
+| `design_portal/templates/settings/index.html` | Inventory Categories block |
+| `design_portal/templates/base.html` | nav entry |
 | `tests/test_inventory.py` (new) | every test in this plan |
 | `docs/adr/0011-inventory-purchases-as-ledger-lines.md` (new), `docs/adr/0010-…`, `docs/adr/README.md`, `docs/glossary.md`, `README.md` | records |
 
-Test helpers: import `build_app`, `authenticated_client`, `demo_user_id` from `test_finance_characterization` (tests run with `tests/` on `sys.path`, as `test_transaction_kind.py` does). The demo user is `demo@gigledger.com`; `_seed_demo_data()` gives it three projects.
+Test helpers: import `build_app`, `authenticated_client`, `demo_user_id` from `test_finance_characterization` (tests run with `tests/` on `sys.path`, as `test_transaction_kind.py` does). The demo user is `demo@example.com`; `_seed_demo_data()` gives it three projects.
 
 ---
 
 ### Task 1: The model, the categories, the migration
 
 **Files:**
-- Modify: `gigledger/models.py` (constants at top, `User` at ~line 76, `Transaction` at ~line 125, new class after `Transaction`)
-- Modify: `gigledger/app.py:_migrate_db` (~line 200, the users block)
+- Modify: `design_portal/models.py` (constants at top, `User` at ~line 76, `Transaction` at ~line 125, new class after `Transaction`)
+- Modify: `design_portal/app.py:_migrate_db` (~line 200, the users block)
 - Create: `tests/test_inventory.py`
 
 **Interfaces:**
@@ -75,9 +75,9 @@ from datetime import datetime
 
 import pytest
 
-import gigledger.app
-from gigledger.app import create_app
-from gigledger.models import (DEFAULT_EXPENSE_CATEGORIES, DEFAULT_INCOME_CATEGORIES,
+import design_portal.app
+from design_portal.app import create_app
+from design_portal.models import (DEFAULT_EXPENSE_CATEGORIES, DEFAULT_INCOME_CATEGORIES,
                               DEFAULT_INVENTORY_CATEGORIES, EXPENSE, INCOME,
                               INVENTORY, INVENTORY_CATEGORY_GUIDANCE, KINDS,
                               InventoryItem, Project, RecurringTransaction,
@@ -199,7 +199,7 @@ def test_an_existing_users_table_gains_the_inventory_categories_column(tmp_path,
                  "email VARCHAR(120), password_hash VARCHAR(128))")
     conn.commit()
     conn.close()
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', db_path)
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', db_path)
 
     create_app()
     create_app()  # a second startup must be a no-op
@@ -217,7 +217,7 @@ Expected: ImportError on `DEFAULT_INVENTORY_CATEGORIES` / `InventoryItem`.
 
 - [ ] **Step 3: Add the constants**
 
-In `gigledger/models.py`, directly after `DEFAULT_EXPENSE_CATEGORIES`:
+In `design_portal/models.py`, directly after `DEFAULT_EXPENSE_CATEGORIES`:
 
 ```python
 DEFAULT_INVENTORY_CATEGORIES = ['Casegoods & Storage', 'Seating', 'Lighting',
@@ -332,7 +332,7 @@ class InventoryItem(db.Model):
 
 - [ ] **Step 6: Migrate the users column**
 
-In `gigledger/app.py:_migrate_db`, after the `custom_expense_categories` line:
+In `design_portal/app.py:_migrate_db`, after the `custom_expense_categories` line:
 
 ```python
     if 'custom_inventory_categories' not in existing_columns:
@@ -350,7 +350,7 @@ Expected: 162 passed (153 + 9).
 - [ ] **Step 8: Commit**
 
 ```bash
-git add gigledger/models.py gigledger/app.py tests/test_inventory.py
+git add design_portal/models.py design_portal/app.py tests/test_inventory.py
 git commit -m "Give an inventory purchase an asset row
 
 InventoryItem is 1:1 with its purchase Transaction: quantity, unit cost,
@@ -368,7 +368,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ### Task 2: One sign rule, and `add()` writes an inventory purchase
 
 **Files:**
-- Modify: `gigledger/routes/transactions.py` (imports line 4; `add()` lines 81-116)
+- Modify: `design_portal/routes/transactions.py` (imports line 4; `add()` lines 81-116)
 - Test: `tests/test_inventory.py`
 
 **Interfaces:**
@@ -474,7 +474,7 @@ Expected: the inventory tests fail (no item written / amount is `-0.0` or `0`); 
 
 - [ ] **Step 3: The helpers and the new `add()`**
 
-Replace the import line and add helpers below `_totals` in `gigledger/routes/transactions.py`:
+Replace the import line and add helpers below `_totals` in `design_portal/routes/transactions.py`:
 
 ```python
 from ..models import (Transaction, InventoryItem, Project, db, clean_kind,
@@ -583,7 +583,7 @@ Expected: all pass. (`test_an_unrecognised_type_does_not_reach_the_column` still
 - [ ] **Step 5: Commit**
 
 ```bash
-git add gigledger/routes/transactions.py tests/test_inventory.py
+git add design_portal/routes/transactions.py tests/test_inventory.py
 git commit -m "Let add() record an inventory purchase
 
 One sign rule for every kind - income is cash in, everything else is
@@ -600,7 +600,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ### Task 3: `edit()` — the blocker fix
 
 **Files:**
-- Modify: `gigledger/routes/transactions.py:edit()` (~lines 119-149)
+- Modify: `design_portal/routes/transactions.py:edit()` (~lines 119-149)
 - Test: `tests/test_inventory.py`
 
 **Interfaces:**
@@ -626,7 +626,7 @@ def test_editing_only_the_date_leaves_an_inventory_row_inventory(app):
     """The failure piece 1's appendix describes: the old modal posted
     type=expense for anything not income, and one date change moved the
     purchase into every cost total forever."""
-    from gigledger.finance import calculate_monthly_summary
+    from design_portal.finance import calculate_monthly_summary
     with app.app_context():
         Transaction.query.delete()  # only our purchase in the ledger
         db.session.commit()
@@ -793,7 +793,7 @@ Expected: all pass, including piece 1's `test_editing_with_a_missing_type_keeps_
 - [ ] **Step 5: Commit**
 
 ```bash
-git add gigledger/routes/transactions.py tests/test_inventory.py
+git add design_portal/routes/transactions.py tests/test_inventory.py
 git commit -m "Make edit() safe for an inventory purchase
 
 Editing an inventory row - even only its date - used to be able to post
@@ -811,8 +811,8 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ### Task 4: Monthly commitment is a cash figure
 
 **Files:**
-- Modify: `gigledger/routes/dashboard.py:70`
-- Modify: `gigledger/routes/recurring.py:44-45`
+- Modify: `design_portal/routes/dashboard.py:70`
+- Modify: `design_portal/routes/recurring.py:44-45`
 - Modify: `docs/adr/0010-classify-transactions-by-kind.md:39-42`
 - Test: `tests/test_inventory.py`
 
@@ -857,7 +857,7 @@ Expected: FAIL — both pages show `$30.00`.
 
 - [ ] **Step 3: Change the two filters**
 
-`gigledger/routes/dashboard.py:67-70`:
+`design_portal/routes/dashboard.py:67-70`:
 
 ```python
     # Recurring monthly commitment: everything that leaves the account each
@@ -867,7 +867,7 @@ Expected: FAIL — both pages show `$30.00`.
     monthly_commitment = sum(abs(r.amount) for r in recurring_active if not r.is_income)
 ```
 
-`gigledger/routes/recurring.py:43-45`:
+`design_portal/routes/recurring.py:43-45`:
 
 ```python
     # Monthly commitments: everything that leaves the account each month.
@@ -899,7 +899,7 @@ Expected: all pass.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add gigledger/routes/dashboard.py gigledger/routes/recurring.py docs/adr/0010-classify-transactions-by-kind.md tests/test_inventory.py
+git add design_portal/routes/dashboard.py design_portal/routes/recurring.py docs/adr/0010-classify-transactions-by-kind.md tests/test_inventory.py
 git commit -m "Decide monthly commitment as a cash figure
 
 Piece 1 left it filtering on is_expense by default. A commitment is an
@@ -915,11 +915,11 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ### Task 5: The transactions page — third radio, inventory block, shared edit modal, filter, export
 
 **Files:**
-- Create: `gigledger/templates/transactions/_edit_modal.html`
-- Modify: `gigledger/templates/transactions/index.html` (filter lines 41-45; row lines 126-130 and 157; add modal lines 199-249; edit modal lines 252-311 → removed; script block 314-440)
-- Modify: `gigledger/templates/transactions/export.html` (table head/body ~line 55-63)
-- Modify: `gigledger/routes/transactions.py:list_transactions` (pass `projects`)
-- Modify: `gigledger/app.py:inject_port` (expose `inventory_guidance`)
+- Create: `design_portal/templates/transactions/_edit_modal.html`
+- Modify: `design_portal/templates/transactions/index.html` (filter lines 41-45; row lines 126-130 and 157; add modal lines 199-249; edit modal lines 252-311 → removed; script block 314-440)
+- Modify: `design_portal/templates/transactions/export.html` (table head/body ~line 55-63)
+- Modify: `design_portal/routes/transactions.py:list_transactions` (pass `projects`)
+- Modify: `design_portal/app.py:inject_port` (expose `inventory_guidance`)
 - Test: `tests/test_inventory.py`
 
 **Interfaces:**
@@ -977,7 +977,7 @@ Expected: 4 failures.
 
 - [ ] **Step 3: Expose the guidance and the projects**
 
-`gigledger/app.py`, in `inject_port`, extend the returned dict:
+`design_portal/app.py`, in `inject_port`, extend the returned dict:
 
 ```python
         from .models import INVENTORY_CATEGORY_GUIDANCE
@@ -987,7 +987,7 @@ Expected: 4 failures.
 
 (Put the import at the top of the function body if `from .models import …` is already there at module level; otherwise the local import is fine.)
 
-`gigledger/routes/transactions.py:list_transactions`, add to the `render_template` call:
+`design_portal/routes/transactions.py:list_transactions`, add to the `render_template` call:
 
 ```python
         projects=Project.query.filter_by(user_id=uid).order_by(Project.name).all(),
@@ -995,7 +995,7 @@ Expected: 4 failures.
 
 - [ ] **Step 4: Create the partial**
 
-Create `gigledger/templates/transactions/_edit_modal.html`. It is the existing edit modal (index.html lines 252-311) plus the inventory block, the guidance line, and the shared script. Included inside `{% block content %}` by two pages, so its script runs before either page's `{% block scripts %}`.
+Create `design_portal/templates/transactions/_edit_modal.html`. It is the existing edit modal (index.html lines 252-311) plus the inventory block, the guidance line, and the shared script. Included inside `{% block content %}` by two pages, so its script runs before either page's `{% block scripts %}`.
 
 ```html
 {#
@@ -1262,7 +1262,7 @@ Delete `openEditModal` and `updateEditCategories` from this script block (they a
 
 - [ ] **Step 6: Export Type column**
 
-`gigledger/templates/transactions/export.html`, the table:
+`design_portal/templates/transactions/export.html`, the table:
 
 ```html
     <thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Category</th><th style="text-align:right">Amount</th><th style="text-align:center">Deductible</th></tr></thead>
@@ -1279,12 +1279,12 @@ Delete `openEditModal` and `updateEditCategories` from this script block (they a
 Run: `python -m pytest -q`
 Expected: all pass — including `test_template_escaping.py` (every new `onclick` argument carries both filters) and `test_the_edit_modal_receives_the_stored_kind` from piece 1.
 
-Then a manual check: `source venv/bin/activate && python run.py` (or however `run.py` starts; check `head run.py`), log in as `demo@gigledger.com` / `demo1234`, open Transactions → Add: click Inventory — amount hides, quantity/unit cost/Bought for/Consumable appear, categories switch to the seven, picking one shows guidance. Add "2 × 490 sofa" to General Inventory. It appears with an amber category badge. Click Edit on it — the Inventory radio is checked and the item fields are prefilled. Change the date only, Save — it stays Inventory. Click Edit on an expense — Income/Expense behave as before. Stop the server.
+Then a manual check: `source venv/bin/activate && python run.py` (or however `run.py` starts; check `head run.py`), log in as `demo@example.com` / `demo1234`, open Transactions → Add: click Inventory — amount hides, quantity/unit cost/Bought for/Consumable appear, categories switch to the seven, picking one shows guidance. Add "2 × 490 sofa" to General Inventory. It appears with an amber category badge. Click Edit on it — the Inventory radio is checked and the item fields are prefilled. Change the date only, Save — it stays Inventory. Click Edit on an expense — Income/Expense behave as before. Stop the server.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add gigledger/templates/transactions/_edit_modal.html gigledger/templates/transactions/index.html gigledger/templates/transactions/export.html gigledger/routes/transactions.py gigledger/app.py tests/test_inventory.py
+git add design_portal/templates/transactions/_edit_modal.html design_portal/templates/transactions/index.html design_portal/templates/transactions/export.html design_portal/routes/transactions.py design_portal/app.py tests/test_inventory.py
 git commit -m "Give the transactions page an Inventory kind
 
 Third radio on both modals, revealing quantity, unit cost, project and
@@ -1302,10 +1302,10 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ### Task 6: The Inventory page
 
 **Files:**
-- Create: `gigledger/routes/inventory.py`
-- Create: `gigledger/templates/inventory/index.html`
-- Modify: `gigledger/app.py` (import + register `inventory_bp`, lines ~161 and ~173)
-- Modify: `gigledger/templates/base.html` (nav after Projects: lines ~608-611 desktop and ~724-727 mobile)
+- Create: `design_portal/routes/inventory.py`
+- Create: `design_portal/templates/inventory/index.html`
+- Modify: `design_portal/app.py` (import + register `inventory_bp`, lines ~161 and ~173)
+- Modify: `design_portal/templates/base.html` (nav after Projects: lines ~608-611 desktop and ~724-727 mobile)
 - Test: `tests/test_inventory.py`
 
 **Interfaces:**
@@ -1393,7 +1393,7 @@ Expected: 404s / assertion failures.
 
 - [ ] **Step 3: The blueprint**
 
-Create `gigledger/routes/inventory.py`:
+Create `design_portal/routes/inventory.py`:
 
 ```python
 """The asset pool: what was bought as inventory and where it was bought for.
@@ -1449,15 +1449,15 @@ def index():
         currency=current_user.currency)
 ```
 
-Register it in `gigledger/app.py`: add `from .routes.inventory import inventory_bp` after the recurring import and `app.register_blueprint(inventory_bp)` after `recurring_bp`.
+Register it in `design_portal/app.py`: add `from .routes.inventory import inventory_bp` after the recurring import and `app.register_blueprint(inventory_bp)` after `recurring_bp`.
 
 - [ ] **Step 4: The template**
 
-Create `gigledger/templates/inventory/index.html`:
+Create `design_portal/templates/inventory/index.html`:
 
 ```html
 {% extends "base.html" %}
-{% block title %}Inventory - GigLedger{% endblock %}
+{% block title %}Inventory - Design Portal{% endblock %}
 {% block content %}
 <div class="space-y-6">
     <div class="fade-up">
@@ -1563,11 +1563,11 @@ Create `gigledger/templates/inventory/index.html`:
 {% endblock %}
 ```
 
-Check `decimal1` exists as a filter (`grep -n decimal1 gigledger/app.py` showed it does). If the quantity expression is awkward, simplify to `{{ item.quantity | decimal1 }}` — the test does not assert the quantity format.
+Check `decimal1` exists as a filter (`grep -n decimal1 design_portal/app.py` showed it does). If the quantity expression is awkward, simplify to `{{ item.quantity | decimal1 }}` — the test does not assert the quantity format.
 
 - [ ] **Step 5: The nav**
 
-In `gigledger/templates/base.html`, after the desktop Projects link (the `</a>` at ~line 611), add:
+In `design_portal/templates/base.html`, after the desktop Projects link (the `</a>` at ~line 611), add:
 
 ```html
                 <a href="{{ url_port('inventory.index') }}" class="nav-link icon-bounce flex items-center gap-3 px-4 py-3 text-sm font-semibold {% if request.endpoint and 'inventory' in request.endpoint %}bg-brand-50 text-brand-700 shadow-sm{% else %}text-gray-500 hover:bg-white/60 hover:text-gray-800{% endif %}">
@@ -1595,7 +1595,7 @@ Manual: start the server, open Inventory. Three cards, the table, filters work, 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add gigledger/routes/inventory.py gigledger/templates/inventory/index.html gigledger/app.py gigledger/templates/base.html tests/test_inventory.py
+git add design_portal/routes/inventory.py design_portal/templates/inventory/index.html design_portal/app.py design_portal/templates/base.html tests/test_inventory.py
 git commit -m "Add the Inventory page
 
 Read-only view over the ledger: asset value, on hand, on projects, and
@@ -1611,8 +1611,8 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ### Task 7: Inventory on the project detail page
 
 **Files:**
-- Modify: `gigledger/routes/projects.py:detail` (~line 278-291) and its imports (line ~1-10)
-- Modify: `gigledger/templates/projects/detail.html` (after the Documents card, before the closing `</div>` of the page column at ~line 137)
+- Modify: `design_portal/routes/projects.py:detail` (~line 278-291) and its imports (line ~1-10)
+- Modify: `design_portal/templates/projects/detail.html` (after the Documents card, before the closing `</div>` of the page column at ~line 137)
 - Test: `tests/test_inventory.py`
 
 - [ ] **Step 1: Write the failing tests**
@@ -1646,7 +1646,7 @@ Expected: 2 failures.
 
 - [ ] **Step 3: The route**
 
-Add `InventoryItem, Transaction` to the models import at the top of `gigledger/routes/projects.py` (check what it imports already). In `detail()`, add two arguments to `render_template`:
+Add `InventoryItem, Transaction` to the models import at the top of `design_portal/routes/projects.py` (check what it imports already). In `detail()`, add two arguments to `render_template`:
 
 ```python
         inventory_items=(InventoryItem.query.filter_by(project_id=project.id)
@@ -1671,7 +1671,7 @@ and, computed first:
 
 - [ ] **Step 4: The section**
 
-In `gigledger/templates/projects/detail.html`, immediately after the Documents card's closing `</div>` (the one following `{% endif %}` at ~line 136) and before the outer column's `</div>`:
+In `design_portal/templates/projects/detail.html`, immediately after the Documents card's closing `</div>` (the one following `{% endif %}` at ~line 136) and before the outer column's `</div>`:
 
 ```html
     <!-- Inventory -->
@@ -1710,7 +1710,7 @@ Expected: all pass (`test_documents.py` and `test_document_sharing.py` render th
 - [ ] **Step 6: Commit**
 
 ```bash
-git add gigledger/routes/projects.py gigledger/templates/projects/detail.html tests/test_inventory.py
+git add design_portal/routes/projects.py design_portal/templates/projects/detail.html tests/test_inventory.py
 git commit -m "List a project's inventory on its detail page
 
 What was bought for the job and what it cost, with a note that it is
@@ -1725,9 +1725,9 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ### Task 8: Settings — the third category block
 
 **Files:**
-- Modify: `gigledger/routes/settings.py` (imports line 3; `index()` lines 17-27; category routes lines 57-118; `reset_categories` lines 144-151)
-- Modify: `gigledger/routes/recurring.py:53` (`get_all_categories(kinds={INCOME, EXPENSE})`)
-- Modify: `gigledger/templates/settings/index.html` (new block after the Expense block ending ~line 241)
+- Modify: `design_portal/routes/settings.py` (imports line 3; `index()` lines 17-27; category routes lines 57-118; `reset_categories` lines 144-151)
+- Modify: `design_portal/routes/recurring.py:53` (`get_all_categories(kinds={INCOME, EXPENSE})`)
+- Modify: `design_portal/templates/settings/index.html` (new block after the Expense block ending ~line 241)
 - Test: `tests/test_inventory.py`
 
 - [ ] **Step 1: Write the failing tests**
@@ -1788,7 +1788,7 @@ Expected: 404s and assertion failures. (`test_the_recurring_page…` may already
 
 - [ ] **Step 3: Shared helpers, six thin routes**
 
-In `gigledger/routes/settings.py`, replace the import on line 3:
+In `design_portal/routes/settings.py`, replace the import on line 3:
 
 ```python
 from ..models import (db, DEFAULT_INCOME_CATEGORIES, DEFAULT_EXPENSE_CATEGORIES,
@@ -1893,7 +1893,7 @@ In `reset_categories`, add:
     current_user.custom_inventory_categories = ''
 ```
 
-In `gigledger/routes/recurring.py:53`, change the import to include `INCOME, EXPENSE` (already imported) and the call to:
+In `design_portal/routes/recurring.py:53`, change the import to include `INCOME, EXPENSE` (already imported) and the call to:
 
 ```python
         user_categories=current_user.get_all_categories(kinds={INCOME, EXPENSE}),
@@ -1901,7 +1901,7 @@ In `gigledger/routes/recurring.py:53`, change the import to include `INCOME, EXP
 
 - [ ] **Step 4: The Settings block**
 
-In `gigledger/templates/settings/index.html`, after the Expense Categories card (its closing `</div>` at ~line 241) and before `<!-- Reset categories -->`:
+In `design_portal/templates/settings/index.html`, after the Expense Categories card (its closing `</div>` at ~line 241) and before `<!-- Reset categories -->`:
 
 ```html
     <!-- Inventory categories -->
@@ -1950,7 +1950,7 @@ Expected: all pass, `test_csrf.py` included (six category POST routes now, all p
 - [ ] **Step 6: Commit**
 
 ```bash
-git add gigledger/routes/settings.py gigledger/routes/recurring.py gigledger/templates/settings/index.html tests/test_inventory.py
+git add design_portal/routes/settings.py design_portal/routes/recurring.py design_portal/templates/settings/index.html tests/test_inventory.py
 git commit -m "Manage inventory categories in Settings
 
 A third block behaving as the other two, with the taxonomy's guidance

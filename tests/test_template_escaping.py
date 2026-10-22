@@ -32,7 +32,7 @@ import re
 
 import pytest
 
-TEMPLATES = pathlib.Path(__file__).resolve().parent.parent / 'gigledger' / 'templates'
+TEMPLATES = pathlib.Path(__file__).resolve().parent.parent / 'design_portal' / 'templates'
 
 # An inline event-handler attribute: onclick="...", onsubmit="...", etc.
 HANDLER = re.compile(r'\bon[a-z]+\s*=\s*(?P<q>["\'])(?P<body>.*?)(?P=q)', re.I | re.S)
@@ -92,7 +92,7 @@ def test_tojson_forceescape_survives_the_html_attribute_round_trip(app, payload)
     environment rather than a bare one - Flask installs its own tojson.
 
     Takes the `app` fixture rather than calling create_app() itself: a bare
-    create_app() opens the real gigledger.db and runs its migrations on it."""
+    create_app() opens the real design_portal.db and runs its migrations on it."""
     import html as html_module
 
     rendered = app.jinja_env.from_string(

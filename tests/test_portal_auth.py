@@ -24,11 +24,11 @@ from datetime import datetime, timedelta
 import re
 import pytest
 
-import gigledger.app
-import gigledger.documents
-import gigledger.portal_auth as portal_auth
-from gigledger.app import create_app
-from gigledger.models import Client, PortalAccount, PortalInvite, User, db
+import design_portal.app
+import design_portal.documents
+import design_portal.portal_auth as portal_auth
+from design_portal.app import create_app
+from design_portal.models import Client, PortalAccount, PortalInvite, User, db
 
 
 # Portal routes reachable without a portal session, by design: you cannot log in
@@ -38,8 +38,8 @@ EXPECTED_ANONYMOUS = {'portal.login', 'portal.redeem'}
 
 
 def build_app(tmp_path, monkeypatch, **config):
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', str(tmp_path / 'test.db'))
-    monkeypatch.setattr(gigledger.documents, 'UPLOAD_ROOT', str(tmp_path / 'uploads'))
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', str(tmp_path / 'test.db'))
+    monkeypatch.setattr(design_portal.documents, 'UPLOAD_ROOT', str(tmp_path / 'uploads'))
     app = create_app()
     app.config.update(TESTING=True, SECRET_KEY='test-key',
                       WTF_CSRF_ENABLED=False, **config)
@@ -150,7 +150,7 @@ def test_logging_into_the_freelancer_app_drops_the_portal_session(app):
     account_id = an_account(app)
     http = portal_session(app, account_id)
 
-    http.post('/login', data={'email': 'demo@gigledger.com', 'password': 'demo1234'})
+    http.post('/login', data={'email': 'demo@example.com', 'password': 'demo1234'})
 
     with http.session_transaction() as session:
         assert 'portal_account_id' not in session
@@ -341,9 +341,9 @@ def test_the_freelancer_login_locks_out_after_repeated_failures(app):
     http = app.test_client()
 
     for _ in range(portal_auth.MAX_FAILURES):
-        http.post('/login', data={'email': 'demo@gigledger.com', 'password': 'wrong'})
+        http.post('/login', data={'email': 'demo@example.com', 'password': 'wrong'})
 
-    http.post('/login', data={'email': 'demo@gigledger.com', 'password': 'demo1234'})
+    http.post('/login', data={'email': 'demo@example.com', 'password': 'demo1234'})
 
     with http.session_transaction() as session:
         assert '_user_id' not in session

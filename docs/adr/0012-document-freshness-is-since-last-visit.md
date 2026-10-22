@@ -22,7 +22,7 @@ wrong for one of them:
   that moment is what "new" has to mean. The obvious refinement, "new until
   opened", is available for uploads — a portal download writes a
   `DocumentAccess` row — but **not for links**: opening a Drive link goes
-  straight to Google and never touches GigLedger
+  straight to Google and never touches Design Portal
   ([ADR-0007](0007-google-drive-as-reference.md)). A read-receipt rule would
   clear honestly for uploads and never for links, and the two kinds already
   differ in enough ways that a third, silent one is not welcome.

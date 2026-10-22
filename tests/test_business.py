@@ -6,9 +6,9 @@ import sqlite3
 
 import pytest
 
-import gigledger.app
-from gigledger.app import create_app
-from gigledger.models import Business, User, db
+import design_portal.app
+from design_portal.app import create_app
+from design_portal.models import Business, User, db
 from tests.conftest import build_app, login_as
 
 
@@ -93,7 +93,7 @@ def test_migration_seeds_the_business_from_the_lowest_id_user(tmp_path, monkeypa
     monkeypatch.delenv('SEED_DEMO', raising=False)
     path = tmp_path / 'legacy.db'
     _legacy_database(str(path))
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', str(path))
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', str(path))
 
     app = create_app()
 
@@ -115,7 +115,7 @@ def test_migration_is_a_no_op_the_second_time(tmp_path, monkeypatch):
     monkeypatch.delenv('SEED_DEMO', raising=False)
     path = tmp_path / 'legacy.db'
     _legacy_database(str(path))
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', str(path))
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', str(path))
 
     create_app()
     app = create_app()
@@ -129,7 +129,7 @@ def test_migration_adds_last_login_at_to_users(tmp_path, monkeypatch):
     monkeypatch.delenv('SEED_DEMO', raising=False)
     path = tmp_path / 'legacy.db'
     _legacy_database(str(path))
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', str(path))
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', str(path))
 
     app = create_app()
 

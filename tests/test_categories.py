@@ -6,7 +6,7 @@ defaults", so emptying it would silently bring all the defaults back.
 """
 from datetime import datetime
 
-from gigledger.models import (DEFAULT_EXPENSE_CATEGORIES, EXPENSE, INCOME,
+from design_portal.models import (DEFAULT_EXPENSE_CATEGORIES, EXPENSE, INCOME,
                               Business, RecurringTransaction, Transaction, db)
 
 

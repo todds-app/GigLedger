@@ -36,7 +36,7 @@ Two further facts shaped the rest of the decision:
   nothing. Any invite or magic-link flow that assumes outbound mail is a flow
   that fails silently in a self-hosted deployment.
 - **A client email is not unique to a freelancer.** `billing@acme.com` may
-  legitimately be a client of several GigLedger users, so an email cannot
+  legitimately be a client of several Design Portal users, so an email cannot
   identify a row in `clients` at a login form.
 
 ## Decision

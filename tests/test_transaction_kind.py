@@ -11,9 +11,9 @@ from datetime import datetime
 
 import pytest
 
-import gigledger.app
-from gigledger.app import create_app
-from gigledger.models import (COST_KINDS, EXPENSE, INCOME, INVENTORY, KINDS,
+import design_portal.app
+from design_portal.app import create_app
+from design_portal.models import (COST_KINDS, EXPENSE, INCOME, INVENTORY, KINDS,
                               RecurringTransaction, Transaction, clean_kind)
 
 
@@ -123,7 +123,7 @@ def test_an_existing_database_gains_the_column(tmp_path, monkeypatch):
     """create_all() never alters an existing table, so the migration must."""
     db_path = str(tmp_path / 'test.db')
     legacy_database(db_path)
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', db_path)
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', db_path)
 
     create_app()
 
@@ -139,7 +139,7 @@ def test_a_zero_amount_row_backfills_as_an_expense(tmp_path, monkeypatch):
     displayed number moves: a zero contributes zero to an expense total."""
     db_path = str(tmp_path / 'test.db')
     legacy_database(db_path)
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', db_path)
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', db_path)
 
     create_app()
 
@@ -151,7 +151,7 @@ def test_the_migration_is_a_no_op_the_second_time(tmp_path, monkeypatch):
     has since been edited away from what the sign implies."""
     db_path = str(tmp_path / 'test.db')
     legacy_database(db_path)
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', db_path)
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', db_path)
 
     create_app()
     conn = sqlite3.connect(db_path)
@@ -164,7 +164,7 @@ def test_the_migration_is_a_no_op_the_second_time(tmp_path, monkeypatch):
     assert kinds_in(db_path, 'transactions', [2])[2] == INVENTORY
 
 
-from gigledger.models import User, db
+from design_portal.models import User, db
 from test_finance_characterization import (authenticated_client,
                                             build_app, demo_user_id)
 
@@ -269,7 +269,7 @@ def test_a_generated_recurring_transaction_inherits_its_kind(app):
 def test_marking_an_invoice_paid_writes_a_tax_expense_with_a_kind(app):
     """Paid posts only the tax reserve since docs/adr/0016; that row still
     needs a kind."""
-    from gigledger.models import Invoice
+    from design_portal.models import Invoice
     with app.app_context():
         invoice = Invoice.query.filter(Invoice.tax_amount > 0).first()
         invoice_id, number = invoice.id, invoice.invoice_number
@@ -397,7 +397,7 @@ def with_inventory(tmp_path, monkeypatch):
     from test_finance_characterization import LEDGER
     app = build_app(tmp_path, monkeypatch)
     with app.app_context():
-        user_id = User.query.filter_by(email='demo@gigledger.com').first().id
+        user_id = User.query.filter_by(email='demo@example.com').first().id
         Transaction.query.delete()
         for amount, category, deductible, day in LEDGER:
             db.session.add(Transaction(
@@ -418,7 +418,7 @@ def with_inventory(tmp_path, monkeypatch):
 def test_an_inventory_purchase_is_not_an_expense(with_inventory):
     """The whole reason for the kind column. Compare against the
     characterization figures: expenses are unchanged by 980 of inventory."""
-    from gigledger.finance import calculate_monthly_summary
+    from design_portal.finance import calculate_monthly_summary
     with with_inventory.app_context():
         income, expenses = calculate_monthly_summary(2026, 3)
     assert income == 7500.00
@@ -426,7 +426,7 @@ def test_an_inventory_purchase_is_not_an_expense(with_inventory):
 
 
 def test_an_inventory_purchase_does_not_reduce_taxable_income(with_inventory):
-    from gigledger.finance import calculate_quarterly_tax
+    from design_portal.finance import calculate_quarterly_tax
     with with_inventory.app_context():
         income, deductions, net, _ = calculate_quarterly_tax(1, 2026, 0.30)
     assert (income, deductions, net) == (7500.00, 1500.00, 6000.00)
@@ -435,14 +435,14 @@ def test_an_inventory_purchase_does_not_reduce_taxable_income(with_inventory):
 def test_an_inventory_purchase_does_leave_the_bank(with_inventory):
     """Cash is not profit. The money is gone even though the cost is not
     recognised, so the balance falls by the full purchase price."""
-    from gigledger.finance import calculate_safe_to_spend
+    from design_portal.finance import calculate_safe_to_spend
     with with_inventory.app_context():
         balance, _, _ = calculate_safe_to_spend(0.30)
     assert balance == pytest.approx(5550.00 - INVENTORY_PURCHASE)
 
 
 def test_an_inventory_purchase_is_absent_from_expense_categories(with_inventory):
-    from gigledger.finance import get_category_breakdown
+    from design_portal.finance import get_category_breakdown
     with with_inventory.app_context():
         categories, _ = get_category_breakdown(year=2026, month=3)
     assert 'Seating' not in categories

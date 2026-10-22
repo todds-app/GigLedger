@@ -9,13 +9,14 @@ ADRs, comments, and code all use the same word for the same thing.
 
 ### Canonical Name
 
-**GigLedger.** The single name the project is called, from which every other
+**Design Portal.** The single name the project is called, from which every other
 name derives: the package directory, the database filename, the `package.json`
-name, the systemd instance, and both git remotes.
+name, and (once the checkout is renamed) the systemd instance.
 
 Settled in [ADR-0001](adr/0001-declare-package-identity.md). The codebase
-previously carried two names — `FreelanceCash` internally and `GigLedger`
-externally — as the result of an unfinished rename inherited from upstream.
+previously carried two names — `FreelanceCash` internally and the upstream
+project's name externally — as the result of an unfinished rename inherited
+from upstream.
 
 ### Display Name
 
@@ -27,8 +28,8 @@ and are therefore changed in separate commits.
 ### Package Identity
 
 The importable Python name of the application package — the string `X` in
-`import X.app`. Here it is `gigledger`, fixed by the name of the
-[gigledger/](../gigledger/) directory inside the repository.
+`import X.app`. Here it is `design_portal`, fixed by the name of the
+[design_portal/](../design_portal/) directory inside the repository.
 
 The distinction that matters: package identity is **declared**, not inferred
 from where the repository happens to be checked out. Deriving it from the
@@ -46,18 +47,18 @@ symlinking — makes it a fact nothing can verify. See
 repository root, *outside* the application package. It makes the app and hands
 it to a WSGI server. It needs no `sys.path` manipulation, because Python places
 a script's own directory at `sys.path[0]`, which is exactly the directory that
-contains the `gigledger/` package.
+contains the `design_portal/` package.
 
 ### Application Factory
 
-`create_app()` in [gigledger/app.py](../gigledger/app.py) — builds and
+`create_app()` in [design_portal/app.py](../design_portal/app.py) — builds and
 configures the Flask `app` object. Standard Flask pattern: configuration,
 extension binding, and blueprint registration happen here rather than at import
 time.
 
 ### Data Path
 
-`DB_PATH` in [gigledger/app.py](../gigledger/app.py) — the absolute path to the
+`DB_PATH` in [design_portal/app.py](../design_portal/app.py) — the absolute path to the
 SQLite database, derived once at module level and consumed by both
 `create_app()` and `_migrate_db()`.
 
@@ -153,7 +154,7 @@ over, and only one the allowlist already accepted.
 
 ### Upload Root
 
-`UPLOAD_ROOT` in [gigledger/documents.py](../gigledger/documents.py) — the
+`UPLOAD_ROOT` in [design_portal/documents.py](../design_portal/documents.py) — the
 absolute path to the uploads directory, derived once at module level exactly as
 **Data Path** is, resolving to the repository root beside the database. Same
 reasoning, same reason it is shared rather than recomputed: a test points it at
@@ -182,17 +183,17 @@ does not show you someone probing for documents they were never granted.
 
 The distinction that runs through every discussion of document access here.
 
-For an **upload**, GigLedger holds the bytes and serves them only to the owner
+For an **upload**, Design Portal holds the bytes and serves them only to the owner
 and to holders of a [[Share Grant]] — the rule is *enforced*. For a **link**,
-GigLedger controls who is shown the URL and Google controls who can open it —
+Design Portal controls who is shown the URL and Google controls who can open it —
 the rule is *advisory*. The share form says so on link documents rather than
 letting an identical-looking checkbox imply a guarantee it cannot make. See
 **Reference, not Integration** below.
 
 ### Reference, not Integration
 
-What "shared via Google Drive" means in GigLedger: the app stores a **URL**, and
-Google decides who may open it. GigLedger holds no Google credentials and never
+What "shared via Google Drive" means in Design Portal: the app stores a **URL**, and
+Google decides who may open it. Design Portal holds no Google credentials and never
 fetches the file.
 
 The consequence to keep in mind whenever document access is discussed: the
@@ -356,16 +357,16 @@ it. Seconds become hours by `round_quarter`: nearest quarter hour, half up.
 ### Project Manifest
 
 [autostart.env](../autostart.env) — declares `AUTOSTART_DESC`, `AUTOSTART_PORT`,
-and `AUTOSTART_EXEC`. Read by `proj-run`, which the `proj@GigLedger.service`
+and `AUTOSTART_EXEC`. Read by `proj-run`, which the `proj@<checkout>.service`
 systemd user unit invokes. Committed, by convention with the sibling projects.
 
 ### Instance Name
 
-The `%i` in `proj@GigLedger.service` — resolved by `proj-run` to a single
+The `%i` in `proj@<checkout>.service` — resolved by `proj-run` to a single
 directory under `~/projects`. **This is still coupled to the checkout directory
 name**, deliberately and separately from package identity. Renaming the checkout
-requires updating the systemd instance and the absolute path in the manifest;
-it no longer affects Python imports.
+requires re-enabling the unit under the new instance name; the manifest's
+`AUTOSTART_EXEC` is relative to the checkout, and Python imports are unaffected.
 
 ---
 
@@ -373,10 +374,11 @@ it no longer affects Python imports.
 
 ### Upstream
 
-`Cyber-Dioxide/GigLedger` — the repository this project was forked from. Treated
+The `upstream` git remote — the open-source freelancer ledger this project was
+forked from. Treated
 as a hard fork: no further merges are expected, which is what makes structural
 divergence such as [ADR-0001](adr/0001-declare-package-identity.md) acceptable.
 
 ### Origin
 
-`todds-app/GigLedger` — this fork.
+The `origin` git remote — this fork, under `todds-app`.

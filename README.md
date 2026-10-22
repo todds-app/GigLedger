@@ -1,6 +1,6 @@
 <div align="center">
 
-# 💰 GigLedger
+# 💰 Design Portal
 
 ### The All-in-One Finance Dashboard for Freelancers
 
@@ -12,14 +12,14 @@
 
 ---
 
-> **Stop juggling multiple apps.** GigLedger is a self-hosted finance dashboard built for freelancers, contractors, and gig workers who want a clear picture of income, expenses, invoices, projects, and quarterly tax obligations — all in one place, without the complexity of full accounting software.
+> **Stop juggling multiple apps.** Design Portal is a self-hosted finance dashboard built for freelancers, contractors, and gig workers who want a clear picture of income, expenses, invoices, projects, and quarterly tax obligations — all in one place, without the complexity of full accounting software.
 <img width="3441" height="1356" alt="Screenshot from 2026-05-26 10-24-46" src="https://github.com/user-attachments/assets/61f00f01-0cfd-4b73-99b8-eb6bf62f83b9" />
 
 ---
 
-## ✨ Why GigLedger?
+## ✨ Why Design Portal?
 
-Freelancers have unique financial challenges that personal finance apps don't solve and accounting software overcomplicates. GigLedger fills that gap with three core questions answered at a glance:
+Freelancers have unique financial challenges that personal finance apps don't solve and accounting software overcomplicates. Design Portal fills that gap with three core questions answered at a glance:
 
 | Question | Answer |
 |---|---|
@@ -100,7 +100,7 @@ No more setting aside random percentages. No more spreadsheet gymnastics. Just c
 
 ### 📎 Project Documents
 - **Attach files to a project** — Contracts, briefs, spreadsheets, presentations, images, archives (50 MB each)
-- **Or link a document** — Paste a Google Drive URL and GigLedger keeps the reference
+- **Or link a document** — Paste a Google Drive URL and Design Portal keeps the reference
 - **Downloads are always attachments** — Never rendered in the browser, whatever the file type
 - **Stored under generated names** — The name you chose is data; the file on disk is an opaque token
 - **Deleting a project deletes its documents** — Rows *and* bytes
@@ -108,20 +108,20 @@ No more setting aside random percentages. No more spreadsheet gymnastics. Just c
 - **Share with any of your clients** — Not just the project's own client; unchecking a box revokes access immediately
 - **Access log** — Every successful download is recorded, by you or by a client
 
-> **Linked documents are a reference, not an integration.** GigLedger stores the
+> **Linked documents are a reference, not an integration.** Design Portal stores the
 > URL; Google decides who can open it. Access rules are *enforced* for uploads
 > and *advisory* for links — see [docs/adr/0007](docs/adr/0007-google-drive-as-reference.md).
 
 ### 🔑 Client Portal
-- **Invite-based access** — Enable portal access per client; GigLedger generates a single-use link that expires in 7 days
-- **You deliver the invite** — GigLedger sends no email, so the link is shown once for you to copy and send however you already talk to your client
+- **Invite-based access** — Enable portal access per client; Design Portal generates a single-use link that expires in 7 days
+- **You deliver the invite** — Design Portal sends no email, so the link is shown once for you to copy and send however you already talk to your client
 - **Immediate revocation** — Revoking signs the client out on their next request, not whenever their cookie happens to expire
 - **One login per person** — A client on several projects uses one account
 - **Login throttling** — Repeated failures lock an address out for 15 minutes, on the client login *and* yours
 - **Documents grouped by project under the business name** — One login shows every document it's been granted, organized by the project it belongs to
 - **Project name only** — Clients see the project a document belongs to, never its rate, hours or internal description
 - **Off switch** — `PORTAL_ENABLED=0` removes the portal routes entirely
-- **Demo seed is opt-in** — `SEED_DEMO=1` seeds the demo business and `demo@gigledger.com` on an empty database; without it a fresh install starts at `/setup`
+- **Demo seed is opt-in** — `SEED_DEMO=1` seeds the demo business and `demo@example.com` on an empty database; without it a fresh install starts at `/setup`
 
 > **Clients are not admins.** Portal sessions live outside Flask-Login on
 > purpose: `current_user` always means an admin, and an admin sees every row.
@@ -202,7 +202,7 @@ Tells you how many months you can survive at your current spending rate. Color-c
 When invoice is paid:
   → Tax reserve transaction: -invoice.tax_amount
 ```
-When you mark an invoice as paid, GigLedger automatically creates a tax reserve expense (the tax portion) that sets aside what you owe. This ensures your "Safe to Spend" accurately reflects that the tax money is already spoken for. No income row is posted: the income an invoice bills is the transaction you already entered in the ledger. If you revert an invoice back to "Sent", the tax reserve is removed.
+When you mark an invoice as paid, Design Portal automatically creates a tax reserve expense (the tax portion) that sets aside what you owe. This ensures your "Safe to Spend" accurately reflects that the tax money is already spoken for. No income row is posted: the income an invoice bills is the transaction you already entered in the ledger. If you revert an invoice back to "Sent", the tax reserve is removed.
 
 ---
 
@@ -231,8 +231,8 @@ When you mark an invoice as paid, GigLedger automatically creates a tax reserve 
 
 ```bash
 # Clone the repository — the folder may be named anything
-git clone https://github.com/YOUR_USERNAME/gigledger.git
-cd gigledger
+git clone https://github.com/YOUR_USERNAME/design-portal.git
+cd design-portal
 
 # Create a virtual environment
 python -m venv venv
@@ -253,7 +253,7 @@ The app starts at **http://localhost:3030**
 > invitation — see the Team feature section below and
 > [docs/adr/0014](docs/adr/0014-one-business-per-install.md).
 
-> The application package is the `gigledger/` directory inside the repository,
+> The application package is the `design_portal/` directory inside the repository,
 > so it is importable under that name no matter what the checkout folder is
 > called. Earlier versions derived the package name from the folder and
 > required a matching folder name or a symlink; that is no longer the case.
@@ -280,7 +280,7 @@ in instantly with pre-loaded data:
 
 | Field | Value |
 |---|---|
-| **Email** | `demo@gigledger.com` |
+| **Email** | `demo@example.com` |
 | **Password** | `demo1234` |
 
 The demo account includes a complete freelancer workspace:
@@ -296,12 +296,12 @@ The demo account includes a complete freelancer workspace:
 ## 📁 Project Structure
 
 ```
-gigledger/                      # Repository root — may be named anything
+design-portal/                  # Repository root — may be named anything
 ├── run.py                      # Entry point (port 3030)
 ├── requirements.txt            # Python dependencies
-├── gigledger.db                # SQLite database (auto-created, gitignored)
+├── design_portal.db            # SQLite database (auto-created, gitignored)
 ├── uploads/                    # Attached project documents (auto-created, gitignored)
-├── gigledger/                  # The application package
+├── design_portal/              # The application package
 │   ├── app.py                  # Flask app factory, config, seed data, DB migrations
 │   ├── models.py               # SQLAlchemy models (18 models)
 │   ├── documents.py            # Document storage: upload root, allowlist, URL scheme rules
@@ -462,7 +462,7 @@ gigledger/                      # Repository root — may be named anything
 
 ## 🎨 Themes & Dark Mode
 
-GigLedger ships with **5 color themes** and a full **dark mode** toggle:
+Design Portal ships with **5 color themes** and a full **dark mode** toggle:
 
 | Theme | Accent Color | Vibe |
 |---|---|---|

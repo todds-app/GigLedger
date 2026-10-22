@@ -6,9 +6,9 @@ the seed stays off by default (tests/test_team.py) deletes the variable again.
 """
 import pytest
 
-import gigledger.app
-import gigledger.documents
-from gigledger.app import create_app
+import design_portal.app
+import design_portal.documents
+from design_portal.app import create_app
 
 
 @pytest.fixture(autouse=True)
@@ -18,8 +18,8 @@ def _seed_demo_for_tests(monkeypatch):
 
 def build_app(tmp_path, monkeypatch, **config):
     """An app backed by a throwaway database and a throwaway upload root."""
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', str(tmp_path / 'test.db'))
-    monkeypatch.setattr(gigledger.documents, 'UPLOAD_ROOT', str(tmp_path / 'uploads'))
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', str(tmp_path / 'test.db'))
+    monkeypatch.setattr(design_portal.documents, 'UPLOAD_ROOT', str(tmp_path / 'uploads'))
     app = create_app()
     app.config.update(TESTING=True, SECRET_KEY='test-key',
                       WTF_CSRF_ENABLED=False, **config)

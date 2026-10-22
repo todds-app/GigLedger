@@ -5,7 +5,7 @@
 
 ## Context
 
-GigLedger was written for one freelancer: every row carried a `user_id`, and
+Design Portal was written for one freelancer: every row carried a `user_id`, and
 every route filtered on `user_id = current_user.id`, so two logins were two
 businesses that could not see each other. The install this was built for is
 one interior-design practice — a designer and perhaps an assistant or two —

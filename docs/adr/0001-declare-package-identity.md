@@ -15,14 +15,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from freelancecash.app import create_app
 ```
 
-That name was `freelancecash`, but the checkout is named `GigLedger`. The
+That name was `freelancecash`, but the checkout was named after the project's newer name. The
 importable name of the application was therefore a consequence of what the
 checkout folder happened to be called — a fact about the filesystem, not
 something the project declared or could verify.
 
 This is downstream of an unfinished rename inherited from upstream commit
 `8627fa3`, which converted `models.py`, `routes/projects.py`,
-`routes/invoices.py`, and `routes/reports.py` to `GigLedger` and left `app.py`,
+`routes/invoices.py`, and `routes/reports.py` to the newer name and left `app.py`,
 `finance.py`, `run.py`, `__init__.py`, `package.json`, the templates, and the
 database filename on `FreelanceCash`.
 
@@ -50,19 +50,18 @@ Two fixes were considered and rejected:
 
 ## Decision
 
-Move the application into a `gigledger/` subpackage inside the repository, and
+Move the application into a `design_portal/` subpackage inside the repository, and
 leave `run.py` at the repository root importing it by its declared name:
 
 ```python
-from gigledger.app import create_app
+from design_portal.app import create_app
 ```
 
 No `sys.path` manipulation is required, because Python already places a script's
 own directory at `sys.path[0]`. The checkout folder may be named anything.
 
-The canonical name is **GigLedger**, chosen because every external dependant —
-the repository, both git remotes, and the `proj@GigLedger.service` systemd unit
-— already uses it, while `FreelanceCash` survived only in internal strings.
+The canonical name is **Design Portal**, with `design_portal` as the package and
+`design-portal` as the `package.json` name. `FreelanceCash` is retired.
 
 ## Consequences
 
@@ -74,11 +73,12 @@ the repository, both git remotes, and the `proj@GigLedger.service` systemd unit
 - The README's installation instructions were wrong in a harmful direction —
   they told readers to create the symlink — and are corrected in the same
   change.
-- The directory name remains load-bearing for *deployment*: `proj@GigLedger.service`
-  resolves `%i` to `~/projects/GigLedger`, and `autostart.env` hardcodes an
-  absolute interpreter path. Renaming the checkout still requires updating both.
-  This decision decouples Python from the directory name, not systemd.
+- The directory name remains load-bearing for *deployment*: `proj@<checkout>.service`
+  resolves `%i` to `~/projects/<checkout>`. `autostart.env` uses a path relative
+  to the checkout, so renaming the checkout only requires re-enabling the unit
+  under the new instance name. This decision decouples Python from the
+  directory name, not systemd.
 - `tests/test_smoke.py` asserts the package imports under its declared name, so
   a regression fails in CI rather than at launch.
-- This diverges structurally from `Cyber-Dioxide/GigLedger`. Acceptable: this is
+- This diverges structurally from the upstream repository. Acceptable: this is
   a hard fork with no planned upstream merges.

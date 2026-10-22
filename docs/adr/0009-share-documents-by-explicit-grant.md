@@ -80,7 +80,7 @@ link — because which one it is would itself be information.
 - The access rule is now **enforced** for uploaded documents: the bytes are
   served only to the owner and to clients holding a grant. For **link**
   documents it remains **advisory**, exactly as
-  [ADR-0007](0007-google-drive-as-reference.md) warned — GigLedger controls who
+  [ADR-0007](0007-google-drive-as-reference.md) warned — Design Portal controls who
   is shown the link, and Google controls who can open it. The share form says
   so on link documents specifically, rather than letting the checkbox imply a
   guarantee it cannot make.

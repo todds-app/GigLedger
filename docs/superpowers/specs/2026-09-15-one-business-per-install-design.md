@@ -11,7 +11,7 @@
 
 ## Problem
 
-GigLedger was written for a freelancer working alone: every row carries a
+Design Portal was written for a freelancer working alone: every row carries a
 `user_id`, and ~60 query sites across every route module filter with
 `user_id=current_user.id`. Two logins are two businesses that cannot see each
 other's data.
@@ -133,7 +133,7 @@ A new section on the Settings page:
 - **Open invitations** — email, expiry, *Cancel*.
 - **Invite an admin** — email field. On submit the single-use link is shown
   once, in the same "copy this and send it however you already talk to them"
-  pattern the client invite uses. GigLedger sends no email.
+  pattern the client invite uses. Design Portal sends no email.
 
 ### First-run setup
 
@@ -144,7 +144,7 @@ it cannot later be used to add an account.
 
 ### The demo seed no longer runs on its own
 
-`create_app()` today seeds `demo@gigledger.com / demo1234` into any empty
+`create_app()` today seeds `demo@example.com / demo1234` into any empty
 database. Under one business that is a known-password admin who sees
 everything, on every fresh install. The seed runs only when `SEED_DEMO=1` is
 set; without it a fresh database starts at `/setup`. The seed itself is
@@ -180,7 +180,7 @@ In `_migrate_db`, idempotent, in this order:
 2. `ALTER TABLE users ADD COLUMN last_login_at DATETIME` if missing.
 3. If `business` is empty and `users` is not: insert one row copied from the
    business columns of the lowest-id user. On the live database that is
-   `demo@gigledger.com` — name "Demo Freelance Studio", prefix `INV`, counter
+   `demo@example.com` — name "Demo Freelance Studio", prefix `INV`, counter
    15 — so invoice numbering continues without a gap.
 4. If both tables are empty, do nothing; `/setup` will create the row.
 
@@ -189,10 +189,10 @@ read.
 
 ## Rollout on ledger.danismithdesign.com
 
-1. Back up `gigledger.db` (the run wrapper already does this).
+1. Back up `design_portal.db` (the run wrapper already does this).
 2. Deploy. The first request runs the migration above.
 3. The migration seeds `business` from the **lowest-id user**, which on the
-   live database is `demo@gigledger.com`, not `dani@danismithdesign.com` (user
+   live database is `demo@example.com`, not `dani@danismithdesign.com` (user
    2). None of the values configured on user 2 are carried over. Sign in as
    `dani@danismithdesign.com`, open Settings → Business, and re-enter exactly:
    - Business name: `Dani Smith Design`
@@ -207,7 +207,7 @@ read.
    restarts the visible sequence at `DSD-0001` unless the counter is also set
    to 15 on the Business settings page.
 
-   Once the values above are re-entered, remove `demo@gigledger.com` from the
+   Once the values above are re-entered, remove `demo@example.com` from the
    Team panel.
 4. Update `TEST_CREDENTIALS.md`.
 

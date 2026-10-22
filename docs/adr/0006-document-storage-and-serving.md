@@ -41,7 +41,7 @@ second copy is where it gets forgotten.
 **Uploaded bytes live in `uploads/` at the repository root** — beside the
 database, outside the importable package, for the reason already settled in
 [ADR-0002](0002-database-path.md): user data does not belong in the source tree.
-`UPLOAD_ROOT` is derived once in `gigledger/documents.py` and shared, so a test
+`UPLOAD_ROOT` is derived once in `design_portal/documents.py` and shared, so a test
 can point it somewhere disposable and every writer follows.
 
 **The name on disk is generated, never chosen.** A `uuid4` hex token carries

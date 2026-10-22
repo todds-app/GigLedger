@@ -14,14 +14,14 @@ from datetime import datetime
 
 import pytest
 
-import gigledger.app
-from gigledger.app import create_app
-from gigledger.models import Transaction, User, db
+import design_portal.app
+from design_portal.app import create_app
+from design_portal.models import Transaction, User, db
 
 
 def build_app(tmp_path, monkeypatch, **config):
     """An app backed by a throwaway database, never the real one."""
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', str(tmp_path / 'test.db'))
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', str(tmp_path / 'test.db'))
     app = create_app()
     app.config.update(TESTING=True, SECRET_KEY='test-key',
                       WTF_CSRF_ENABLED=False, **config)
@@ -44,7 +44,7 @@ def ledger(tmp_path, monkeypatch):
     """An app whose only transactions are LEDGER, owned by the demo user."""
     app = build_app(tmp_path, monkeypatch)
     with app.app_context():
-        user = User.query.filter_by(email='demo@gigledger.com').first()
+        user = User.query.filter_by(email='demo@example.com').first()
         Transaction.query.delete()
         for amount, category, deductible, day in LEDGER:
             db.session.add(Transaction(
@@ -59,7 +59,7 @@ def ledger(tmp_path, monkeypatch):
 
 def demo_user_id(app):
     with app.app_context():
-        return User.query.filter_by(email='demo@gigledger.com').first().id
+        return User.query.filter_by(email='demo@example.com').first().id
 
 
 def authenticated_client(app):
@@ -71,7 +71,7 @@ def authenticated_client(app):
 
 
 def test_monthly_summary(ledger):
-    from gigledger.finance import calculate_monthly_summary
+    from design_portal.finance import calculate_monthly_summary
     with ledger.app_context():
         income, expenses = calculate_monthly_summary(2026, 3)
     assert income == 7500.00
@@ -79,7 +79,7 @@ def test_monthly_summary(ledger):
 
 
 def test_quarterly_income_and_deductions(ledger):
-    from gigledger.finance import calculate_quarterly_income_deductions
+    from design_portal.finance import calculate_quarterly_income_deductions
     with ledger.app_context():
         income, deductions = calculate_quarterly_income_deductions(1, 2026)
     assert income == 7500.00
@@ -87,7 +87,7 @@ def test_quarterly_income_and_deductions(ledger):
 
 
 def test_quarterly_tax(ledger):
-    from gigledger.finance import calculate_quarterly_tax
+    from design_portal.finance import calculate_quarterly_tax
     with ledger.app_context():
         income, deductions, net, tax = calculate_quarterly_tax(1, 2026, 0.30)
     assert (income, deductions, net) == (7500.00, 1500.00, 6000.00)
@@ -96,14 +96,14 @@ def test_quarterly_tax(ledger):
 
 def test_bank_balance_is_every_transaction(ledger):
     """Cash, not profit: the balance sums all transactions regardless of kind."""
-    from gigledger.finance import calculate_safe_to_spend
+    from design_portal.finance import calculate_safe_to_spend
     with ledger.app_context():
         balance, _, _ = calculate_safe_to_spend(0.30)
     assert balance == pytest.approx(5550.00)
 
 
 def test_category_breakdown_is_expenses_only(ledger):
-    from gigledger.finance import get_category_breakdown
+    from design_portal.finance import get_category_breakdown
     with ledger.app_context():
         categories, totals = get_category_breakdown(year=2026, month=3)
     assert dict(zip(categories, totals)) == {

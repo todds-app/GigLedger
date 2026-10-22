@@ -13,13 +13,13 @@ Two things this file is careful about:
    whether or not CSRF is enforced, and the test would pass with protection
    switched off. `test_the_probe_is_not_vacuous` pins that down.
 2. **It uses a throwaway database.** create_app() otherwise resolves to the real
-   gigledger.db, and a *failing* run - one where a route wrongly acts on the
+   design_portal.db, and a *failing* run - one where a route wrongly acts on the
    request - would write to the user's data.
 """
 import pytest
 
-import gigledger.app
-from gigledger.app import create_app
+import design_portal.app
+from design_portal.app import create_app
 
 
 # Routes deliberately not protected. Empty by design: an entry here is a
@@ -31,7 +31,7 @@ UNSAFE = {'POST', 'PUT', 'PATCH', 'DELETE'}
 
 def build_app(tmp_path, monkeypatch, **config):
     """An app backed by a throwaway database, never the real one."""
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', str(tmp_path / 'test.db'))
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', str(tmp_path / 'test.db'))
     app = create_app()
     app.config.update(TESTING=True, SECRET_KEY='test-key', **config)
     app.login_manager.session_protection = None

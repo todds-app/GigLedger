@@ -6,10 +6,10 @@ from datetime import datetime, timedelta
 
 import pytest
 
-import gigledger.app
-from gigledger.app import create_app
-from gigledger.models import AdminInvite, Business, User, db
-from gigledger import team
+import design_portal.app
+from design_portal.app import create_app
+from design_portal.models import AdminInvite, Business, User, db
+from design_portal import team
 from tests.conftest import build_app, login_as
 
 
@@ -36,7 +36,7 @@ def test_the_login_page_does_not_link_to_signup(app):
 def test_the_login_page_does_not_advertise_demo_credentials(app):
     body = app.test_client().get('/login').get_data(as_text=True)
     assert 'demo1234' not in body
-    assert 'demo@gigledger.com' not in body
+    assert 'demo@example.com' not in body
 
 
 def test_the_demo_seed_does_not_run_without_the_flag(empty_app):
@@ -47,7 +47,7 @@ def test_the_demo_seed_does_not_run_without_the_flag(empty_app):
 
 def test_the_demo_seed_runs_with_the_flag(app):
     with app.app_context():
-        assert User.query.filter_by(email='demo@gigledger.com').count() == 1
+        assert User.query.filter_by(email='demo@example.com').count() == 1
 
 
 def test_the_seed_is_a_no_op_on_a_database_that_went_through_setup(tmp_path, monkeypatch):
@@ -67,7 +67,7 @@ def test_the_seed_is_a_no_op_on_a_database_that_went_through_setup(tmp_path, mon
 
     with app.app_context():
         assert User.query.count() == 1
-        assert User.query.filter_by(email='demo@gigledger.com').count() == 0
+        assert User.query.filter_by(email='demo@example.com').count() == 0
         assert Business.query.count() == 1
         assert Business.get().name == 'Dani Smith Design'
         assert Business.get().next_invoice_number == 40
@@ -118,24 +118,24 @@ def test_setup_is_a_404_once_an_admin_exists(app):
 
 
 def test_login_records_last_login_at(app):
-    from gigledger.app import bcrypt
+    from design_portal.app import bcrypt
     with app.app_context():
         user = User.query.get(1)
         user.password_hash = bcrypt.generate_password_hash('demo1234').decode('utf-8')
         db.session.commit()
-    app.test_client().post('/login', data={'email': 'demo@gigledger.com',
+    app.test_client().post('/login', data={'email': 'demo@example.com',
                                            'password': 'demo1234'})
     with app.app_context():
         assert User.query.get(1).last_login_at is not None
 
 
 def test_login_accepts_the_email_in_any_case(app):
-    from gigledger.app import bcrypt
+    from design_portal.app import bcrypt
     with app.app_context():
         user = User.query.get(1)
         user.password_hash = bcrypt.generate_password_hash('demo1234').decode('utf-8')
         db.session.commit()
-    response = app.test_client().post('/login', data={'email': 'Demo@GigLedger.com',
+    response = app.test_client().post('/login', data={'email': 'Demo@Example.com',
                                                       'password': 'demo1234'})
     assert response.status_code == 302
     assert response.headers['Location'].endswith('/')
@@ -166,7 +166,7 @@ def test_an_invite_is_shown_once_and_stored_hashed(admin_client, app):
 
 
 def test_an_invite_for_an_existing_admin_is_refused(admin_client, app):
-    admin_client.post('/settings/team/invite', data={'email': 'demo@gigledger.com'})
+    admin_client.post('/settings/team/invite', data={'email': 'demo@example.com'})
     with app.app_context():
         assert AdminInvite.query.count() == 0
 
@@ -253,7 +253,7 @@ def _second_admin(app):
 
 def test_an_admin_can_be_removed_and_their_rows_stay(admin_client, app):
     other_id = _second_admin(app)
-    from gigledger.models import Client
+    from design_portal.models import Client
     with app.app_context():
         db.session.add(Client(user_id=other_id, name='Added By Assistant'))
         db.session.commit()
@@ -287,6 +287,6 @@ def test_the_team_panel_lists_admins_and_open_invites(admin_client, app):
     _second_admin(app)
     _invite(admin_client, app, email='new@example.com')
     body = admin_client.get('/settings').get_data(as_text=True)
-    assert 'demo@gigledger.com' in body
+    assert 'demo@example.com' in body
     assert 'assistant@example.com' in body
     assert 'new@example.com' in body

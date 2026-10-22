@@ -69,7 +69,7 @@ both.
   login, 35 of 37 routes redirect to `/login` regardless of CSRF, and the
   enforcement test would pass with protection disabled — it was written that
   way first, and the vacuity check is what caught it.
-- Tests run against a throwaway database rather than the real `gigledger.db`,
+- Tests run against a throwaway database rather than the real `design_portal.db`,
   because a *failing* enforcement run is one where routes do act, and those
   writes would land in real data.
 - **Trap for later: `WTF_CSRF_SSL_STRICT` behind a proxy.** Flask-WTF also

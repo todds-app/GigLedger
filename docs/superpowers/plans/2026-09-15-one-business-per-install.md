@@ -4,7 +4,7 @@
 
 **Goal:** Every admin login sees and edits the same clients, projects, invoices, transactions, documents and settings; admins are added by invitation from Settings; public sign-up is removed; a fresh install starts at `/setup`.
 
-**Architecture:** A single-row `Business` model takes the business-wide settings off `User`; `Business.get()` is the one seam that fetches it, and a context processor injects it into every template as `business`. Every `filter_by(user_id=current_user.id)` loses its `user_id` clause so `@login_required` is the whole access rule; `user_id` columns stay as a passive "created by" stamp. A new `gigledger/team.py` owns admin invites (a copy of the portal-invite pattern) and the first-run setup rule.
+**Architecture:** A single-row `Business` model takes the business-wide settings off `User`; `Business.get()` is the one seam that fetches it, and a context processor injects it into every template as `business`. Every `filter_by(user_id=current_user.id)` loses its `user_id` clause so `@login_required` is the whole access rule; `user_id` columns stay as a passive "created by" stamp. A new `design_portal/team.py` owns admin invites (a copy of the portal-invite pattern) and the first-run setup rule.
 
 **Tech Stack:** Flask 3, Flask-SQLAlchemy, Flask-Login, Flask-Bcrypt, Flask-WTF (CSRF), SQLite, Jinja2, pytest.
 
@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Python 3.13, run tests with `venv/bin/python -m pytest tests -q` from the repo root. Every task ends with the full suite green.
-- Never run `create_app()` against the real `gigledger.db` in a test: every test app patches `gigledger.app.DB_PATH` (and `gigledger.documents.UPLOAD_ROOT` where documents are involved) to a `tmp_path`. `tests/conftest.py` (Task 1) sets `SEED_DEMO=1` for every test so the existing fixtures that rely on seeded rows keep working.
+- Never run `create_app()` against the real `design_portal.db` in a test: every test app patches `design_portal.app.DB_PATH` (and `design_portal.documents.UPLOAD_ROOT` where documents are involved) to a `tmp_path`. `tests/conftest.py` (Task 1) sets `SEED_DEMO=1` for every test so the existing fixtures that rely on seeded rows keep working.
 - No hand-built HTML in routes: pages are rendered from templates (`tests/test_no_handbuilt_html.py` enforces this; ADR-0005).
 - Every unsafe route is CSRF-protected by default (`tests/test_csrf.py` walks the url map). New POST routes need no special handling; do not add `@csrf.exempt`.
 - Values interpolated into inline JS or `onsubmit` handlers go through `|tojson|forceescape` (ADR-0004).
@@ -26,36 +26,36 @@
 ## File Structure
 
 **Create**
-- `gigledger/team.py` — admin invites (`create_invite`, `open_invite`, `redeem_invite`, `cancel_invite`), admin removal rule (`can_remove`), first-run rule (`needs_setup`). Mirrors `portal_auth.py`'s shape so the two invite flows read alike.
-- `gigledger/routes/team.py` — `team_bp`: `/settings/team/invite` (POST), `/settings/team/invites/<id>/cancel` (POST), `/settings/team/admins/<id>/remove` (POST), `/join/<token>` (GET/POST), `/setup` (GET/POST).
-- `gigledger/templates/settings/_team.html` — the Team panel, included from `settings/index.html`.
-- `gigledger/templates/auth/join.html` — redeem an admin invite.
-- `gigledger/templates/auth/setup.html` — first-run setup.
+- `design_portal/team.py` — admin invites (`create_invite`, `open_invite`, `redeem_invite`, `cancel_invite`), admin removal rule (`can_remove`), first-run rule (`needs_setup`). Mirrors `portal_auth.py`'s shape so the two invite flows read alike.
+- `design_portal/routes/team.py` — `team_bp`: `/settings/team/invite` (POST), `/settings/team/invites/<id>/cancel` (POST), `/settings/team/admins/<id>/remove` (POST), `/join/<token>` (GET/POST), `/setup` (GET/POST).
+- `design_portal/templates/settings/_team.html` — the Team panel, included from `settings/index.html`.
+- `design_portal/templates/auth/join.html` — redeem an admin invite.
+- `design_portal/templates/auth/setup.html` — first-run setup.
 - `tests/conftest.py` — `SEED_DEMO` autouse fixture, `build_app`, `app`, `admin_client`.
 - `tests/test_business.py` — `Business` model, migration, context processor.
 - `tests/test_team.py` — invites, join, remove, setup, signup gone, seed gate.
 - `docs/adr/0014-one-business-per-install.md`.
 
 **Modify**
-- `gigledger/models.py` — add `Business`, `AdminInvite`; shrink `User`; move category helpers.
-- `gigledger/app.py` — migration, seed gate, seed creates `Business`, context processor injects `business`, register `team_bp`.
-- `gigledger/finance.py`, `gigledger/documents.py` — drop `user_id` parameters.
-- `gigledger/routes/{auth,settings,dashboard,taxes,reports,transactions,inventory,recurring,goals,clients,projects,invoices,portal}.py` — drop scoping, read `Business.get()`.
-- `gigledger/templates/base.html`, `settings/index.html`, `auth/login.html`, `invoices/export.html`, `invoices/detail.html`, `transactions/export.html`, `transactions/_edit_modal.html`, `transactions/index.html`, `dashboard/index.html`, `recurring/index.html`, `portal/index.html`.
-- `gigledger/portal_auth.py` — module docstring and `visible_clients` docstring.
+- `design_portal/models.py` — add `Business`, `AdminInvite`; shrink `User`; move category helpers.
+- `design_portal/app.py` — migration, seed gate, seed creates `Business`, context processor injects `business`, register `team_bp`.
+- `design_portal/finance.py`, `design_portal/documents.py` — drop `user_id` parameters.
+- `design_portal/routes/{auth,settings,dashboard,taxes,reports,transactions,inventory,recurring,goals,clients,projects,invoices,portal}.py` — drop scoping, read `Business.get()`.
+- `design_portal/templates/base.html`, `settings/index.html`, `auth/login.html`, `invoices/export.html`, `invoices/detail.html`, `transactions/export.html`, `transactions/_edit_modal.html`, `transactions/index.html`, `dashboard/index.html`, `recurring/index.html`, `portal/index.html`.
+- `design_portal/portal_auth.py` — module docstring and `visible_clients` docstring.
 - `tests/test_documents.py`, `tests/test_document_sharing.py`, `tests/test_inventory.py`, `tests/test_portal_auth.py`, `tests/test_finance_characterization.py` — invert isolation cases; drop `user_id` arguments.
 - `docs/glossary.md`, `README.md`.
 
 **Delete**
-- `gigledger/templates/auth/signup.html`.
+- `design_portal/templates/auth/signup.html`.
 
 ---
 
 ### Task 1: `Business` model, migration, and the test scaffolding everything else needs
 
 **Files:**
-- Modify: `gigledger/models.py` (User at lines 84–147; add `Business` before `User`)
-- Modify: `gigledger/app.py` (`_migrate_db` lines 195–283; `_seed_demo_data` lines 286–300)
+- Modify: `design_portal/models.py` (User at lines 84–147; add `Business` before `User`)
+- Modify: `design_portal/app.py` (`_migrate_db` lines 195–283; `_seed_demo_data` lines 286–300)
 - Create: `tests/conftest.py`
 - Create: `tests/test_business.py`
 
@@ -75,9 +75,9 @@ the seed stays off by default (tests/test_team.py) deletes the variable again.
 """
 import pytest
 
-import gigledger.app
-import gigledger.documents
-from gigledger.app import create_app
+import design_portal.app
+import design_portal.documents
+from design_portal.app import create_app
 
 
 @pytest.fixture(autouse=True)
@@ -87,8 +87,8 @@ def _seed_demo_for_tests(monkeypatch):
 
 def build_app(tmp_path, monkeypatch, **config):
     """An app backed by a throwaway database and a throwaway upload root."""
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', str(tmp_path / 'test.db'))
-    monkeypatch.setattr(gigledger.documents, 'UPLOAD_ROOT', str(tmp_path / 'uploads'))
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', str(tmp_path / 'test.db'))
+    monkeypatch.setattr(design_portal.documents, 'UPLOAD_ROOT', str(tmp_path / 'uploads'))
     app = create_app()
     app.config.update(TESTING=True, SECRET_KEY='test-key',
                       WTF_CSRF_ENABLED=False, **config)
@@ -128,9 +128,9 @@ import sqlite3
 
 import pytest
 
-import gigledger.app
-from gigledger.app import create_app
-from gigledger.models import Business, User, db
+import design_portal.app
+from design_portal.app import create_app
+from design_portal.models import Business, User, db
 from tests.conftest import build_app
 
 
@@ -215,7 +215,7 @@ def test_migration_seeds_the_business_from_the_lowest_id_user(tmp_path, monkeypa
     monkeypatch.delenv('SEED_DEMO', raising=False)
     path = tmp_path / 'legacy.db'
     _legacy_database(str(path))
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', str(path))
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', str(path))
 
     app = create_app()
 
@@ -237,7 +237,7 @@ def test_migration_is_a_no_op_the_second_time(tmp_path, monkeypatch):
     monkeypatch.delenv('SEED_DEMO', raising=False)
     path = tmp_path / 'legacy.db'
     _legacy_database(str(path))
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', str(path))
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', str(path))
 
     create_app()
     app = create_app()
@@ -251,7 +251,7 @@ def test_migration_adds_last_login_at_to_users(tmp_path, monkeypatch):
     monkeypatch.delenv('SEED_DEMO', raising=False)
     path = tmp_path / 'legacy.db'
     _legacy_database(str(path))
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', str(path))
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', str(path))
 
     app = create_app()
 
@@ -270,7 +270,7 @@ def test_the_seed_creates_the_business_row(app):
 Run: `venv/bin/python -m pytest tests/test_business.py -q`
 Expected: ImportError — `cannot import name 'Business'`.
 
-- [ ] **Step 4: Add `Business` to `gigledger/models.py`, shrink `User`**
+- [ ] **Step 4: Add `Business` to `design_portal/models.py`, shrink `User`**
 
 Insert immediately before `class User(UserMixin, db.Model):` (currently line 84):
 
@@ -371,7 +371,7 @@ class User(UserMixin, db.Model):
     recurring_transactions = db.relationship('RecurringTransaction', backref='user', lazy=True)
 ```
 
-- [ ] **Step 5: Migration and seed in `gigledger/app.py`**
+- [ ] **Step 5: Migration and seed in `design_portal/app.py`**
 
 In `_migrate_db`, replace the block that starts `# Check existing columns in users table` and ends with the `next_invoice_number` ALTER (lines 204–229) with:
 
@@ -419,7 +419,7 @@ Note `_migrate_db` runs after `db.create_all()` in `create_app`, so `business` e
 In `_seed_demo_data`, replace the `demo_user = User(...)` construction (the seven-line call) with:
 
 ```python
-    demo_user = User(email='demo@gigledger.com', password_hash=password_hash)
+    demo_user = User(email='demo@example.com', password_hash=password_hash)
     db.session.add(demo_user)
     db.session.add(Business(
         name='Demo Freelance Studio',
@@ -452,7 +452,7 @@ Expected: failures only where routes/templates still read `current_user.default_
 - [ ] **Step 8: Commit**
 
 ```bash
-git add gigledger/models.py gigledger/app.py tests/conftest.py tests/test_business.py
+git add design_portal/models.py design_portal/app.py tests/conftest.py tests/test_business.py
 git commit -m "Add the Business row and migrate business settings off User
 
 One install keeps books for one business, so the settings every admin
@@ -467,12 +467,12 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ### Task 2: Inject `business` into templates; move Settings to the `Business` row
 
 **Files:**
-- Modify: `gigledger/app.py` (context processor `inject_port`, ~line 137)
-- Modify: `gigledger/routes/settings.py` (whole file)
-- Modify: `gigledger/templates/settings/index.html` (lines 31–70, 136–170)
-- Modify: `gigledger/templates/base.html:648`
-- Modify: `gigledger/templates/transactions/export.html:45`, `transactions/index.html:98`, `transactions/_edit_modal.html:82-84`, `dashboard/index.html:373-374`, `recurring/index.html` (the `current_user.get_*` / `current_user.currency` lines)
-- Modify: `gigledger/templates/invoices/export.html:53-88`
+- Modify: `design_portal/app.py` (context processor `inject_port`, ~line 137)
+- Modify: `design_portal/routes/settings.py` (whole file)
+- Modify: `design_portal/templates/settings/index.html` (lines 31–70, 136–170)
+- Modify: `design_portal/templates/base.html:648`
+- Modify: `design_portal/templates/transactions/export.html:45`, `transactions/index.html:98`, `transactions/_edit_modal.html:82-84`, `dashboard/index.html:373-374`, `recurring/index.html` (the `current_user.get_*` / `current_user.currency` lines)
+- Modify: `design_portal/templates/invoices/export.html:53-88`
 - Test: `tests/test_business.py` (append)
 
 **Interfaces:**
@@ -539,7 +539,7 @@ def test_theme_and_dark_mode_stay_personal(admin_client, app):
 Run: `venv/bin/python -m pytest tests/test_business.py -q`
 Expected: the four new tests FAIL (AttributeError on `current_user.default_tax_rate` in the settings route / template).
 
-- [ ] **Step 3: Context processor in `gigledger/app.py`**
+- [ ] **Step 3: Context processor in `design_portal/app.py`**
 
 In `inject_port`, change the return to:
 
@@ -550,7 +550,7 @@ In `inject_port`, change the return to:
                 'business': Business.get()}
 ```
 
-- [ ] **Step 4: Rewrite `gigledger/routes/settings.py`**
+- [ ] **Step 4: Rewrite `design_portal/routes/settings.py`**
 
 Replace the file's contents with:
 
@@ -747,7 +747,7 @@ def update_business():
     return redirect(url_for('settings.index'))
 ```
 
-- [ ] **Step 5: `gigledger/templates/settings/index.html`**
+- [ ] **Step 5: `design_portal/templates/settings/index.html`**
 
 Reorder and relabel the panels so the page reads Business → Team (placeholder for Task 8) → My account. Concretely:
 
@@ -777,7 +777,7 @@ Apply these exact replacements:
 | `invoices/export.html:82` | `current_user.default_tax_rate` | `business.default_tax_rate` |
 | `invoices/export.html:88` | `current_user.invoice_note` (both occurrences) | `business.invoice_note` |
 
-Then verify nothing is left: `grep -rn "current_user\.\(business\|invoice_note\|invoice_prefix\|default_tax\|currency\|get_.*categories\|next_invoice\)" gigledger/templates` must print nothing.
+Then verify nothing is left: `grep -rn "current_user\.\(business\|invoice_note\|invoice_prefix\|default_tax\|currency\|get_.*categories\|next_invoice\)" design_portal/templates` must print nothing.
 
 - [ ] **Step 7: Run the tests**
 
@@ -787,7 +787,7 @@ Expected: PASS.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add gigledger/app.py gigledger/routes/settings.py gigledger/templates tests/test_business.py
+git add design_portal/app.py design_portal/routes/settings.py design_portal/templates tests/test_business.py
 git commit -m "Read business settings from the Business row in Settings and templates
 
 Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
@@ -798,9 +798,9 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ### Task 3: Drop scoping from the finance helpers, dashboard, taxes, reports
 
 **Files:**
-- Modify: `gigledger/finance.py` (every function taking `user_id`)
-- Modify: `gigledger/documents.py:135-157` (`per_project_stats`)
-- Modify: `gigledger/routes/dashboard.py`, `gigledger/routes/taxes.py`, `gigledger/routes/reports.py`
+- Modify: `design_portal/finance.py` (every function taking `user_id`)
+- Modify: `design_portal/documents.py:135-157` (`per_project_stats`)
+- Modify: `design_portal/routes/dashboard.py`, `design_portal/routes/taxes.py`, `design_portal/routes/reports.py`
 - Modify: `tests/test_finance_characterization.py` (call sites at lines 74–112)
 
 **Interfaces:**
@@ -815,7 +815,7 @@ In `tests/test_finance_characterization.py`, remove the first positional argumen
 Run: `venv/bin/python -m pytest tests/test_finance_characterization.py -q`
 Expected: TypeError (missing positional argument).
 
-- [ ] **Step 3: `gigledger/finance.py`**
+- [ ] **Step 3: `design_portal/finance.py`**
 
 Remove the `user_id` parameter from every function signature and every internal call, and delete each `Transaction.user_id == user_id,` filter line (there are four: in `_get_tx_range`, `calculate_safe_to_spend`, `calculate_runway`, `get_category_breakdown`) and the `filter_by(user_id=user_id)` in `get_recent_transactions` (becomes `Transaction.query`). Resulting signatures:
 
@@ -833,7 +833,7 @@ def get_category_breakdown(year=None, month=None):
 
 Add one line to the module docstring: `Every query here is business-wide: there is one business per install (ADR-0014).`
 
-- [ ] **Step 4: `gigledger/documents.py` `per_project_stats`**
+- [ ] **Step 4: `design_portal/documents.py` `per_project_stats`**
 
 ```python
 def per_project_stats():
@@ -872,12 +872,12 @@ Delete `uid = current_user.id`; `business = Business.get()`; `tax_rate = busines
 - [ ] **Step 8: Run**
 
 Run: `venv/bin/python -m pytest tests/test_finance_characterization.py tests/test_smoke.py -q`
-Expected: PASS. Also `venv/bin/python -c "import gigledger.routes.dashboard, gigledger.routes.taxes, gigledger.routes.reports"` imports cleanly.
+Expected: PASS. Also `venv/bin/python -c "import design_portal.routes.dashboard, design_portal.routes.taxes, design_portal.routes.reports"` imports cleanly.
 
 - [ ] **Step 9: Commit**
 
 ```bash
-git add gigledger/finance.py gigledger/documents.py gigledger/routes/dashboard.py gigledger/routes/taxes.py gigledger/routes/reports.py tests/test_finance_characterization.py
+git add design_portal/finance.py design_portal/documents.py design_portal/routes/dashboard.py design_portal/routes/taxes.py design_portal/routes/reports.py tests/test_finance_characterization.py
 git commit -m "Drop per-user scoping from finance, dashboard, taxes and reports
 
 Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
@@ -888,7 +888,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ### Task 4: Drop scoping from transactions, inventory, recurring, goals
 
 **Files:**
-- Modify: `gigledger/routes/transactions.py`, `gigledger/routes/inventory.py`, `gigledger/routes/recurring.py`, `gigledger/routes/goals.py`
+- Modify: `design_portal/routes/transactions.py`, `design_portal/routes/inventory.py`, `design_portal/routes/recurring.py`, `design_portal/routes/goals.py`
 - Modify: `tests/test_inventory.py:226-238` and `:478-495`
 
 **Interfaces:**
@@ -973,7 +973,7 @@ Expected: PASS.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add gigledger/routes/transactions.py gigledger/routes/inventory.py gigledger/routes/recurring.py gigledger/routes/goals.py tests/test_inventory.py
+git add design_portal/routes/transactions.py design_portal/routes/inventory.py design_portal/routes/recurring.py design_portal/routes/goals.py tests/test_inventory.py
 git commit -m "Drop per-user scoping from transactions, inventory, recurring and goals
 
 Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
@@ -984,8 +984,8 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ### Task 5: Drop scoping from clients, projects, invoices; invert the document tests
 
 **Files:**
-- Modify: `gigledger/routes/clients.py`, `gigledger/routes/projects.py`, `gigledger/routes/invoices.py`
-- Modify: `gigledger/templates/invoices/detail.html:55-60,136-139`
+- Modify: `design_portal/routes/clients.py`, `design_portal/routes/projects.py`, `design_portal/routes/invoices.py`
+- Modify: `design_portal/templates/invoices/detail.html:55-60,136-139`
 - Modify: `tests/test_documents.py` (tests at lines 210, 311, 370, 438), `tests/test_document_sharing.py` (191, 208), `tests/test_portal_auth.py` (402)
 
 **Interfaces:**
@@ -1032,7 +1032,7 @@ def test_delete_removes_a_document_uploaded_by_another_admin(app):
 
     with app.app_context():
         assert ProjectDocument.query.count() == 0
-    assert not os.path.exists(gigledger.documents.path_for(stored))
+    assert not os.path.exists(design_portal.documents.path_for(stored))
 
 
 def test_project_detail_is_visible_to_every_admin(app):
@@ -1173,12 +1173,12 @@ Expected: FAIL.
 - [ ] **Step 6: Run the whole suite**
 
 Run: `venv/bin/python -m pytest tests -q`
-Expected: everything passes except `test_document_sharing.py::test_documents_from_two_freelancers_are_grouped_by_who_shared_them` (or whatever the grouping test at ~line 258 is named) — that one is Task 6's. Confirm with `grep -rn "current_user\.\(business\|invoice_note\|invoice_prefix\|default_tax\|currency\|get_.*categories\|next_invoice\)\|user_id=current_user.id)\|user_id=uid\|user_id == uid" gigledger/routes gigledger/*.py` → only construction sites (`Model(user_id=current_user.id, ...)`) and `record_access(..., user_id=...)` should remain; no `filter_by(... user_id=` anywhere.
+Expected: everything passes except `test_document_sharing.py::test_documents_from_two_freelancers_are_grouped_by_who_shared_them` (or whatever the grouping test at ~line 258 is named) — that one is Task 6's. Confirm with `grep -rn "current_user\.\(business\|invoice_note\|invoice_prefix\|default_tax\|currency\|get_.*categories\|next_invoice\)\|user_id=current_user.id)\|user_id=uid\|user_id == uid" design_portal/routes design_portal/*.py` → only construction sites (`Model(user_id=current_user.id, ...)`) and `record_access(..., user_id=...)` should remain; no `filter_by(... user_id=` anywhere.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add gigledger/routes/clients.py gigledger/routes/projects.py gigledger/routes/invoices.py gigledger/templates/invoices/detail.html tests/test_documents.py tests/test_document_sharing.py tests/test_portal_auth.py
+git add design_portal/routes/clients.py design_portal/routes/projects.py design_portal/routes/invoices.py design_portal/templates/invoices/detail.html tests/test_documents.py tests/test_document_sharing.py tests/test_portal_auth.py
 git commit -m "Drop per-user scoping from clients, projects and invoices
 
 @login_required is now the whole access rule on the admin side. The
@@ -1192,9 +1192,9 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ### Task 6: The portal shows one business
 
 **Files:**
-- Modify: `gigledger/routes/portal.py:91-133` (`index`)
-- Modify: `gigledger/templates/portal/index.html`
-- Modify: `gigledger/portal_auth.py` (module docstring lines 1–12; `visible_clients` docstring lines 208–213)
+- Modify: `design_portal/routes/portal.py:91-133` (`index`)
+- Modify: `design_portal/templates/portal/index.html`
+- Modify: `design_portal/portal_auth.py` (module docstring lines 1–12; `visible_clients` docstring lines 208–213)
 - Modify: `tests/test_document_sharing.py` (`test_documents_from_two_freelancers_are_labelled_separately`, line 260)
 
 **Interfaces:**
@@ -1238,7 +1238,7 @@ def test_the_portal_names_the_business_once_and_groups_by_project(app):
     assert 'Other Project' in body
 ```
 
-Add `Business` to the test module's `from gigledger.models import (...)`.
+Add `Business` to the test module's `from design_portal.models import (...)`.
 
 - [ ] **Step 2: Run to see it fail**
 
@@ -1279,7 +1279,7 @@ Replace from the comment `# Every project the account is the client of is listed
                            max_upload_mb=documents_module.MAX_UPLOAD_BYTES // (1024 * 1024))
 ```
 
-Add `Business` to the `from ..models import (...)`; remove `User` from it if `grep -n "User" gigledger/routes/portal.py` shows no other use. Leave the ADR-0012 block above (`new_ids` / `mark_documents_seen`) exactly as it is.
+Add `Business` to the `from ..models import (...)`; remove `User` from it if `grep -n "User" design_portal/routes/portal.py` shows no other use. Leave the ADR-0012 block above (`new_ids` / `mark_documents_seen`) exactly as it is.
 
 - [ ] **Step 4: `templates/portal/index.html`**
 
@@ -1322,7 +1322,7 @@ Expected: PASS.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add gigledger/routes/portal.py gigledger/templates/portal/index.html gigledger/portal_auth.py tests/test_document_sharing.py
+git add design_portal/routes/portal.py design_portal/templates/portal/index.html design_portal/portal_auth.py tests/test_document_sharing.py
 git commit -m "Head the portal with the one business name and group by project
 
 Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
@@ -1333,13 +1333,13 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ### Task 7: Remove sign-up, gate the seed, add first-run setup
 
 **Files:**
-- Modify: `gigledger/routes/auth.py` (delete `signup`; record `last_login_at`; redirect to setup)
-- Delete: `gigledger/templates/auth/signup.html`
-- Modify: `gigledger/templates/auth/login.html:193`
-- Modify: `gigledger/app.py` (seed gate; register `team_bp`)
-- Create: `gigledger/team.py` (`needs_setup` only in this task; invites in Task 8)
-- Create: `gigledger/routes/team.py` (`/setup` only in this task)
-- Create: `gigledger/templates/auth/setup.html`
+- Modify: `design_portal/routes/auth.py` (delete `signup`; record `last_login_at`; redirect to setup)
+- Delete: `design_portal/templates/auth/signup.html`
+- Modify: `design_portal/templates/auth/login.html:193`
+- Modify: `design_portal/app.py` (seed gate; register `team_bp`)
+- Create: `design_portal/team.py` (`needs_setup` only in this task; invites in Task 8)
+- Create: `design_portal/routes/team.py` (`/setup` only in this task)
+- Create: `design_portal/templates/auth/setup.html`
 - Create: `tests/test_team.py`
 
 **Interfaces:**
@@ -1354,9 +1354,9 @@ Spec: docs/superpowers/specs/2026-09-15-one-business-per-install-design.md
 """
 import pytest
 
-import gigledger.app
-from gigledger.app import create_app
-from gigledger.models import Business, User, db
+import design_portal.app
+from design_portal.app import create_app
+from design_portal.models import Business, User, db
 from tests.conftest import build_app, login_as
 
 
@@ -1388,7 +1388,7 @@ def test_the_demo_seed_does_not_run_without_the_flag(empty_app):
 
 def test_the_demo_seed_runs_with_the_flag(app):
     with app.app_context():
-        assert User.query.filter_by(email='demo@gigledger.com').count() == 1
+        assert User.query.filter_by(email='demo@example.com').count() == 1
 
 
 # --- first run -----------------------------------------------------------
@@ -1435,12 +1435,12 @@ def test_setup_is_a_404_once_an_admin_exists(app):
 
 
 def test_login_records_last_login_at(app):
-    from gigledger.app import bcrypt
+    from design_portal.app import bcrypt
     with app.app_context():
         user = User.query.get(1)
         user.password_hash = bcrypt.generate_password_hash('demo1234').decode('utf-8')
         db.session.commit()
-    app.test_client().post('/login', data={'email': 'demo@gigledger.com',
+    app.test_client().post('/login', data={'email': 'demo@example.com',
                                            'password': 'demo1234'})
     with app.app_context():
         assert User.query.get(1).last_login_at is not None
@@ -1451,11 +1451,11 @@ def test_login_records_last_login_at(app):
 Run: `venv/bin/python -m pytest tests/test_team.py -q`
 Expected: FAIL — `/signup` is 200, seed runs regardless, `/setup` is 404 everywhere, `last_login_at` stays None.
 
-- [ ] **Step 3: `gigledger/team.py` (first-run rule)**
+- [ ] **Step 3: `design_portal/team.py` (first-run rule)**
 
 ```python
 """
-GigLedger - Admin accounts: who may be one, and how they get in.
+Design Portal - Admin accounts: who may be one, and how they get in.
 
 One install keeps books for one business, and every admin sees every row
 (docs/adr/0014). Admins are therefore added by invitation from Settings rather
@@ -1475,7 +1475,7 @@ def needs_setup():
     return User.query.count() == 0
 ```
 
-- [ ] **Step 4: `gigledger/routes/team.py` (setup route)**
+- [ ] **Step 4: `design_portal/routes/team.py` (setup route)**
 
 ```python
 from flask import Blueprint, render_template, redirect, url_for, request, flash, abort
@@ -1521,7 +1521,7 @@ def setup():
 
 - [ ] **Step 5: `templates/auth/setup.html`**
 
-Base it on `auth/login.html` (same wrapper markup, logo, card). Title block: `Set up - GigLedger`. Card heading "Set up your business"; sub-line "This creates the first admin account. More admins can be invited from Settings." Form `method="POST" action="{{ url_port('team.setup') }}"` with `{{ csrf_field() }}` and fields: `business_name` (text, required), `email` (email, required), `password` (password, required, `minlength="12"`), `confirm_password` (password, required); submit "Create account →". No sign-in link, no demo credentials block.
+Base it on `auth/login.html` (same wrapper markup, logo, card). Title block: `Set up - Design Portal`. Card heading "Set up your business"; sub-line "This creates the first admin account. More admins can be invited from Settings." Form `method="POST" action="{{ url_port('team.setup') }}"` with `{{ csrf_field() }}` and fields: `business_name` (text, required), `email` (email, required), `password` (password, required, `minlength="12"`), `confirm_password` (password, required); submit "Create account →". No sign-in link, no demo credentials block.
 
 - [ ] **Step 6: `routes/auth.py`**
 
@@ -1543,9 +1543,9 @@ Base it on `auth/login.html` (same wrapper markup, logo, card). Title block: `Se
 
   with `from datetime import datetime` added.
 
-Delete `gigledger/templates/auth/signup.html`. In `auth/login.html` delete line 193 (the "Don't have an account? Sign up" paragraph).
+Delete `design_portal/templates/auth/signup.html`. In `auth/login.html` delete line 193 (the "Don't have an account? Sign up" paragraph).
 
-- [ ] **Step 7: `gigledger/app.py`**
+- [ ] **Step 7: `design_portal/app.py`**
 
 Register the blueprint alongside the others:
 
@@ -1575,13 +1575,13 @@ Expected: PASS. (`test_csrf` probes `POST /setup` without a token and expects a 
 
 - [ ] **Step 9: Update `autostart.env` note and the run wrapper**
 
-The live service starts via `autostart.env` → `run.py` and the database is already seeded, so nothing changes for it. Add to `README.md` under the Client Portal section a line: `SEED_DEMO=1` seeds the demo business and `demo@gigledger.com` on an empty database; without it a fresh install starts at `/setup`. (Full README pass is Task 9; this one line goes in now so the flag is documented in the same commit that introduces it.)
+The live service starts via `autostart.env` → `run.py` and the database is already seeded, so nothing changes for it. Add to `README.md` under the Client Portal section a line: `SEED_DEMO=1` seeds the demo business and `demo@example.com` on an empty database; without it a fresh install starts at `/setup`. (Full README pass is Task 9; this one line goes in now so the flag is documented in the same commit that introduces it.)
 
 - [ ] **Step 10: Commit**
 
 ```bash
-git add gigledger/team.py gigledger/routes/team.py gigledger/routes/auth.py gigledger/app.py gigledger/templates/auth tests/test_team.py README.md
-git rm gigledger/templates/auth/signup.html
+git add design_portal/team.py design_portal/routes/team.py design_portal/routes/auth.py design_portal/app.py design_portal/templates/auth tests/test_team.py README.md
+git rm design_portal/templates/auth/signup.html
 git commit -m "Replace sign-up with first-run setup and make the demo seed opt-in
 
 Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
@@ -1592,13 +1592,13 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ### Task 8: Admin invites, join, and the Team panel
 
 **Files:**
-- Modify: `gigledger/models.py` (add `AdminInvite` after `PortalInvite`)
-- Modify: `gigledger/team.py` (invites, removal rule)
-- Modify: `gigledger/routes/team.py` (invite, cancel, remove, join)
-- Modify: `gigledger/routes/settings.py` `index` (pass admins + invites)
-- Create: `gigledger/templates/settings/_team.html`
-- Modify: `gigledger/templates/settings/index.html` (include the panel at the marker)
-- Create: `gigledger/templates/auth/join.html`
+- Modify: `design_portal/models.py` (add `AdminInvite` after `PortalInvite`)
+- Modify: `design_portal/team.py` (invites, removal rule)
+- Modify: `design_portal/routes/team.py` (invite, cancel, remove, join)
+- Modify: `design_portal/routes/settings.py` `index` (pass admins + invites)
+- Create: `design_portal/templates/settings/_team.html`
+- Modify: `design_portal/templates/settings/index.html` (include the panel at the marker)
+- Create: `design_portal/templates/auth/join.html`
 - Test: `tests/test_team.py` (append)
 
 **Interfaces:**
@@ -1610,8 +1610,8 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ```python
 from datetime import datetime, timedelta
 
-from gigledger.models import AdminInvite
-from gigledger import team
+from design_portal.models import AdminInvite
+from design_portal import team
 
 
 def _invite(admin_client, app, email='assistant@example.com'):
@@ -1639,7 +1639,7 @@ def test_an_invite_is_shown_once_and_stored_hashed(admin_client, app):
 
 
 def test_an_invite_for_an_existing_admin_is_refused(admin_client, app):
-    admin_client.post('/settings/team/invite', data={'email': 'demo@gigledger.com'})
+    admin_client.post('/settings/team/invite', data={'email': 'demo@example.com'})
     with app.app_context():
         assert AdminInvite.query.count() == 0
 
@@ -1726,7 +1726,7 @@ def _second_admin(app):
 
 def test_an_admin_can_be_removed_and_their_rows_stay(admin_client, app):
     other_id = _second_admin(app)
-    from gigledger.models import Client
+    from design_portal.models import Client
     with app.app_context():
         db.session.add(Client(user_id=other_id, name='Added By Assistant'))
         db.session.commit()
@@ -1760,7 +1760,7 @@ def test_the_team_panel_lists_admins_and_open_invites(admin_client, app):
     _second_admin(app)
     _invite(admin_client, app, email='new@example.com')
     body = admin_client.get('/settings').get_data(as_text=True)
-    assert 'demo@gigledger.com' in body
+    assert 'demo@example.com' in body
     assert 'assistant@example.com' in body
     assert 'new@example.com' in body
 ```
@@ -1770,7 +1770,7 @@ def test_the_team_panel_lists_admins_and_open_invites(admin_client, app):
 Run: `venv/bin/python -m pytest tests/test_team.py -q`
 Expected: the new tests FAIL (ImportError on `AdminInvite`).
 
-- [ ] **Step 3: `AdminInvite` in `gigledger/models.py`** (after `PortalInvite`)
+- [ ] **Step 3: `AdminInvite` in `design_portal/models.py`** (after `PortalInvite`)
 
 ```python
 class AdminInvite(db.Model):
@@ -1796,7 +1796,7 @@ class AdminInvite(db.Model):
 
 `db.create_all()` creates the table on existing databases too, so no `_migrate_db` change is needed.
 
-- [ ] **Step 4: `gigledger/team.py` (invites and removal)**
+- [ ] **Step 4: `design_portal/team.py` (invites and removal)**
 
 Append:
 
@@ -1870,7 +1870,7 @@ def can_remove(target, actor):
 
 Note the circular-import shape: `team.py` imports `bcrypt` from `app.py`, exactly as `routes/auth.py` does, so it must be imported *inside* `create_app` consumers (the route module), not at `app.py` import time. `routes/team.py` already imports it that way.
 
-- [ ] **Step 5: `gigledger/routes/team.py` (append the four routes)**
+- [ ] **Step 5: `design_portal/routes/team.py` (append the four routes)**
 
 ```python
 from flask import session
@@ -1976,7 +1976,7 @@ with `from flask import session` and `AdminInvite, User` added to the models imp
 ```html
 <div class="glass-card p-6 fade-up fade-up-delay-1">
     <h2 class="text-lg font-extrabold text-gray-900 mb-1">Team</h2>
-    <p class="text-xs text-gray-400 mb-4">Every admin sees and edits the same books. Invite someone by creating a link and sending it yourself &mdash; GigLedger does not send email.</p>
+    <p class="text-xs text-gray-400 mb-4">Every admin sees and edits the same books. Invite someone by creating a link and sending it yourself &mdash; Design Portal does not send email.</p>
 
     <div class="space-y-2 mb-5">
         {% for admin in admins %}
@@ -2033,7 +2033,7 @@ In `settings/index.html`, replace the `{# Team panel: ... #}` marker from Task 2
 
 - [ ] **Step 8: `templates/auth/join.html`**
 
-Same wrapper as `auth/setup.html`. Title `Join - GigLedger`. Heading "You've been invited to join {{ business.name or 'GigLedger' }}"; sub-line "for **{{ invite.email }}**". Form `method="POST" action="{{ url_port('team.join', token=token) }}"` with `{{ csrf_field() }}`, `password` (required, `minlength="12"`), `confirm_password` (required); submit "Join →". Footer line: "This invitation can be used once, and expires seven days after it was created."
+Same wrapper as `auth/setup.html`. Title `Join - Design Portal`. Heading "You've been invited to join {{ business.name or 'Design Portal' }}"; sub-line "for **{{ invite.email }}**". Form `method="POST" action="{{ url_port('team.join', token=token) }}"` with `{{ csrf_field() }}`, `password` (required, `minlength="12"`), `confirm_password` (required); submit "Join →". Footer line: "This invitation can be used once, and expires seven days after it was created."
 
 - [ ] **Step 9: Run**
 
@@ -2043,7 +2043,7 @@ Expected: all PASS, including `test_csrf` (the three new POST routes reject toke
 - [ ] **Step 10: Commit**
 
 ```bash
-git add gigledger/models.py gigledger/team.py gigledger/routes/team.py gigledger/routes/settings.py gigledger/templates/settings tests/test_team.py gigledger/templates/auth/join.html
+git add design_portal/models.py design_portal/team.py design_portal/routes/team.py design_portal/routes/settings.py design_portal/templates/settings tests/test_team.py design_portal/templates/auth/join.html
 git commit -m "Add admins by invitation from a Team panel in Settings
 
 Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
@@ -2068,7 +2068,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 ## Context
 
-GigLedger was written for one freelancer: every row carried a `user_id`, and
+Design Portal was written for one freelancer: every row carried a `user_id`, and
 every route filtered on `user_id = current_user.id`, so two logins were two
 businesses that could not see each other. The install this was built for is
 one interior-design practice — a designer and perhaps an assistant or two —
@@ -2165,9 +2165,9 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 Not a task for the implementer — a checklist for the operator, from the spec:
 
-1. `cp gigledger.db gigledger.db.bak-$(date +%Y%m%d-%H%M%S)-pre-0014`
-2. Restart the `proj@GigLedger` service (the first request runs `_migrate_db`, which seeds `business` from `demo@gigledger.com`'s columns: name "Demo Freelance Studio", prefix `INV`, counter 15).
+1. `cp design_portal.db design_portal.db.bak-$(date +%Y%m%d-%H%M%S)-pre-0014`
+2. Restart the `proj@<checkout>` service (the first request runs `_migrate_db`, which seeds `business` from `demo@example.com`'s columns: name "Demo Freelance Studio", prefix `INV`, counter 15).
 3. Sign in as `dani@danismithdesign.com` → Settings → Business: rename to "Dani Smith Design".
-4. Settings → Team: remove `demo@gigledger.com`.
+4. Settings → Team: remove `demo@example.com`.
 5. Update `TEST_CREDENTIALS.md` (drop the demo row).
 6. Confirm a portal login (Okafor or Raman) shows "Dani Smith Design" as the heading.

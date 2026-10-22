@@ -26,10 +26,10 @@ against a file that does not exist, skipping every `ALTER TABLE` while the app
 starts normally and appears healthy. Second, `base_dir` is derived from
 `__file__`, so moving the code (as [0001](0001-declare-package-identity.md)
 does) moves the database with it — the file would have landed inside the
-`gigledger/` source package, where a careless `rm -rf gigledger/` takes the
+`design_portal/` source package, where a careless `rm -rf design_portal/` takes the
 user's data along with the code.
 
-The database was renamed as part of adopting **GigLedger** as the canonical
+The database was renamed as part of adopting **Design Portal** as the canonical
 name. The existing file contained only seeded demo data — a single
 `demo@freelancecash.com` user and its generated clients, transactions, invoices,
 projects and goals — so it was discarded and re-seeded rather than migrated. A
@@ -42,7 +42,7 @@ Derive the path once, at module level, anchored to the repository root:
 ```python
 DB_PATH = os.path.join(
     os.path.dirname(os.path.abspath(os.path.dirname(__file__))),
-    'gigledger.db',
+    'design_portal.db',
 )
 ```
 

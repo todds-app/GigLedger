@@ -10,9 +10,9 @@ from datetime import datetime, timedelta
 
 import pytest
 
-import gigledger.app
-from gigledger.app import create_app
-from gigledger.models import (INCOME, Project, TimeLog, Transaction, db,
+import design_portal.app
+from design_portal.app import create_app
+from design_portal.models import (INCOME, Project, TimeLog, Transaction, db,
                               quarter_hours, round_quarter)
 from conftest import login_as
 
@@ -166,7 +166,7 @@ def test_an_existing_projects_table_gains_timer_columns_and_its_hours_become_one
     conn.execute("INSERT INTO projects VALUES (4, 7, 'Idle', 0, '2026-08-01 09:00:00')")
     conn.commit()
     conn.close()
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', path)
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', path)
 
     create_app()
     create_app()  # idempotent: the second start must not add a second log
@@ -679,7 +679,7 @@ def test_a_legacy_time_logs_table_loses_its_unique_link(tmp_path, monkeypatch):
     conn.execute("INSERT INTO time_logs VALUES (2, 7, 3, 1.0, '2026-08-03', '2026-08-04', NULL, '2026-08-04')")
     conn.commit()
     conn.close()
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', path)
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', path)
 
     create_app()
     create_app()  # idempotent

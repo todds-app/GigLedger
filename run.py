@@ -1,8 +1,8 @@
-"""GigLedger - Entry Point"""
+"""Design Portal - Entry Point"""
 import os
 
-from gigledger.app import create_app
-from gigledger.models import db
+from design_portal.app import create_app
+from design_portal.models import db
 
 app = create_app()
 
@@ -16,5 +16,5 @@ def shutdown_session(exception=None):
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 3030))
     from werkzeug.serving import run_simple
-    print(f"GigLedger starting on port {port}...")
+    print(f"Design Portal starting on port {port}...")
     run_simple('0.0.0.0', port, app, use_reloader=False, use_debugger=False, threaded=True)

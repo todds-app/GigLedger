@@ -14,7 +14,7 @@ import pathlib
 
 import pytest
 
-ROUTES = pathlib.Path(__file__).resolve().parent.parent / 'gigledger' / 'routes'
+ROUTES = pathlib.Path(__file__).resolve().parent.parent / 'design_portal' / 'routes'
 
 # Substrings that mark a string literal as HTML rather than, say, a flash
 # message that happens to contain an angle bracket.

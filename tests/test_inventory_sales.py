@@ -10,9 +10,9 @@ from datetime import datetime
 
 import pytest
 
-import gigledger.app
-from gigledger.app import create_app
-from gigledger.models import (EXPENSE, INCOME, INVENTORY, INVENTORY_SALES_CATEGORY,
+import design_portal.app
+from design_portal.app import create_app
+from design_portal.models import (EXPENSE, INCOME, INVENTORY, INVENTORY_SALES_CATEGORY,
                               SALE_SOURCE, Invoice, InvoiceLineItem, InventoryItem,
                               Project, Transaction, db)
 from conftest import login_as
@@ -142,7 +142,7 @@ def test_existing_invoice_tables_gain_sales_tax(tmp_path, monkeypatch):
     conn.execute("INSERT INTO invoice_line_items VALUES (1, 1, 'Old line', 1, 100, 100, NULL)")
     conn.commit()
     conn.close()
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', path)
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', path)
 
     create_app()
     create_app()  # idempotent
@@ -511,7 +511,7 @@ def test_the_inventory_sales_category_is_locked_because_the_app_writes_it(app, k
     client.post(f'/settings/categories/{kind}/delete',
                 data={'category_name': INVENTORY_SALES_CATEGORY})
     with app.app_context():
-        from gigledger.models import Business
+        from design_portal.models import Business
         categories = getattr(Business.get(), f'get_{kind}_categories')()
         assert INVENTORY_SALES_CATEGORY in categories
     body = client.get('/settings').get_data(as_text=True)

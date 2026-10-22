@@ -10,9 +10,9 @@ from datetime import datetime
 
 import pytest
 
-import gigledger.app
-from gigledger.app import create_app
-from gigledger.models import (Business, DEFAULT_EXPENSE_CATEGORIES,
+import design_portal.app
+from design_portal.app import create_app
+from design_portal.models import (Business, DEFAULT_EXPENSE_CATEGORIES,
                               DEFAULT_INCOME_CATEGORIES,
                               DEFAULT_INVENTORY_CATEGORIES, EXPENSE, INCOME,
                               INVENTORY, INVENTORY_CATEGORY_GUIDANCE, KINDS,
@@ -151,7 +151,7 @@ def test_an_existing_users_table_gains_the_inventory_categories_column(tmp_path,
                  "created_at DATETIME DEFAULT CURRENT_TIMESTAMP)")
     conn.commit()
     conn.close()
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', db_path)
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', db_path)
 
     create_app()
     create_app()  # a second startup must be a no-op
@@ -268,7 +268,7 @@ def test_editing_only_the_date_leaves_an_inventory_row_inventory(app):
     """The failure piece 1's appendix describes: the old modal posted
     type=expense for anything not income, and one date change moved the
     purchase into every cost total forever."""
-    from gigledger.finance import calculate_monthly_summary
+    from design_portal.finance import calculate_monthly_summary
     with app.app_context():
         Transaction.query.delete()  # only our purchase in the ledger
         db.session.commit()

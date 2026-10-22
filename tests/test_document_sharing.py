@@ -22,17 +22,17 @@ import os
 
 import pytest
 
-import gigledger.app
-import gigledger.documents
-import gigledger.portal_auth as portal_auth
-from gigledger.app import create_app
-from gigledger.models import (Business, Client, DocumentAccess, DocumentShare, PortalAccount,
+import design_portal.app
+import design_portal.documents
+import design_portal.portal_auth as portal_auth
+from design_portal.app import create_app
+from design_portal.models import (Business, Client, DocumentAccess, DocumentShare, PortalAccount,
                               Project, ProjectDocument, TimeLog, User, db)
 
 
 def build_app(tmp_path, monkeypatch, **config):
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', str(tmp_path / 'test.db'))
-    monkeypatch.setattr(gigledger.documents, 'UPLOAD_ROOT', str(tmp_path / 'uploads'))
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', str(tmp_path / 'test.db'))
+    monkeypatch.setattr(design_portal.documents, 'UPLOAD_ROOT', str(tmp_path / 'uploads'))
     app = create_app()
     app.config.update(TESTING=True, SECRET_KEY='test-key',
                       WTF_CSRF_ENABLED=False, **config)
@@ -49,7 +49,7 @@ def app(tmp_path, monkeypatch):
     with app.app_context():
         for doc in ProjectDocument.query.all():
             if doc.stored_name:
-                gigledger.documents.delete(doc.stored_name)
+                design_portal.documents.delete(doc.stored_name)
             db.session.delete(doc)
         db.session.commit()
     return app
@@ -392,7 +392,7 @@ def test_deleting_a_project_removes_its_documents_shares(app):
 #
 # The portal flags documents shared since the account last loaded its home
 # page. "Since last visit" rather than "until opened", because opening a link
-# document never touches GigLedger - a read receipt would be honest for
+# document never touches Design Portal - a read receipt would be honest for
 # uploads and silently absent for links. See ADR-0012.
 
 def link_document(app, project_id, title='Budget sheet'):
@@ -502,8 +502,8 @@ def test_the_migration_adds_documents_seen_at_to_an_existing_portal_accounts_tab
     conn.commit()
     conn.close()
 
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', db_path)
-    monkeypatch.setattr(gigledger.documents, 'UPLOAD_ROOT', str(tmp_path / 'uploads'))
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', db_path)
+    monkeypatch.setattr(design_portal.documents, 'UPLOAD_ROOT', str(tmp_path / 'uploads'))
     create_app()
 
     conn = sqlite3.connect(db_path)
@@ -548,7 +548,7 @@ def test_a_client_can_upload_to_their_own_project(app):
         assert doc.user_id == 1                       # the freelancer's document
         assert doc.added_by_client_id == client_id    # attributed to the client
         assert doc.shared_client_ids == {client_id}   # and visible to them at once
-        assert os.path.exists(gigledger.documents.path_for(doc.stored_name))
+        assert os.path.exists(design_portal.documents.path_for(doc.stored_name))
 
 
 def test_a_client_can_add_a_link_to_their_own_project(app):
@@ -600,7 +600,7 @@ def test_a_client_upload_obeys_the_same_allowlist(app):
 
     with app.app_context():
         assert ProjectDocument.query.count() == 0
-    assert os.listdir(gigledger.documents.UPLOAD_ROOT) == []
+    assert os.listdir(design_portal.documents.UPLOAD_ROOT) == []
 
 
 def test_a_client_link_obeys_the_same_scheme_rule(app):
@@ -686,8 +686,8 @@ def test_the_migration_adds_added_by_client_id_to_an_existing_documents_table(tm
     conn.commit()
     conn.close()
 
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', db_path)
-    monkeypatch.setattr(gigledger.documents, 'UPLOAD_ROOT', str(tmp_path / 'uploads'))
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', db_path)
+    monkeypatch.setattr(design_portal.documents, 'UPLOAD_ROOT', str(tmp_path / 'uploads'))
     create_app()
 
     conn = sqlite3.connect(db_path)

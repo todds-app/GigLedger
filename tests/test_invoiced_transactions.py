@@ -10,9 +10,9 @@ from datetime import datetime
 
 import pytest
 
-import gigledger.app
-from gigledger.app import create_app
-from gigledger.models import (EXPENSE, INCOME, INVENTORY, Invoice, InvoiceLineItem,
+import design_portal.app
+from design_portal.app import create_app
+from design_portal.models import (EXPENSE, INCOME, INVENTORY, Invoice, InvoiceLineItem,
                               InventoryItem, Transaction, db)
 from conftest import login_as
 
@@ -129,7 +129,7 @@ def test_an_existing_line_items_table_gains_transaction_id(tmp_path, monkeypatch
     conn.execute("INSERT INTO invoice_line_items VALUES (1, 1, 'Old line', 1, 10, 10)")
     conn.commit()
     conn.close()
-    monkeypatch.setattr(gigledger.app, 'DB_PATH', path)
+    monkeypatch.setattr(design_portal.app, 'DB_PATH', path)
 
     create_app()
     create_app()  # idempotent
@@ -465,7 +465,7 @@ def test_a_draft_offers_to_remove_a_line_and_a_sent_invoice_does_not(app):
 
 def test_the_create_form_stores_totals_from_its_lines(app):
     with app.app_context():
-        from gigledger.models import Business
+        from design_portal.models import Business
         Business.get().default_tax_rate = 0.25
         db.session.commit()
     resp = login_as(app).post('/invoices/create', data={
@@ -582,7 +582,7 @@ def test_editing_adds_new_lines_and_recomputes(app):
     iid = a_draft(app)
     keep = a_typed_line(app, iid, rate=100)
     with app.app_context():
-        from gigledger.models import Business
+        from design_portal.models import Business
         Business.get().default_tax_rate = 0.25
         db.session.commit()
     login_as(app).post(f'/invoices/{iid}/edit', data=edit_form(
