@@ -181,13 +181,3 @@ def test_a_second_admin_sees_the_same_business_settings(admin_client, app):
 
     body = login_as(app, other_id).get('/settings').get_data(as_text=True)
     assert 'Shared Name' in body
-
-
-def test_theme_and_dark_mode_stay_personal(admin_client, app):
-    admin_client.post('/settings/dark-mode', data={'dark_mode': 'on'})
-    with app.app_context():
-        other = User(email='assistant@example.com', password_hash='x')
-        db.session.add(other)
-        db.session.commit()
-        assert User.query.get(1).dark_mode is True
-        assert bool(other.dark_mode) is False

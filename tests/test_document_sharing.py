@@ -20,6 +20,8 @@ from datetime import datetime
 import sqlite3
 import os
 
+import re
+
 import pytest
 
 import design_portal.app
@@ -285,8 +287,9 @@ def test_the_portal_names_the_business_once_and_groups_by_project(app):
     body = http.get('/portal/').get_data(as_text=True)
 
     # One <h2> heading. The name also appears inside each project's upload
-    # modal copy ("… will see it straight away"), so count the heading markup.
-    assert body.count('<h2 class="text-sm font-bold text-gray-700">Dani Smith Design</h2>') == 1
+    # modal copy ("… will see it straight away") and in the page chrome, so
+    # count the heading element, whatever it is styled with.
+    assert len(re.findall(r'<h2\b[^>]*>Dani Smith Design</h2>', body)) == 1
     assert 'Signed contract' in body
     assert 'Other Brief' in body
     assert 'Other Project' in body

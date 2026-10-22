@@ -176,8 +176,10 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
-    theme = db.Column(db.String(20), default='emerald')  # theme name
-    dark_mode = db.Column(db.Boolean, default=False)      # dark mode toggle
+    # Unused: the app has one look, the Dani Smith Design system. Kept so
+    # existing databases need no migration.
+    theme = db.Column(db.String(20), default='emerald')
+    dark_mode = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login_at = db.Column(db.DateTime, nullable=True)
 

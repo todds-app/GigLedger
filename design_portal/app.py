@@ -1,6 +1,8 @@
 """
 Design Portal - Flask Application Factory
 """
+import base64
+import functools
 import os
 from datetime import datetime
 import uuid
@@ -134,6 +136,13 @@ def create_app():
                 response.headers['Location'] = f"{location}{sep}XTransformPort={port}"
         return response
 
+    @functools.lru_cache(maxsize=1)
+    def badge_data_uri():
+        """The studio's badge as a data URI, for the downloaded documents:
+        they are opened from disk, where a link to /static would not resolve."""
+        with app.open_resource('static/dsd/logo-badge.png') as f:
+            return 'data:image/png;base64,' + base64.b64encode(f.read()).decode('ascii')
+
     # Template context: url_port helper and xport variable
     @app.context_processor
     def inject_port():
@@ -149,7 +158,7 @@ def create_app():
         from .models import INVENTORY_CATEGORY_GUIDANCE, Business
         return {'xport': port, 'url_port': url_port, 'currency_symbols': CURRENCY_SYMBOLS,
                 'inventory_guidance': INVENTORY_CATEGORY_GUIDANCE,
-                'business': Business.get()}
+                'business': Business.get(), 'badge_data_uri': badge_data_uri}
 
     # Register blueprints
     from .routes.auth import auth_bp

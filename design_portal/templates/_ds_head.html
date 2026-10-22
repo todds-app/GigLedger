@@ -1,0 +1,72 @@
+{#
+  The Dani Smith Design system, as every screen page loads it: Archivo, the
+  token sheet, Tailwind configured so its utilities can only produce the
+  system's values, and the app's UI layer on top.
+
+  The Tailwind palette is remapped rather than extended. Every colour family
+  (gray, green, red, brand, ...) resolves to the same greige ramp, so a
+  utility such as text-green-600 still renders but can no longer introduce
+  chroma: the system has no accent and no status colours. Radius is 0 and
+  shadows are none for the same reason. Meaning that colour used to carry
+  must be carried by words, signs (+/-), weight or a hairline instead.
+#}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='dsd/logo-badge.png') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='dsd/tokens.css') }}">
+<script src="{{ url_for('static', filename='vendor/tailwindcss-3.4.17.js') }}"></script>
+<script>
+    (function () {
+        // ramp: paper, paper-warm, hairline, stone, ink-soft x3, ink x4
+        var greige = { 50:'#edebe8', 100:'#f2efea', 200:'#c9c6bf', 300:'#cbc7be', 400:'#5a5854',
+                       500:'#5a5854', 600:'#5a5854', 700:'#1e1e1c', 800:'#1e1e1c', 900:'#1e1e1c', 950:'#1e1e1c' };
+        // the action ramp reaches ink sooner, so primary controls are ink, not ink-soft
+        var action = { 50:'#f2efea', 100:'#f2efea', 200:'#c9c6bf', 300:'#cbc7be', 400:'#5a5854',
+                       500:'#1e1e1c', 600:'#1e1e1c', 700:'#1e1e1c', 800:'#1e1e1c', 900:'#1e1e1c', 950:'#1e1e1c' };
+        var colors = {
+            transparent: 'transparent', current: 'currentColor', inherit: 'inherit',
+            // white is paper: a white fill must not read as a panel; white text on ink stays light
+            white: '#edebe8', black: '#1e1e1c',
+            paper: { DEFAULT: '#edebe8', warm: '#f2efea' },
+            ink: { DEFAULT: '#1e1e1c', soft: '#5a5854' },
+            hairline: '#c9c6bf', reverse: '#f5f3ef',
+            brand: action
+        };
+        ['slate','gray','zinc','neutral','stone','red','orange','amber','yellow','lime','green','emerald',
+         'teal','cyan','sky','blue','indigo','violet','purple','fuchsia','pink','rose'].forEach(function (name) {
+            colors[name] = greige;
+        });
+        var zero = {}, none = {};
+        ['none','sm','DEFAULT','md','lg','xl','2xl','3xl','full'].forEach(function (k) { zero[k] = '0'; });
+        ['sm','DEFAULT','md','lg','xl','2xl','inner','none'].forEach(function (k) { none[k] = 'none'; });
+        var core = ['Archivo', 'Neue Haas Grotesk', 'Helvetica Neue', 'Arial', 'sans-serif'];
+        tailwind.config = {
+            theme: {
+                colors: colors,
+                borderRadius: zero,
+                boxShadow: none,
+                dropShadow: { DEFAULT: 'none', sm: 'none', md: 'none', lg: 'none', xl: 'none', '2xl': 'none', none: 'none' },
+                fontFamily: { sans: core, serif: core, mono: core },
+                // 300 body, 400 titles, 500 names: never bold for emphasis
+                fontWeight: { thin: '300', extralight: '300', light: '300', normal: '400',
+                              medium: '500', semibold: '500', bold: '500', extrabold: '500', black: '500' },
+                // the system's measured ladder
+                fontSize: {
+                    xs: ['11.5px', { lineHeight: '1.4' }],
+                    sm: ['13.6px', { lineHeight: '1.55' }],
+                    base: ['15px', { lineHeight: '1.55' }],
+                    lg: ['16.7px', { lineHeight: '1.4' }],
+                    xl: ['18.7px', { lineHeight: '1.2' }],
+                    '2xl': ['26.7px', { lineHeight: '1.2' }],
+                    '3xl': ['33.3px', { lineHeight: '1.2' }],
+                    '4xl': ['40px', { lineHeight: '1.15' }],
+                    '5xl': ['53.3px', { lineHeight: '1.15' }],
+                    '6xl': ['53.3px', { lineHeight: '1.15' }]
+                },
+                extend: {}
+            }
+        };
+    })();
+</script>
+<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">

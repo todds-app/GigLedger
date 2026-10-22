@@ -409,18 +409,12 @@ def generate_pdf(id):
            'CAD': 'C$', 'AUD': 'A$', 'INR': '\u20b9', 'JPY': '\u00a5'
            }.get(Business.get().currency, '$')
 
-    status_colors = {
-        'draft': '#6b7280', 'sent': '#3b82f6', 'paid': '#16a34a',
-        'overdue': '#dc2626', 'cancelled': '#9ca3af'
-    }
-
     # Rendered from a template, not built as an f-string, so that autoescape
     # applies to the client and business fields by default. See docs/adr/0005.
     html = render_template('invoices/export.html',
         invoice=invoice,
         line_items=line_items,
-        sym=sym,
-        status_color=status_colors.get(invoice.status, '#6b7280'))
+        sym=sym)
 
     return Response(html, mimetype='text/html',
         headers={'Content-Disposition':

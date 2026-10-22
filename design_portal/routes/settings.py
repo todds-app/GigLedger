@@ -7,15 +7,6 @@ from ..models import (db, AdminInvite, Business, RecurringTransaction, Transacti
 
 settings_bp = Blueprint('settings', __name__)
 
-AVAILABLE_THEMES = {
-    'emerald': {'name': 'Emerald', 'desc': 'Fresh green, the default'},
-    'ocean': {'name': 'Ocean Blue', 'desc': 'Deep and professional'},
-    'sunset': {'name': 'Sunset Orange', 'desc': 'Warm and energetic'},
-    'rose': {'name': 'Rose Pink', 'desc': 'Bold and vibrant'},
-    'midnight': {'name': 'Midnight Slate', 'desc': 'Sleek and sophisticated'},
-}
-
-
 @settings_bp.route('/settings')
 @login_required
 def index():
@@ -29,9 +20,6 @@ def index():
         inventory_categories=business.get_inventory_categories(),
         default_inventory_categories=DEFAULT_INVENTORY_CATEGORIES,
         locked_categories={TAX_RESERVE_CATEGORY, INVENTORY_SALES_CATEGORY},
-        available_themes=AVAILABLE_THEMES,
-        current_theme=current_user.theme or 'emerald',
-        dark_mode=current_user.dark_mode or False,
         admins=User.query.order_by(User.created_at).all(),
         open_invites=[i for i in AdminInvite.query.order_by(AdminInvite.created_at).all()
                       if i.is_open()],
@@ -201,29 +189,6 @@ def delete_inventory_category():
 @login_required
 def rename_inventory_category():
     return _rename_category('inventory')
-
-
-@settings_bp.route('/settings/theme', methods=['POST'])
-@login_required
-def update_theme():
-    theme = request.form.get('theme', 'emerald')
-    if theme in AVAILABLE_THEMES:
-        current_user.theme = theme
-        db.session.commit()
-        flash(f'Theme changed to {AVAILABLE_THEMES[theme]["name"]}.', 'success')
-    else:
-        flash('Invalid theme selection.', 'error')
-    return redirect(url_for('settings.index'))
-
-
-@settings_bp.route('/settings/dark-mode', methods=['POST'])
-@login_required
-def toggle_dark_mode():
-    dark = request.form.get('dark_mode', 'off')
-    current_user.dark_mode = (dark == 'on')
-    db.session.commit()
-    flash('Dark mode ' + ('enabled' if current_user.dark_mode else 'disabled') + '.', 'success')
-    return redirect(url_for('settings.index'))
 
 
 @settings_bp.route('/settings/categories/reset', methods=['POST'])

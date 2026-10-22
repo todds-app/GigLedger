@@ -2,63 +2,91 @@
   Standalone transaction report for download. Deliberately NOT extending
   base.html: this is a self-contained file the user saves and opens from disk.
 
+  Set in the Dani Smith Design document grammar: header rail, tracked-caps
+  labels over hairlines, a DataTable, footer rail. Income and expense are told
+  apart by their sign, never by colour.
+
   It exists as a template rather than an f-string in the route so that Jinja's
   autoescape applies to the description and category fields by default.
   See docs/adr/0005.
 #}<!DOCTYPE html>
-<html><head><meta charset="UTF-8">
+<html lang="en"><head><meta charset="UTF-8">
+<title>Transaction report</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-  body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1a1a1a; margin: 40px; font-size: 12px; }
-  h1 { font-size: 24px; color: #16a34a; margin-bottom: 4px; }
-  h2 { font-size: 16px; color: #374151; margin-top: 24px; border-bottom: 2px solid #e5e7eb; padding-bottom: 6px; }
-  .subtitle { color: #6b7280; font-size: 13px; margin-bottom: 20px; }
-  .summary-grid { display: flex; gap: 16px; margin-bottom: 20px; }
-  .summary-card { flex: 1; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; }
-  .summary-card .label { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
-  .summary-card .value { font-size: 18px; font-weight: 700; margin-top: 4px; }
-  .green { color: #16a34a; }
-  .red { color: #dc2626; }
-  .amber { color: #d97706; }
-  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-  th { background: #f3f4f6; text-align: left; padding: 8px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; border-bottom: 2px solid #e5e7eb; }
-  td { padding: 7px 10px; border-bottom: 1px solid #f3f4f6; }
-  tr:nth-child(even) { background: #fafafa; }
-  .amount-pos { color: #16a34a; font-weight: 600; }
-  .amount-neg { color: #dc2626; font-weight: 600; }
-  .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; }
-  .badge-ded { background: #dcfce7; color: #16a34a; }
-  .badge-nd { background: #f3f4f6; color: #9ca3af; }
-  .footer { margin-top: 30px; padding-top: 12px; border-top: 1px solid #e5e7eb; color: #9ca3af; font-size: 10px; }
+  :root {
+    --paper: #edebe8; --ink: #1e1e1c; --ink-soft: #5a5854; --hairline: #c9c6bf;
+    --font-core: "Archivo", "Neue Haas Grotesk", "Helvetica Neue", Arial, sans-serif;
+    --rule-weight: 0.5pt; --rule-weight-strong: 0.75pt; --page-margin: 52.8px;
+  }
+  @page { size: letter landscape; margin: 0.55in; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font-core); font-weight: 300; }
+  body { padding: var(--page-margin); max-width: 1056px; margin: 0 auto; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .label { font-size: 10px; font-weight: 400; letter-spacing: 0.3em; text-transform: uppercase; color: var(--ink-soft); }
+  .rule { height: 0; border-top: var(--rule-weight) solid var(--hairline); }
+  .rail { display: flex; justify-content: space-between; align-items: flex-start; }
+  .wordmark { font-size: 13.3px; font-weight: 500; letter-spacing: 0.34em; text-transform: uppercase; }
+  .rail .label { margin-top: 8px; }
+  .rail img { width: 64px; height: 64px; }
+  h1 { margin: 40px 0 0; font-size: 33.3px; font-weight: 400; line-height: 1.2; letter-spacing: -0.005em; }
+  .intro { margin: 8px 0 0; font-size: 13.6px; line-height: 1.55; color: var(--ink-soft); }
+
+  .summary { margin-top: 36px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 32px; }
+  .summary .label { padding-bottom: 8px; border-bottom: var(--rule-weight) solid var(--hairline); }
+  .summary .value { margin-top: 12px; font-size: 18.7px; font-weight: 400; font-variant-numeric: tabular-nums; }
+
+  h2 { margin: 48px 0 0; font-size: 18.7px; font-weight: 400; }
+  table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13.6px; line-height: 1.55; }
+  th { text-align: left; padding: 0 12px 8px 0; border-bottom: var(--rule-weight-strong) solid var(--hairline);
+       font-size: 10px; font-weight: 400; letter-spacing: 0.3em; text-transform: uppercase; color: var(--ink-soft); }
+  td { padding: 8px 12px 8px 0; border-bottom: var(--rule-weight) solid var(--hairline); vertical-align: top; }
+  td.soft { color: var(--ink-soft); }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .footer { margin-top: 48px; }
+  .footer .bar { margin-top: 16px; display: flex; justify-content: space-between; }
 </style></head><body>
-  <h1>Design Portal</h1>
-  <p class="subtitle">Transaction Report &middot; {{ current_user.email }} &middot; Generated {{ generated_at.strftime('%B %d, %Y at %I:%M %p') }}</p>
+  <div class="rail">
+    <div>
+      <div class="wordmark">Dani Smith Design</div>
+      <div class="label">Transaction report</div>
+    </div>
+    <img src="{{ badge_data_uri() }}" alt="Dani Smith Design">
+  </div>
+  <div class="rule" style="margin-top: 12px;"></div>
 
-  <h2>Summary</h2>
-  <div class="summary-grid">
-    <div class="summary-card"><div class="label">Total Income</div><div class="value green">{{ sym }}{{ '{:,.2f}'.format(total_income) }}</div></div>
-    <div class="summary-card"><div class="label">Total Expenses</div><div class="value red">{{ sym }}{{ '{:,.2f}'.format(total_expenses) }}</div></div>
-    <div class="summary-card"><div class="label">Deductible</div><div class="value amber">{{ sym }}{{ '{:,.2f}'.format(total_deductible) }}</div></div>
-    <div class="summary-card"><div class="label">Net</div><div class="value {{ 'green' if net >= 0 else 'red' }}">{{ sym }}{{ '{:,.2f}'.format(net) }}</div></div>
+  <h1>Transactions</h1>
+  <p class="intro">{{ current_user.email }} &middot; Generated {{ generated_at.strftime('%-d %B %Y at %-I:%M %p') }}</p>
+
+  <div class="summary">
+    <div><div class="label">Income</div><div class="value">{{ sym }}{{ '{:,.2f}'.format(total_income) }}</div></div>
+    <div><div class="label">Expenses</div><div class="value">{{ sym }}{{ '{:,.2f}'.format(total_expenses) }}</div></div>
+    <div><div class="label">Net</div><div class="value">{{ '−' if net < 0 else '' }}{{ sym }}{{ '{:,.2f}'.format(net|abs) }}</div></div>
+    <div><div class="label">Deductible</div><div class="value">{{ sym }}{{ '{:,.2f}'.format(total_deductible) }}</div></div>
+    <div><div class="label">Tax rate</div><div class="value">{{ '%g'|format(business.default_tax_rate * 100) }}%</div></div>
+    <div><div class="label">Tax saving</div><div class="value">{{ sym }}{{ '{:,.2f}'.format(tax_saving) }}</div></div>
   </div>
 
-  <div class="summary-grid">
-    <div class="summary-card"><div class="label">Tax Rate</div><div class="value">{{ '%.0f'|format(business.default_tax_rate * 100) }}%</div></div>
-    <div class="summary-card"><div class="label">Tax Saving from Deductions</div><div class="value green">{{ sym }}{{ '{:,.2f}'.format(tax_saving) }}</div></div>
-  </div>
-
-  <h2>Transactions ({{ transactions|length }} records)</h2>
+  <h2>{{ transactions|length }} records</h2>
   <table>
-    <thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Category</th><th style="text-align:right">Amount</th><th style="text-align:center">Deductible</th><th>Invoiced</th></tr></thead>
+    <thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Category</th><th class="num">Amount</th><th>Deductible</th><th>Invoiced</th></tr></thead>
     <tbody>{% for tx in transactions %}<tr>
-            <td>{{ tx.date.strftime('%b %d, %Y') }}</td>
+            <td class="soft">{{ tx.date.strftime('%-d %b %Y') }}</td>
             <td>{{ tx.kind_label }}</td>
-            <td>{{ tx.description or '-' }}</td>
-            <td>{{ tx.category or 'Other' }}</td>
-            <td style="text-align:right" class="{{ 'amount-pos' if tx.amount > 0 else 'amount-neg' }}">{{ '+' if tx.amount > 0 else '-' }}{{ sym }}{{ '{:,.2f}'.format(tx.amount|abs) }}</td>
-            <td style="text-align:center">{% if tx.is_tax_deductible %}<span class="badge badge-ded">Yes</span>{% else %}<span class="badge badge-nd">No</span>{% endif %}</td>
-            <td>{{ tx.invoice_line.invoice.invoice_number if tx.is_invoiced else '-' }}</td>
+            <td>{{ tx.description or '—' }}</td>
+            <td class="soft">{{ tx.category or 'Other' }}</td>
+            <td class="num">{{ '+' if tx.amount > 0 else '−' }}{{ sym }}{{ '{:,.2f}'.format(tx.amount|abs) }}</td>
+            <td class="soft">{{ 'Yes' if tx.is_tax_deductible else 'No' }}</td>
+            <td class="soft">{{ tx.invoice_line.invoice.invoice_number if tx.is_invoiced else '—' }}</td>
         </tr>{% endfor %}
     </tbody>
   </table>
-  <div class="footer">Design Portal &middot; This report is for informational purposes only and does not constitute tax advice.</div>
+
+  <div class="footer">
+    <div class="rule"></div>
+    <div class="bar label">
+      <span>{{ business.name or 'Dani Smith Design' }}</span>
+      <span>For information only &mdash; not tax advice</span>
+    </div>
+  </div>
 </body></html>

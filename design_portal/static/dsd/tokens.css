@@ -1,0 +1,67 @@
+/* Dani Smith Design — design tokens.
+   Values are the system's tokens.json (greige monochrome, one family, radius 0).
+   Source of truth: the "Dani Smith Design" design system; change it there first. */
+:root {
+  /* colour — no accent at any tier */
+  --paper: #edebe8;
+  --paper-warm: #f2efea;
+  --stone: #cbc7be;
+  --ink: #1e1e1c;
+  --ink-soft: #5a5854;
+  --hairline: #c9c6bf;
+  --reverse: #f5f3ef;
+  --overlay: rgba(20, 18, 16, 0.28);
+  --overlay-strong: rgba(20, 18, 16, 0.42);
+  --surface-page: var(--paper);
+  --surface-panel: var(--stone);
+  --text-primary: var(--ink);
+  --text-meta: var(--ink-soft);
+  --text-reverse: var(--reverse);
+  --border-hairline: var(--hairline);
+  --state-hover-ink: #3b3a36;
+  --state-press-ink: #000000;
+  --focus-ring: 1px solid var(--ink);
+
+  /* type */
+  --font-core: "Archivo", "Neue Haas Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --type-cover-title: 53.3px;
+  --type-cover-eyebrow: 18.7px;
+  --type-page-title: 33.3px;
+  --type-page-intro: 16.7px;
+  --type-column-header: 18.7px;
+  --type-subhead: 16.7px;
+  --type-body: 13.6px;
+  --type-caption: 11.5px;
+  --type-wordmark: 13.3px;
+  --type-label: 10px;
+  --type-folio: 13.3px;
+  --type-pull-quote: 26.7px;
+  --leading-tight: 1.15;
+  --leading-title: 1.2;
+  --leading-body: 1.55;
+  --leading-loose: 1.7;
+  --tracking-wordmark: 0.34em;
+  --tracking-label: 0.3em;
+  --tracking-caps: 0.12em;
+  --tracking-title: -0.005em;
+  --font-weight-light: 300;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --measure-body: 45ch;
+
+  /* spacing — 8px base */
+  --space-1: 8px; --space-2: 16px; --space-3: 24px; --space-4: 32px; --space-5: 40px;
+  --space-6: 48px; --space-8: 64px; --space-10: 80px; --space-12: 96px;
+  --gutter-column: 32px;
+  --gutter-photo: 24px;
+  --row-pad: 15px;
+
+  /* shape and strokes */
+  --radius-none: 0;
+  --rule-weight: 0.5pt;
+  --rule-weight-strong: 0.75pt;
+
+  /* page geometry (US Letter @ 96dpi) */
+  --page-margin: 52.8px;
+  --footer-mark-size: 28px;
+}

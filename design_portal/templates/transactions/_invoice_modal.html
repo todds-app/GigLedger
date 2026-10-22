@@ -9,45 +9,43 @@
   openInvoiceModal(txId, description, item.sale_values) to sell.
 #}
 <div id="invoiceModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
-    <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" onclick="document.getElementById('invoiceModal').classList.add('hidden')"></div>
-    <div class="relative glass-card rounded-3xl p-7 max-w-md w-full shadow-2xl" style="background:rgba(255,255,255,0.9)">
+    <div class="absolute inset-0 bg-black/30" onclick="document.getElementById('invoiceModal').classList.add('hidden')"></div>
+    <div class="relative glass-card p-7 max-w-md w-full">
         <div class="flex items-center justify-between mb-1">
-            <h2 id="invoiceModalTitle" class="text-lg font-extrabold text-gray-900">Add to Invoice</h2>
-            <button onclick="document.getElementById('invoiceModal').classList.add('hidden')" class="text-gray-300 hover:text-gray-600 transition-colors p-1">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
+            <h2 id="invoiceModalTitle" class="text-lg font-medium text-gray-900">Add to Invoice</h2>
+            <button onclick="document.getElementById('invoiceModal').classList.add('hidden')" class="ds-label hover:text-gray-900">Close</button>
         </div>
         <p id="invoiceModalDescription" class="text-sm text-gray-400 mb-5 truncate"></p>
         <form method="POST" id="invoiceForm" class="space-y-4">
             {{ csrf_field() }}
 
-            <div id="invoiceSaleFields" class="hidden space-y-3 rounded-2xl border-2 border-amber-200/80 bg-amber-50/40 p-4">
+            <div id="invoiceSaleFields" class="hidden space-y-3 border-2 border-amber-200/80 bg-amber-50/40 p-4">
                 <div>
-                    <label for="invoice_sale_price" class="block text-sm font-semibold text-gray-600 mb-1.5">Sale price <span class="text-gray-400 font-medium">(whole item)</span></label>
+                    <label for="invoice_sale_price" class="block text-sm font-medium text-gray-600 mb-1.5">Sale price <span class="text-gray-400 font-medium">(whole item)</span></label>
                     <div class="relative">
-                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">{{ currency | currency_symbol }}</span>
+                        <span class="absolute left-3 top-1/2 text-gray-400 text-sm">{{ currency | currency_symbol }}</span>
                         <input type="number" name="sale_price" id="invoice_sale_price" step="0.01" min="0.01" disabled class="candy-input block w-full pl-7 pr-3 py-2.5 text-sm text-gray-900 focus:outline-none" placeholder="0.00">
                     </div>
                     <p id="invoiceSaleCost" class="text-[11px] text-gray-400 mt-1"></p>
                 </div>
                 <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" name="sales_tax_collected" id="invoice_sales_tax_collected" disabled onchange="applyInvoiceSalesTax()" class="accent-brand-500">
-                    <span class="text-sm font-semibold text-gray-700">Sales tax collected</span>
+                    <span class="text-sm font-medium text-gray-700">Sales tax collected</span>
                 </label>
                 <div id="invoiceSalesTaxAmount" class="hidden">
-                    <label for="invoice_sales_tax" class="block text-sm font-semibold text-gray-600 mb-1.5">How much?</label>
+                    <label for="invoice_sales_tax" class="block text-sm font-medium text-gray-600 mb-1.5">How much?</label>
                     <div class="relative">
-                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">{{ currency | currency_symbol }}</span>
+                        <span class="absolute left-3 top-1/2 text-gray-400 text-sm">{{ currency | currency_symbol }}</span>
                         <input type="number" name="sales_tax" id="invoice_sales_tax" step="0.01" min="0" disabled class="candy-input block w-full pl-7 pr-3 py-2.5 text-sm text-gray-900 focus:outline-none" placeholder="0.00">
                     </div>
                     <p class="text-[11px] text-gray-400 mt-1">Added to the invoice total. Kept out of your income - it is owed to the state.</p>
                 </div>
             </div>
 
-            <label class="block cursor-pointer rounded-2xl border-2 border-gray-200/80 p-4 has-[:checked]:border-brand-400 has-[:checked]:bg-brand-50/60 transition-all">
+            <label class="block cursor-pointer border-2 border-gray-200/80 p-4 has-[:checked]:border-brand-400 has-[:checked]:bg-brand-50/60">
                 <div class="flex items-center gap-2">
                     <input type="radio" name="target" value="new" checked onchange="applyInvoiceTarget()" class="accent-brand-500">
-                    <span class="text-sm font-bold text-gray-800">New draft invoice</span>
+                    <span class="text-sm font-medium text-gray-800">New draft invoice</span>
                 </div>
                 <select name="client_id" id="invoice_client_id" class="candy-input block w-full mt-3 px-3 py-2.5 text-sm text-gray-900 focus:outline-none">
                     <option value="">Choose a client (optional)</option>
@@ -56,10 +54,10 @@
                     {% endfor %}
                 </select>
             </label>
-            <label class="block cursor-pointer rounded-2xl border-2 border-gray-200/80 p-4 has-[:checked]:border-brand-400 has-[:checked]:bg-brand-50/60 transition-all">
+            <label class="block cursor-pointer border-2 border-gray-200/80 p-4 has-[:checked]:border-brand-400 has-[:checked]:bg-brand-50/60">
                 <div class="flex items-center gap-2">
                     <input type="radio" name="target" value="existing" onchange="applyInvoiceTarget()" class="accent-brand-500" {% if not draft_invoices %}disabled{% endif %}>
-                    <span class="text-sm font-bold text-gray-800">Add to an existing draft</span>
+                    <span class="text-sm font-medium text-gray-800">Add to an existing draft</span>
                 </div>
                 <select name="invoice_id" id="invoice_invoice_id" disabled class="candy-input block w-full mt-3 px-3 py-2.5 text-sm text-gray-900 focus:outline-none disabled:opacity-50">
                     {% for inv in draft_invoices %}
@@ -70,8 +68,8 @@
                 </select>
             </label>
             <div class="flex gap-3 pt-2">
-                <button type="button" onclick="document.getElementById('invoiceModal').classList.add('hidden')" class="flex-1 px-4 py-2.5 rounded-xl border-2 border-gray-200/80 text-sm font-semibold text-gray-600 hover:bg-white/70 transition-all">Cancel</button>
-                <button type="submit" id="invoiceModalSubmit" class="flex-1 px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-bold shadow-lg shadow-brand-500/25 transition-all">Add</button>
+                <button type="button" onclick="document.getElementById('invoiceModal').classList.add('hidden')" class="flex-1 px-4 py-2.5 border-2 border-gray-200/80 text-sm font-medium text-gray-600">Cancel</button>
+                <button type="submit" id="invoiceModalSubmit" class="flex-1 px-4 py-2.5 bg-brand-500 text-white text-sm font-medium">Add</button>
             </div>
         </form>
     </div>
