@@ -53,6 +53,12 @@ when its project goes.
 went when billing several logs together arrived. An existing `time_logs`
 table is rebuilt once without it on start.)*
 
+*(Amended 2026-11-15: the same clock is also offered on an active project's
+own page, above Hours Logged. Its forms post `return_to=detail` to come back
+there; any other value returns to the list, so the field cannot redirect
+elsewhere. Starting it says, before the click, which other project's timer it
+will stop, and afterwards what that timer had counted.)*
+
 ## Consequences
 
 **The dead column stays.** SQLite cannot drop it cleanly. It is not declared

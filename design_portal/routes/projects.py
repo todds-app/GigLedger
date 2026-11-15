@@ -170,6 +170,15 @@ def edit(id):
     return redirect(url_for('projects.list_projects'))
 
 
+def _back(project):
+    """Where a timer or Log Hours form returns to. The project's own page posts
+    return_to=detail; every other value means the list, so the field can never
+    become an open redirect."""
+    if request.form.get('return_to') == 'detail':
+        return redirect(url_for('projects.detail', id=project.id))
+    return redirect(url_for('projects.list_projects'))
+
+
 def _parse_day(value, default):
     try:
         return datetime.strptime(value, '%Y-%m-%d')
@@ -186,7 +195,7 @@ def log_hours(id):
     project page (ADR-0015)."""
     project = _owned_project(id)
     now = datetime.now()
-    back = redirect(url_for('projects.list_projects'))
+    back = _back(project)
 
     try:
         hours = round_quarter(float(request.form.get('hours', '0')))
@@ -215,7 +224,7 @@ def log_hours(id):
     db.session.commit()
 
     flash(f'{hours:g}h logged on "{project.name}".', 'success')
-    return back
+    return _back(project)
 
 
 # --- Timer -----------------------------------------------------------------
@@ -230,12 +239,16 @@ def log_hours(id):
 def timer_start(id):
     project = _owned_project(id)
     now = datetime.now()
+    stopped = []
     for other in Project.query.filter(Project.timer_started_at.isnot(None),
                                       Project.id != project.id).all():
         other.stop_timer(now)
+        stopped.append(other)
     project.start_timer(now)
     db.session.commit()
-    return redirect(url_for('projects.list_projects'))
+    for other in stopped:
+        flash(f'Stopped the timer on "{other.name}" at {other.timer_label(now)}.', 'info')
+    return _back(project)
 
 
 @projects_bp.route('/<int:id>/timer/stop', methods=['POST'])
@@ -244,7 +257,7 @@ def timer_stop(id):
     project = _owned_project(id)
     project.stop_timer(datetime.now())
     db.session.commit()
-    return redirect(url_for('projects.list_projects'))
+    return _back(project)
 
 
 @projects_bp.route('/update-status/<int:id>', methods=['POST'])
@@ -450,6 +463,10 @@ def detail(id):
                        .order_by(Transaction.date.desc()).all())
     return render_template('projects/detail.html',
         project=project,
+        # The one running clock, if it is on another project: starting this
+        # one stops it, and the timer panel says so before you click.
+        timer_elsewhere=Project.query.filter(Project.timer_started_at.isnot(None),
+                                             Project.id != project.id).first(),
         # By day, then by entry: ended_on carries a time only for migrated
         # rows, so the clock must not decide the order within a day.
         time_logs=TimeLog.query.filter_by(project_id=project.id)

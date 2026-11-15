@@ -38,12 +38,55 @@
     </div>
     {% endif %}
 
-    <!-- Hours Logged: the timer lives on the Projects page; its logs land here -->
+    <!-- Timer: the same server-side clock as the card on the Projects list
+         (ADR-0015). Offered while the project is active; afterwards only to
+         log time it already counted. Forms post return_to=detail to come back. -->
+    {% set elapsed = project.elapsed_seconds(now) %}
+    {% if project.status == 'active' or elapsed > 0 %}
+    <div id="project-timer" class="glass-card p-5 fade-up">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div class="min-w-0 flex-1">
+                <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wider">Timer</h2>
+                <p id="timer-{{ project.id }}" class="font-mono text-3xl font-medium tabular-nums mt-2 {% if project.timer_running %}text-gray-900{% else %}text-gray-400{% endif %}" data-project-id="{{ project.id }}" data-elapsed="{{ elapsed }}"{% if project.timer_running %} data-timer-running="1"{% endif %}>{{ project.timer_label(now) }}</p>
+                <p class="text-xs text-gray-400 mt-1">
+                    {% if project.timer_running %}
+                    Running since {{ project.timer_started_at.strftime('%H:%M') }}{% if project.timer_started_at.date() != now.date() %} on {{ project.timer_started_at.strftime('%d %b') }}{% endif %}{% if project.timer_since and project.timer_since < project.timer_started_at %} &middot; unlogged since {{ project.timer_since.strftime('%d %b') }}{% endif %}
+                    {% elif elapsed > 0 %}
+                    Stopped &middot; unlogged since {{ project.timer_since.strftime('%d %b') if project.timer_since else 'earlier' }}. Log it, or start again to keep counting.
+                    {% else %}
+                    Not started. Time it here, then log what it counted.
+                    {% endif %}
+                </p>
+                {% if timer_elsewhere and not project.timer_running and project.status == 'active' %}
+                <p class="text-xs text-amber-600 mt-1">Starting stops the timer on <a href="{{ url_port('projects.detail', id=timer_elsewhere.id) }}" class="font-medium underline">{{ timer_elsewhere.name }}</a>, which keeps its time.</p>
+                {% endif %}
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                {% if project.timer_running %}
+                <form method="POST" action="{{ url_port('projects.timer_stop', id=project.id) }}" class="inline">
+                    {{ csrf_field() }}
+                    <input type="hidden" name="return_to" value="detail">
+                    <button type="submit" class="px-5 py-2.5 text-sm font-medium text-white bg-red-400" title="Stop timer">Stop</button>
+                </form>
+                {% elif project.status == 'active' %}
+                <form method="POST" action="{{ url_port('projects.timer_start', id=project.id) }}" class="inline">
+                    {{ csrf_field() }}
+                    <input type="hidden" name="return_to" value="detail">
+                    <button type="submit" class="px-5 py-2.5 text-sm font-medium text-white bg-brand-500" title="Start timer">{{ 'Resume' if elapsed > 0 else 'Start' }}</button>
+                </form>
+                {% endif %}
+                <button type="button" onclick="openLogHoursModal({{ project.id|tojson|forceescape }}, {{ (project.name or '')|tojson|forceescape }}, {{ elapsed|tojson|forceescape }}, {{ project.timer_running|tojson|forceescape }}, {{ (project.timer_since.strftime('%Y-%m-%d') if project.timer_since else '')|tojson|forceescape }})" class="px-4 py-2.5 text-sm font-medium text-brand-600 glass-card" title="Log Hours">Log Hours</button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Hours Logged: what the timer banked, ready to bill -->
     <div id="hours-logged" class="glass-card p-5 fade-up">
         <div class="flex items-center justify-between mb-3">
             <div>
                 <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wider">Hours Logged</h2>
-                <p class="text-xs text-gray-400 mt-1">Time banked from the timer on the Projects page. Bill a block of hours to book it as income.</p>
+                <p class="text-xs text-gray-400 mt-1">Time banked from the timer. Bill a block of hours to book it as income.</p>
             </div>
             <div class="flex items-center gap-3 shrink-0">
                 {% if project.rate_type == 'hourly' and project.rate and project.unbilled_time_logs | length > 1 %}
@@ -98,7 +141,7 @@
         {% else %}
         <div class="text-center py-10">
             <p class="text-sm font-medium text-gray-500">No hours logged yet</p>
-            <p class="text-xs text-gray-400 mt-1">Start the timer on the <a href="{{ url_port('projects.list_projects') }}" class="text-brand-600 font-medium">Projects page</a>, then log what it counted.</p>
+            <p class="text-xs text-gray-400 mt-1">{% if project.status == 'active' %}Start the timer above, then log what it counted.{% else %}Hours are timed while a project is active.{% endif %}</p>
         </div>
         {% endif %}
     </div>
@@ -230,6 +273,9 @@
 
 {% include 'transactions/_invoice_modal.html' %}
 
+{% set timer_return_to = 'detail' %}
+{% include 'projects/_log_hours_modal.html' %}
+
 <!-- Upload modal -->
 <div id="uploadModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40">
     <div class="glass-card w-full max-w-md p-6">
@@ -275,4 +321,14 @@
         </form>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    {% include 'projects/_timer_script.html' %}
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeLogHoursModal();
+    });
+</script>
 {% endblock %}

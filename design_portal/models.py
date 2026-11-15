@@ -633,7 +633,7 @@ QUARTER_HOUR = 0.25
 
 def round_quarter(hours):
     """Nearest quarter hour, half up. The one rounding rule; the timer script
-    in projects/index.html mirrors it so the prefilled figure and the stored
+    in projects/_timer_script.html mirrors it so the prefilled figure and the stored
     figure agree."""
     return math.floor(hours / QUARTER_HOUR + 0.5) * QUARTER_HOUR
 

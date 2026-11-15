@@ -1,0 +1,51 @@
+{# The timer display and the Log Hours modal's prefill, shared by the Projects
+   list and a project's page. Include inside a <script> block. Every element
+   with data-timer-running ticks; its id is timer-<project id>. #}
+    // ===== TIMER =====
+    // The server renders each running timer's elapsed seconds; this only
+    // keeps the display moving until the next page load. Date.now() deltas,
+    // not a counter, so a throttled background tab still shows the truth.
+    var TODAY = {{ now.strftime('%Y-%m-%d')|tojson }};
+    var timers = {};
+    document.querySelectorAll('[data-timer-running]').forEach(function (el) {
+        timers[el.dataset.projectId] = {base: parseInt(el.dataset.elapsed, 10) || 0, t0: Date.now()};
+    });
+    function formatDuration(seconds) {
+        seconds = Math.max(0, Math.floor(seconds));
+        var h = Math.floor(seconds / 3600), m = Math.floor((seconds % 3600) / 60), s = seconds % 60;
+        return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+    // Mirrors models.quarter_hours: nearest quarter, half up, never zero once started.
+    function quarterHours(seconds) {
+        if (seconds <= 0) return 0;
+        return Math.max(0.25, Math.floor(seconds / 3600 / 0.25 + 0.5) * 0.25);
+    }
+    function elapsedNow(projectId, fallback) {
+        var t = timers[projectId];
+        return t ? t.base + Math.floor((Date.now() - t.t0) / 1000) : fallback;
+    }
+    function tickTimers() {
+        Object.keys(timers).forEach(function (id) {
+            var el = document.getElementById('timer-' + id);
+            if (el) el.textContent = formatDuration(elapsedNow(id, 0));
+        });
+    }
+    if (Object.keys(timers).length) setInterval(tickTimers, 1000);
+
+    // ===== LOG HOURS MODAL =====
+    function openLogHoursModal(projectId, projectName, elapsedSeconds, running, sinceDate) {
+        var seconds = running ? elapsedNow(projectId, elapsedSeconds) : elapsedSeconds;
+        var hours = quarterHours(seconds);
+        document.getElementById('logHoursModal').classList.remove('hidden');
+        document.getElementById('logProjectName').textContent = projectName;
+        document.getElementById('logHoursForm').action = '{{ url_port("projects.log_hours", id=0) }}'.replace('/0', '/' + projectId);
+        document.getElementById('log_hours').value = hours ? hours : '';
+        document.getElementById('log_started_on').value = sinceDate || TODAY;
+        document.getElementById('log_ended_on').value = TODAY;
+        var hint = document.getElementById('logTimerHint');
+        hint.textContent = seconds > 0 ? 'Timer: ' + formatDuration(seconds) + ' \u2192 ' + hours + 'h, rounded to the quarter hour. Adjust if needed.' : 'The timer is at zero; enter the hours yourself.';
+        document.getElementById('log_hours').focus();
+    }
+    function closeLogHoursModal() {
+        document.getElementById('logHoursModal').classList.add('hidden');
+    }

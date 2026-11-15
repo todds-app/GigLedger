@@ -691,3 +691,108 @@ def test_a_legacy_time_logs_table_loses_its_unique_link(tmp_path, monkeypatch):
     conn.execute("UPDATE time_logs SET transaction_id = 9 WHERE id = 2")  # now allowed
     conn.commit()
     conn.close()
+
+
+# --- The timer inside a project's page ---------------------------------------
+#
+# The same server-side clock as the card on the Projects list, offered on the
+# project's own page. A form posted from that page carries return_to=detail and
+# comes back to it; anything else still goes to the list.
+
+def test_the_project_page_offers_start_when_idle(app):
+    pid = a_project(app)
+    body = login_as(app).get(f'/projects/{pid}').get_data(as_text=True)
+    assert 'id="project-timer"' in body
+    assert f'/projects/{pid}/timer/start' in body
+    assert f'/projects/{pid}/timer/stop' not in body
+    assert 'Not started' in body
+
+
+def test_the_project_page_shows_a_running_timer_ticking(app):
+    pid = a_project(app)
+    set_timer(app, pid, running_for=timedelta(seconds=125), since=datetime(2026, 9, 2, 8, 0))
+    body = login_as(app).get(f'/projects/{pid}').get_data(as_text=True)
+    assert f'/projects/{pid}/timer/stop' in body
+    assert f'/projects/{pid}/timer/start' not in body
+    assert 'data-timer-running="1"' in body
+    assert 'Running since' in body
+    assert f'openLogHoursModal({pid}, ' in body
+    assert 'id="logHoursModal"' in body
+
+
+def test_the_project_page_shows_unlogged_time_on_a_stopped_timer(app):
+    pid = a_project(app)
+    set_timer(app, pid, seconds=3600, since=datetime(2026, 9, 2, 8, 0))
+    body = login_as(app).get(f'/projects/{pid}').get_data(as_text=True)
+    assert '1:00:00' in body
+    assert 'unlogged since 02 Sep' in body
+
+
+def test_the_project_page_warns_that_starting_stops_another_timer(app):
+    a, b = a_project(app, name='Elsewhere'), a_project(app, name='Here')
+    set_timer(app, a, running_for=timedelta(seconds=60))
+    body = login_as(app).get(f'/projects/{b}').get_data(as_text=True)
+    assert 'Starting stops the timer on' in body
+    assert 'Elsewhere' in body
+
+
+@pytest.mark.parametrize('status', ['completed', 'on_hold'])
+def test_an_inactive_project_page_cannot_start_the_timer(app, status):
+    pid = a_project(app, status=status)
+    body = login_as(app).get(f'/projects/{pid}').get_data(as_text=True)
+    assert 'id="project-timer"' not in body
+    assert f'/projects/{pid}/timer/start' not in body
+
+
+def test_an_inactive_project_with_unlogged_time_can_still_log_it(app):
+    pid = a_project(app, status='on_hold')
+    set_timer(app, pid, seconds=900)
+    body = login_as(app).get(f'/projects/{pid}').get_data(as_text=True)
+    assert 'id="project-timer"' in body
+    assert f'/projects/{pid}/timer/start' not in body
+    assert f'openLogHoursModal({pid}, ' in body
+
+
+@pytest.mark.parametrize('path', ['timer/start', 'timer/stop'])
+def test_timer_buttons_on_the_project_page_return_to_it(app, path):
+    pid = a_project(app)
+    response = login_as(app).post(f'/projects/{pid}/{path}', data={'return_to': 'detail'})
+    assert response.headers['Location'].endswith(f'/projects/{pid}')
+
+
+def test_logging_hours_from_the_project_page_returns_to_it(app):
+    pid = a_project(app)
+    response = login_as(app).post(f'/projects/log-hours/{pid}',
+                                  data={'hours': '1', 'return_to': 'detail'})
+    assert response.headers['Location'].endswith(f'/projects/{pid}')
+    assert [l.hours for l in logs_of(app, pid)] == [1.0]
+
+
+def test_a_refused_log_from_the_project_page_returns_to_it(app):
+    pid = a_project(app)
+    response = login_as(app).post(f'/projects/log-hours/{pid}',
+                                  data={'hours': '0', 'return_to': 'detail'})
+    assert response.headers['Location'].endswith(f'/projects/{pid}')
+
+
+@pytest.mark.parametrize('value', ['', 'list', 'https://evil.example/'])
+def test_any_other_return_to_goes_to_the_list(app, value):
+    pid = a_project(app)
+    response = login_as(app).post(f'/projects/{pid}/timer/start', data={'return_to': value})
+    assert response.headers['Location'].endswith('/projects/')
+
+
+def test_the_project_page_form_posts_carry_return_to(app):
+    pid = a_project(app)
+    set_timer(app, pid, running_for=timedelta(seconds=5))
+    body = login_as(app).get(f'/projects/{pid}').get_data(as_text=True)
+    assert 'name="return_to" value="detail"' in body
+
+
+def test_starting_over_another_timer_says_which_one_stopped(app):
+    a, b = a_project(app, name='Elsewhere'), a_project(app, name='Here')
+    set_timer(app, a, running_for=timedelta(seconds=75))
+    body = login_as(app).post(f'/projects/{b}/timer/start', data={'return_to': 'detail'},
+                              follow_redirects=True).get_data(as_text=True)
+    assert 'Stopped the timer on' in body
+    assert '0:01:1' in body  # 0:01:15, give or take a second
