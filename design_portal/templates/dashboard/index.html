@@ -18,7 +18,7 @@
     </div>
 
     <!-- Hours Worked: logged hours, each log counted on the day it ended (hours.py) -->
-    <div id="hours-worked" class="glass-card p-6 fade-up">
+    <div id="hours-worked" class="dash-panel p-6 fade-up">
         <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-medium text-gray-900">Hours Worked</h2>
             <a href="{{ url_port('projects.list_projects') }}" class="text-sm text-brand-600 hover:text-brand-500 font-medium transition-colors">View projects</a>
@@ -36,9 +36,11 @@
     </div>
 
     <!-- 4 Hero Cards -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+    <div id="money-this-month" class="dash-panel p-6 fade-up">
+    <h2 class="text-lg font-medium text-gray-900 mb-4">This Month</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-5">
         <!-- Income Card -->
-        <div class="bouncy-card p-6 fade-up">
+        <div class="py-2 border-t border-gray-200">
             <div class="flex items-center justify-between mb-4 relative z-10">
                 <div class="flex items-center gap-1">
                     <span class="candy-badge">Income</span>
@@ -54,7 +56,7 @@
         </div>
 
         <!-- Expenses Card -->
-        <div class="bouncy-card p-6 fade-up">
+        <div class="py-2 border-t border-gray-200">
             <div class="flex items-center justify-between mb-4 relative z-10">
                 <div class="flex items-center gap-1">
                     <span class="ds-label whitespace-nowrap">Expenses</span>
@@ -70,7 +72,7 @@
         </div>
 
         <!-- Safe to Spend Card (KILLER FEATURE) -->
-        <div class="bouncy-card p-6 fade-up">
+        <div class="py-2 border-t border-gray-200">
             <div class="flex items-center justify-between mb-4 relative z-10">
                 <span class="candy-badge">Safe to Spend</span>
             </div>
@@ -79,7 +81,7 @@
         </div>
 
         <!-- Tax Reserve Card -->
-        <div class="bouncy-card p-6 fade-up">
+        <div class="py-2 border-t border-gray-200">
             <div class="flex items-center justify-between mb-4 relative z-10">
                 <span class="ds-label whitespace-nowrap">Tax Reserve</span>
             </div>
@@ -88,10 +90,12 @@
         </div>
     </div>
 
+    </div>
+
     <!-- Chart + Quick Add -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Income vs Expenses Chart -->
-        <div class="lg:col-span-2 glass-card p-6 fade-up">
+        <div class="lg:col-span-2 dash-panel p-6 fade-up">
             <div class="flex items-center justify-between mb-4">
                 <div>
                     <h2 class="text-lg font-medium text-gray-900">Income vs. Expenses</h2>
@@ -108,7 +112,7 @@
         </div>
 
         <!-- Quick Add Form -->
-        <div class="glass-card p-6 fade-up">
+        <div class="dash-panel p-6 fade-up">
             <h2 class="text-lg font-medium text-gray-900 mb-4">Quick Add</h2>
             <form method="POST" action="{{ url_port('transactions.add') }}" id="quickAddForm" class="space-y-4">
                 {{ csrf_field() }}
@@ -162,8 +166,10 @@
     </div>
 
     <!-- Bottom Row: Balance + Runway + Net + Tax Savings -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="glass-card p-6 fade-up">
+    <div id="cash-position" class="dash-panel p-6 fade-up">
+    <h2 class="text-lg font-medium text-gray-900 mb-4">Cash Position</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-5">
+        <div class="py-2 border-t border-gray-200">
             <div class="flex items-center gap-3 mb-2">
                 <h3 class="text-sm font-medium text-gray-400">Bank Balance</h3>
             </div>
@@ -171,7 +177,7 @@
             <p class="text-xs text-gray-500 mt-1 font-medium">All-time net</p>
         </div>
 
-        <div class="glass-card p-6 fade-up">
+        <div class="py-2 border-t border-gray-200">
             <div class="flex items-center gap-3 mb-2">
                 <h3 class="text-sm font-medium text-gray-400">Runway</h3>
             </div>
@@ -181,7 +187,7 @@
             <p class="text-xs text-gray-500 mt-1 font-medium">Avg {{ currency | currency_symbol }}{{ avg_monthly_expenses | money }}/mo</p>
         </div>
 
-        <div class="glass-card p-6 fade-up">
+        <div class="py-2 border-t border-gray-200">
             <div class="flex items-center gap-3 mb-2">
                 <h3 class="text-sm font-medium text-gray-400">Net This Month</h3>
             </div>
@@ -189,7 +195,7 @@
             <p class="text-xs text-gray-500 mt-1 font-medium">Income - expenses</p>
         </div>
 
-        <div class="glass-card p-6 fade-up">
+        <div class="py-2 border-t border-gray-200">
             <div class="flex items-center gap-3 mb-2">
                 <h3 class="text-sm font-medium text-gray-400">Monthly Commitments</h3>
             </div>
@@ -198,10 +204,12 @@
         </div>
     </div>
 
+    </div>
+
     <!-- Projects + Invoices Row -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Active Projects -->
-        <div class="glass-card p-6 fade-up">
+        <div class="dash-panel p-6 fade-up">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-lg font-medium text-gray-900">Active Projects</h2>
                 <a href="{{ url_port('projects.list_projects') }}" class="text-sm text-brand-600 hover:text-brand-500 font-medium transition-colors">View all</a>
@@ -235,7 +243,7 @@
         </div>
 
         <!-- Unpaid Invoices -->
-        <div class="glass-card p-6 fade-up">
+        <div class="dash-panel p-6 fade-up">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-lg font-medium text-gray-900">Outstanding Invoices</h2>
                 <a href="{{ url_port('invoices.list_invoices') }}" class="text-sm text-brand-600 hover:text-brand-500 font-medium transition-colors">View all</a>
@@ -275,7 +283,7 @@
 
     <!-- Recent Transactions + Category Breakdown -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="glass-card p-6 fade-up">
+        <div class="dash-panel p-6 fade-up">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-lg font-medium text-gray-900">Recent</h2>
                 <a href="{{ url_port('transactions.list_transactions') }}" class="text-sm text-brand-600 hover:text-brand-500 font-medium transition-colors">View all</a>
@@ -301,7 +309,7 @@
             {% endif %}
         </div>
 
-        <div class="glass-card p-6 fade-up">
+        <div class="dash-panel p-6 fade-up">
             <h2 class="text-lg font-medium text-gray-900 mb-1">Expense Breakdown</h2>
             <p class="text-sm text-gray-400 mb-4 font-medium">This month by category</p>
             {% if cat_totals %}

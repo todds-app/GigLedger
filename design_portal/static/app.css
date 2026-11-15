@@ -98,6 +98,13 @@ td, .tabular { font-variant-numeric: tabular-nums; }
 
 .wavy-divider { height: 0; border-top: var(--rule-weight) solid var(--hairline); }
 
+/* ---------- Dashboard panels ----------
+   Each dashboard section sits in its own frame so it reads apart from its
+   neighbours: the same warmer surface and all-round hairline as the project
+   and client cards below, without their hover, since a panel is not a link.
+   Figures inside a panel keep the hairline-above-figure pattern. */
+.dash-panel { background: var(--paper-warm); border: var(--rule-weight) solid var(--hairline); border-radius: 0; box-shadow: none; }
+
 /* ---------- Project and client cards ----------
    The one place the app departs from "no cards", by request: on the Projects
    and Clients lists each entry is a box so one is easy to tell from the next. Built only
