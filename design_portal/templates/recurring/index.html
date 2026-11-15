@@ -33,11 +33,11 @@
     </div>
 
     <!-- Recurring Transactions List -->
-    <div class="glass-card overflow-hidden fade-up">
+    <div class="data-table-panel overflow-hidden fade-up">
         {% if recurring %}
         <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
-            <table class="w-full">
-                <thead class="sticky top-0 bg-white/80 border-b border-gray-100/50 z-10">
+            <table class="w-full data-table">
+                <thead>
                     <tr>
                         <th class="px-5 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Description</th>
                         <th class="px-5 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Amount</th>
@@ -46,7 +46,7 @@
                         <th class="px-5 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Next Date</th>
                         <th class="px-5 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Last Generated</th>
                         <th class="px-5 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">Active</th>
-                        <th class="px-5 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                        <th class="px-5 py-3 w-12"><span class="sr-only">Actions</span></th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100/50">
@@ -104,14 +104,17 @@
                                 </button>
                             </form>
                         </td>
-                        <td class="px-5 py-3.5 text-center">
-                            <div class="flex items-baseline justify-center gap-4">
-                                <button onclick="openEditRecurringModal({{ rt.id|tojson|forceescape }}, {{ (rt.description or '')|tojson|forceescape }}, {{ (rt.amount|abs)|tojson|forceescape }}, {{ rt.kind|tojson|forceescape }}, {{ (rt.category or '')|tojson|forceescape }}, {{ (rt.frequency or '')|tojson|forceescape }}, {{ rt.day_of_month|tojson|forceescape }}, {{ rt.is_tax_deductible|tojson|forceescape }})" class="ds-label hover:text-gray-900" title="Edit">Edit</button>
-                                <form method="POST" action="{{ url_port('recurring.delete', id=rt.id) }}" onsubmit="return confirm('Delete this recurring transaction?')" class="inline">
+                        <td class="px-5 py-3.5 text-right">
+                            <details class="row-menu">
+                                <summary aria-label="Actions for {{ rt.description }}" title="Actions">&#8943;</summary>
+                                <div class="row-menu-list">
+                                <button type="button" onclick="openEditRecurringModal({{ rt.id|tojson|forceescape }}, {{ (rt.description or '')|tojson|forceescape }}, {{ (rt.amount|abs)|tojson|forceescape }}, {{ rt.kind|tojson|forceescape }}, {{ (rt.category or '')|tojson|forceescape }}, {{ (rt.frequency or '')|tojson|forceescape }}, {{ rt.day_of_month|tojson|forceescape }}, {{ rt.is_tax_deductible|tojson|forceescape }})" class="row-menu-item">Edit</button>
+                                <form method="POST" action="{{ url_port('recurring.delete', id=rt.id) }}" onsubmit="return confirm('Delete this recurring transaction?')">
                                     {{ csrf_field() }}
-                                    <button type="submit" class="ds-label hover:text-gray-900" title="Delete">Delete</button>
+                                    <button type="submit" class="row-menu-item">Delete</button>
                                 </form>
-                            </div>
+                                </div>
+                            </details>
                         </td>
                     </tr>
                     {% endfor %}

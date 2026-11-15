@@ -215,6 +215,31 @@ table thead th {
 }
 table tbody tr { border-color: var(--hairline); }
 
+/* ---------- Data tables: framed, quietly striped ----------
+   The Invoices, Transactions, Recurring and Inventory lists. The table sits
+   in a panel like the dashboard's; every other row takes a slightly deeper
+   paper so a long row can be followed across; the header stays put while the
+   rows scroll, ruled off in ink; figures line up on their digits. */
+.data-table-panel { background: var(--paper-warm); border: var(--rule-weight) solid var(--hairline); border-radius: 0; box-shadow: none; }
+.data-table { --stripe: #e9e5de; --row-hover: #e2ddd4; }
+.data-table thead th { position: sticky; top: 0; z-index: 2; background: var(--paper-warm); border-bottom: 1px solid var(--ink); }
+.data-table tbody tr:nth-child(even) { background: var(--stripe); }
+.data-table tbody tr:hover { background: var(--row-hover); }
+.data-table .text-right { font-variant-numeric: tabular-nums; }
+
+/* Row actions: one menu per row instead of a column of words. The list is
+   placed by static/row-menu.js in fixed position, so the table's own scroll
+   box cannot clip it. */
+.row-menu { display: inline-block; }
+.row-menu > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border: var(--rule-weight) solid transparent; color: var(--ink-soft); font-size: 1.1rem; line-height: 1; user-select: none; }
+.row-menu > summary::-webkit-details-marker { display: none; }
+.row-menu > summary:hover, .row-menu[open] > summary { border-color: var(--hairline); color: var(--ink); background: var(--paper); }
+.row-menu > summary:focus-visible { outline: var(--focus-ring); outline-offset: 1px; }
+.row-menu-list { position: fixed; z-index: 60; min-width: 9rem; background: var(--paper); border: var(--rule-weight) solid var(--hairline); padding: 4px 0; text-align: left; }
+.row-menu-item { display: block; width: 100%; padding: 8px 14px; text-align: left; font-size: var(--type-label); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--ink-soft); background: none; border: 0; cursor: pointer; }
+.row-menu-item:hover, .row-menu-item:focus-visible { background: var(--paper-warm); color: var(--ink); outline: none; }
+.row-menu-list form { display: block; margin: 0; }
+
 /* ---------- Motion: a 120ms opacity fade is the ceiling ---------- */
 .fade-up { animation: ds-fade 120ms linear both; }
 @keyframes ds-fade { from { opacity: 0; } to { opacity: 1; } }

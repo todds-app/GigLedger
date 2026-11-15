@@ -102,11 +102,11 @@
     {% endif %}
 
     <!-- Transactions Table -->
-    <div class="glass-card overflow-hidden fade-up">
+    <div class="data-table-panel overflow-hidden fade-up">
         {% if transactions %}
         <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
-            <table class="w-full">
-                <thead class="sticky top-0 bg-white/80 border-b border-gray-100/50 z-10">
+            <table class="w-full data-table">
+                <thead>
                     <tr>
                         <th class="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Date</th>
                         <th class="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Description</th>
@@ -115,12 +115,12 @@
                         <th class="px-3 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">Deductible</th>
                         <th class="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Tax Impact</th>
                         <th class="px-3 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">Invoiced</th>
-                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                        <th class="px-3 py-3 w-12"><span class="sr-only">Actions</span></th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100/50">
                     {% for tx in transactions %}
-                    <tr class="{% if tx.is_expense and tx.is_tax_deductible %}bg-green-50/20{% endif %}">
+                    <tr>
                         <td class="px-3 py-3.5 text-sm text-gray-500 whitespace-nowrap font-medium">{{ tx.date.strftime('%b %d, %Y') }}</td>
                         <td class="px-3 py-3.5 text-sm text-gray-800 font-medium max-w-[16rem] truncate">{{ tx.description or 'No description' }}</td>
                         <td class="px-3 py-3.5">
@@ -165,19 +165,22 @@
                             <span class="text-xs text-gray-500">-</span>
                             {% endif %}
                         </td>
-                        <td class="px-3 py-3.5 text-center">
+                        <td class="px-3 py-3.5 text-right">
                             {% if tx.is_invoiced or tx.is_posted_by_invoice %}
                             <span class="inline-flex items-center gap-1 text-[11px] font-medium text-gray-500" title="{% if tx.is_posted_by_invoice %}Posted by paying invoice {{ tx.invoice_ref.invoice_number }}: revert the invoice to remove it{% else %}On an invoice: remove it from the invoice to edit or delete{% endif %}">
                                 Locked
                             </span>
                             {% else %}
-                            <div class="flex items-baseline justify-center gap-4">
-                                <button onclick="openEditModal({{ tx.id|tojson|forceescape }}, {{ (tx.amount|abs)|tojson|forceescape }}, {{ tx.kind|tojson|forceescape }}, {{ tx.date.strftime('%Y-%m-%d')|tojson|forceescape }}, {{ (tx.category or '')|tojson|forceescape }}, {{ (tx.description or '')|tojson|forceescape }}, {{ tx.is_tax_deductible|tojson|forceescape }}, {{ (tx.inventory_item.form_values if tx.inventory_item else none)|tojson|forceescape }})" class="ds-label hover:text-gray-900" title="Edit">Edit</button>
-                                <form method="POST" action="{{ url_port('transactions.delete', id=tx.id) }}" onsubmit="return confirm('Delete this transaction?')" class="inline">
+                            <details class="row-menu">
+                                <summary aria-label="Actions for {{ tx.description or 'transaction' }}" title="Actions">&#8943;</summary>
+                                <div class="row-menu-list">
+                                <button type="button" onclick="openEditModal({{ tx.id|tojson|forceescape }}, {{ (tx.amount|abs)|tojson|forceescape }}, {{ tx.kind|tojson|forceescape }}, {{ tx.date.strftime('%Y-%m-%d')|tojson|forceescape }}, {{ (tx.category or '')|tojson|forceescape }}, {{ (tx.description or '')|tojson|forceescape }}, {{ tx.is_tax_deductible|tojson|forceescape }}, {{ (tx.inventory_item.form_values if tx.inventory_item else none)|tojson|forceescape }})" class="row-menu-item">Edit</button>
+                                <form method="POST" action="{{ url_port('transactions.delete', id=tx.id) }}" onsubmit="return confirm('Delete this transaction?')">
                                     {{ csrf_field() }}
-                                    <button type="submit" class="ds-label hover:text-gray-900" title="Delete">Delete</button>
+                                    <button type="submit" class="row-menu-item">Delete</button>
                                 </form>
-                            </div>
+                                </div>
+                            </details>
                             {% endif %}
                         </td>
                     </tr>
