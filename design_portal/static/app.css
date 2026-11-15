@@ -98,6 +98,38 @@ td, .tabular { font-variant-numeric: tabular-nums; }
 
 .wavy-divider { height: 0; border-top: var(--rule-weight) solid var(--hairline); }
 
+/* ---------- Project cards ----------
+   The one place the app departs from "no cards", by request: on the Projects
+   list each project is a box so one is easy to tell from the next. Built only
+   from the system's materials - the rare warmer surface, a hairline all round,
+   radius 0, no shadow - and hover greys toward ink as the system's hover does.
+
+   The whole card opens the project: the name link's ::after is stretched over
+   the card, and every other control is lifted above it so Start, Log Hours,
+   Edit, Delete and the rest keep their own action. */
+.project-card {
+    position: relative;
+    background: var(--paper-warm);
+    border: var(--rule-weight) solid var(--hairline);
+    border-radius: 0;
+    box-shadow: none;
+    transition: border-color 120ms ease;
+}
+.project-card:hover { border-color: #3b3a36; }
+.project-card:hover .project-card-link { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: var(--rule-weight); }
+.project-card-link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+}
+.project-card-link:focus-visible { outline: none; }
+.project-card-link:focus-visible::after { outline: var(--focus-ring); outline-offset: -1px; }
+.project-card :is(a, button, input, select, textarea, label, form):not(.project-card-link) {
+    position: relative;
+    z-index: 1;
+}
+
 /* ---------- Controls ---------- */
 .candy-btn {
     background: var(--ink);

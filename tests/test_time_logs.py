@@ -796,3 +796,26 @@ def test_starting_over_another_timer_says_which_one_stopped(app):
                               follow_redirects=True).get_data(as_text=True)
     assert 'Stopped the timer on' in body
     assert '0:01:1' in body  # 0:01:15, give or take a second
+
+
+# --- Project cards on the list ------------------------------------------------
+#
+# Each project is a card, and the card opens the project: its name link is
+# stretched across it (.project-card-link), while the controls inside sit
+# above that link and keep their own actions.
+
+def test_each_project_is_a_card_whose_link_opens_it(app):
+    a, b = a_project(app, name='First'), a_project(app, name='Second')
+    body = login_as(app).get('/projects/').get_data(as_text=True)
+    assert body.count('class="project-card ') == body.count('class="project-card-link ') >= 2
+    for pid in (a, b):
+        assert f'href="/projects/{pid}" class="project-card-link' in body
+
+
+def test_the_card_styles_stretch_the_link_and_lift_the_controls():
+    import pathlib
+    css = (pathlib.Path(__file__).resolve().parent.parent
+           / 'design_portal' / 'static' / 'app.css').read_text()
+    assert '.project-card-link::after' in css
+    assert 'inset: 0' in css
+    assert ':not(.project-card-link)' in css  # controls are raised, the link is not

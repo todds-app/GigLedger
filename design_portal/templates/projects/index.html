@@ -62,17 +62,17 @@
 
     <!-- Project Cards Grid -->
     {% if projects %}
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 fade-up">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 fade-up">
         {% for project in projects %}
-        <div class="bouncy-card overflow-hidden group">
-            <!-- Color Accent Bar -->
-
-            <div class="p-5 relative z-10">
+        {# A card, and the whole card opens the project: the name link is
+           stretched over it (app.css), the controls below sit above that. #}
+        <div class="project-card flex flex-col">
+            <div class="p-6 flex-1 flex flex-col">
                 <!-- Header: Name + Status -->
                 <div class="flex items-start justify-between mb-3">
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2 mb-1">
-                            <a href="{{ url_port('projects.detail', id=project.id) }}" class="text-base font-medium text-gray-900 truncate hover:text-brand-600 transition-colors">{{ project.name }}</a>
+                            <a href="{{ url_port('projects.detail', id=project.id) }}" class="project-card-link text-base font-medium text-gray-900 truncate">{{ project.name }}</a>
                         </div>
                         {% if project.client %}
                         <p class="text-xs text-gray-400 font-medium">{{ project.client.name }}{% if project.client.company %} &middot; {{ project.client.company }}{% endif %}</p>
@@ -186,7 +186,7 @@
                 {% endif %}
 
                 <!-- Quick Actions -->
-                <div class="flex items-center gap-1.5 pt-2 border-t border-gray-100/50">
+                <div class="flex items-center gap-1.5 pt-2 mt-auto border-t border-gray-200">
                     {% if project.status == 'active' %}
                     <form method="POST" action="{{ url_port('projects.update_status', id=project.id) }}" class="inline">
                         {{ csrf_field() }}
