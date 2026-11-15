@@ -98,16 +98,18 @@ td, .tabular { font-variant-numeric: tabular-nums; }
 
 .wavy-divider { height: 0; border-top: var(--rule-weight) solid var(--hairline); }
 
-/* ---------- Project cards ----------
+/* ---------- Project and client cards ----------
    The one place the app departs from "no cards", by request: on the Projects
-   list each project is a box so one is easy to tell from the next. Built only
+   and Clients lists each entry is a box so one is easy to tell from the next. Built only
    from the system's materials - the rare warmer surface, a hairline all round,
    radius 0, no shadow - and hover greys toward ink as the system's hover does.
 
-   The whole card opens the project: the name link's ::after is stretched over
-   the card, and every other control is lifted above it so Start, Log Hours,
-   Edit, Delete and the rest keep their own action. */
-.project-card {
+   The whole card opens the entry. A client card holds no controls, so the
+   card itself is the link. A project card holds its own (Start, Log Hours,
+   Edit, Delete...), so its name link's ::after is stretched over the card and
+   every other control is lifted above it to keep its own action. */
+.project-card,
+.client-card {
     position: relative;
     background: var(--paper-warm);
     border: var(--rule-weight) solid var(--hairline);
@@ -115,7 +117,10 @@ td, .tabular { font-variant-numeric: tabular-nums; }
     box-shadow: none;
     transition: border-color 120ms ease;
 }
-.project-card:hover { border-color: #3b3a36; }
+.project-card:hover,
+.client-card:hover { border-color: #3b3a36; }
+.client-card:focus-visible { outline: var(--focus-ring); outline-offset: -1px; }
+.client-card:hover h3,
 .project-card:hover .project-card-link { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: var(--rule-weight); }
 .project-card-link::after {
     content: '';

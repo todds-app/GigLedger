@@ -31,13 +31,14 @@
 
     <!-- Client Cards Grid -->
     {% if clients %}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 fade-up">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 fade-up">
         {% for client in clients %}
-        <a href="{{ url_port('clients.detail', id=client.id) }}" class="bouncy-card p-5 block group">
+        {# A card, and the card is the link: it holds no controls of its own (app.css) #}
+        <a href="{{ url_port('clients.detail', id=client.id) }}" class="client-card p-6 flex flex-col">
             <div class="flex items-start justify-between mb-3">
                 <div class="flex items-center gap-3">
                     <div>
-                        <h3 class="font-medium text-gray-800 group-hover:text-brand-600 transition-colors">{{ client.name }}</h3>
+                        <h3 class="font-medium text-gray-900">{{ client.name }}</h3>
                         {% if client.company %}
                         <p class="text-xs text-gray-400 font-medium">{{ client.company }}</p>
                         {% endif %}
@@ -49,12 +50,12 @@
             </div>
 
             {% if client.email %}
-            <div class="flex items-center gap-2 text-xs text-gray-400 mb-1">
+            <div class="flex items-center gap-2 text-xs text-gray-400 mb-4">
                 {{ client.email }}
             </div>
             {% endif %}
 
-            <div class="mt-3 pt-3 border-t border-gray-100/50 grid grid-cols-2 gap-2">
+            <div class="mt-auto pt-3 border-t border-gray-200 grid grid-cols-2 gap-2">
                 <div>
                     <p class="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Invoiced</p>
                     <p class="text-sm font-medium text-gray-700">{{ currency | currency_symbol }}{{ client.total_invoiced() | money }}</p>
