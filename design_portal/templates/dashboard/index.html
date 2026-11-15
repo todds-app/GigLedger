@@ -180,6 +180,24 @@
         </div>
     </div>
 
+    <!-- Hours Worked: logged hours, each log counted on the day it ended (hours.py) -->
+    <div id="hours-worked" class="glass-card p-6 fade-up">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-medium text-gray-900">Hours Worked</h2>
+            <a href="{{ url_port('projects.list_projects') }}" class="text-sm text-brand-600 hover:text-brand-500 font-medium transition-colors">View projects</a>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-5">
+            {% for figure in hours_worked %}
+            <div class="py-2 border-t border-gray-200">
+                <p class="ds-label">{{ figure.label }}</p>
+                <p class="text-3xl font-medium text-gray-900 mt-2 tabular-nums">{{ figure.hours | decimal1 }}h</p>
+                <p class="text-xs text-gray-500 mt-1 font-medium">{{ figure.note }}</p>
+            </div>
+            {% endfor %}
+        </div>
+        <p class="text-[11px] text-gray-400 mt-4">Logged hours. A log counts on the day it ended; time still on a timer counts once it is logged.</p>
+    </div>
+
     <!-- Projects + Invoices Row -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Active Projects -->

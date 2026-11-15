@@ -2,6 +2,7 @@ from datetime import datetime
 from flask import Blueprint, render_template
 from flask_login import login_required
 from ..models import Project, Invoice, Client, Business, COST_KINDS
+from ..hours import hours_worked
 from ..finance import (calculate_monthly_summary, calculate_safe_to_spend,
                        calculate_runway, get_6_month_chart_data, get_quarter,
                        get_recent_transactions, get_category_breakdown)
@@ -84,4 +85,5 @@ def index():
         active_projects=active_projects, active_project_count=active_project_count,
         unpaid_invoices=unpaid_invoices, total_outstanding=total_outstanding,
         overdue_count=overdue_count, client_count=client_count,
-        monthly_commitment=monthly_commitment, now=now)
+        monthly_commitment=monthly_commitment,
+        hours_worked=hours_worked(now.date()), now=now)
