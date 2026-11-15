@@ -154,3 +154,8 @@ def test_the_dashboard_shows_the_section(clean):
                   'Previous month', 'Active projects'):
         assert label in body
     assert '2.5h' in body
+
+
+def test_hours_worked_comes_before_the_financial_cards(clean):
+    body = login_as(clean).get('/').get_data(as_text=True)
+    assert body.index('id="hours-worked"') < body.index('<!-- 4 Hero Cards -->')
