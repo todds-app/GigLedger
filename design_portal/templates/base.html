@@ -44,6 +44,9 @@
         <!-- Sidebar -->
         <aside class="hidden md:flex w-64 flex-col sidebar-wave z-10">
             <div class="px-6 pt-10 pb-6">
+                <a href="{{ url_port('dashboard.index') }}" class="sidebar-mark" aria-label="Dani Smith Design, go to Dashboard">
+                    <img src="{{ url_for('static', filename='dsd/logo-badge.png') }}" alt="">
+                </a>
                 <p class="ds-wordmark whitespace-nowrap">Dani Smith Design</p>
                 <p class="ds-label mt-2">Design Portal</p>
                 <div class="ds-rule mt-3"></div>
@@ -60,12 +63,9 @@
 
             <div class="px-6 pb-8">
                 <div class="ds-rule mb-4"></div>
-                <div class="flex items-center gap-3">
-                    <img src="{{ url_for('static', filename='dsd/logo-badge.png') }}" alt="Dani Smith Design" style="width: var(--footer-mark-size); height: var(--footer-mark-size);">
-                    <div class="min-w-0">
-                        <p class="text-xs text-gray-500 truncate">{{ current_user.email }}</p>
-                        <p class="text-xs text-gray-500">{{ (business.default_tax_rate * 100)|int }}% tax rate</p>
-                    </div>
+                <div class="min-w-0">
+                    <p class="text-xs text-gray-500 truncate">{{ current_user.email }}</p>
+                    <p class="text-xs text-gray-500">{{ (business.default_tax_rate * 100)|int }}% tax rate</p>
                 </div>
                 <form method="POST" action="{{ url_port('auth.logout') }}" class="mt-3">
                     {{ csrf_field() }}

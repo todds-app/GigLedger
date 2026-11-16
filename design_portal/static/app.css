@@ -31,6 +31,11 @@ td, .tabular { font-variant-numeric: tabular-nums; }
 [class*="hover:scale-"]:hover, [class*="hover:-translate-"]:hover { transform: none !important; }
 
 /* ---------- Type ---------- */
+/* The logo badge heads the sidebar, above the wordmark, and leads home. */
+.sidebar-mark { display: block; width: 64px; height: 64px; margin-bottom: var(--space-2); }
+.sidebar-mark img { display: block; width: 100%; height: 100%; }
+.sidebar-mark:focus-visible { outline: var(--focus-ring); outline-offset: 3px; }
+
 .ds-wordmark {
     font-size: var(--type-wordmark);
     font-weight: var(--font-weight-medium);
