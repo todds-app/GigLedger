@@ -26,3 +26,13 @@ def test_logo_leads_to_the_dashboard(app):
     link = side[side.rindex('<a ', 0, side.index('logo-badge')):side.index('logo-badge')]
     assert 'class="sidebar-mark"' in link and 'href="/"' in link
     assert 'aria-label="Dani Smith Design, go to Dashboard"' in link
+
+
+def test_the_logo_and_title_are_centred(app):
+    body = login_as(app).get('/').get_data(as_text=True)
+    aside = body[body.index('<aside'):body.index('</aside>')]
+    brand = aside[aside.index('class="sidebar-brand'):aside.index('<nav')]
+    assert 'class="sidebar-mark"' in brand and 'Dani Smith Design</p>' in brand
+    css = app.test_client().get('/static/app.css').get_data(as_text=True)
+    assert '.sidebar-brand { text-align: center; }' in css
+    assert '.sidebar-brand .sidebar-mark { margin-left: auto; margin-right: auto; }' in css

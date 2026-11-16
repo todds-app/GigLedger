@@ -36,6 +36,14 @@ td, .tabular { font-variant-numeric: tabular-nums; }
 .sidebar-mark img { display: block; width: 100%; height: 100%; }
 .sidebar-mark:focus-visible { outline: var(--focus-ring); outline-offset: 3px; }
 
+/* Logo and title are centred in the sidebar. Tracked caps carry the tracking
+   after their last letter too, so an equal indent keeps them optically centred. */
+.sidebar-brand { text-align: center; }
+.sidebar-brand .sidebar-mark { margin-left: auto; margin-right: auto; }
+/* The wordmark is wider than the padded column, so it centres across the full sidebar. */
+.sidebar-brand .ds-wordmark { text-indent: var(--tracking-wordmark); margin-left: -1.5rem; margin-right: -1.5rem; }
+.sidebar-brand .ds-label { text-indent: var(--tracking-label); }
+
 .ds-wordmark {
     font-size: var(--type-wordmark);
     font-weight: var(--font-weight-medium);
