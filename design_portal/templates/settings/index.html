@@ -9,7 +9,7 @@
     </div>
 
     <!-- Business Profile (for invoices) -->
-    <div class="glass-card p-6 fade-up">
+    <div class="dash-panel p-6 fade-up">
         <h2 class="text-lg font-medium text-gray-900 mb-2">Business</h2>
         <p class="text-xs text-gray-400 mb-4">These settings are shared by every admin.</p>
         <p class="text-sm text-gray-400 mb-6 font-medium">This info appears on your invoices and exported reports.</p>
@@ -42,7 +42,7 @@
     </div>
 
     <!-- Tax Rate -->
-    <div class="glass-card p-6 fade-up">
+    <div class="dash-panel p-6 fade-up">
         <h2 class="text-lg font-medium text-gray-900 mb-2">Tax Rate</h2>
         <p class="text-sm text-gray-400 mb-6 font-medium">US freelancers typically set aside 25-35% for self-employment taxes.</p>
         <form method="POST" action="{{ url_port('settings.update_tax_rate') }}" class="flex items-end gap-4">
@@ -61,7 +61,7 @@
     </div>
 
     <!-- Currency -->
-    <div class="glass-card p-6 fade-up">
+    <div class="dash-panel p-6 fade-up">
         <h2 class="text-lg font-medium text-gray-900 mb-2">Currency</h2>
         <p class="text-sm text-gray-400 mb-6 font-medium">Select your preferred display currency.</p>
         <form method="POST" action="{{ url_port('settings.update_currency') }}" class="flex items-end gap-4">
@@ -83,7 +83,7 @@
     </div>
 
     <!-- Income Categories -->
-    <div class="glass-card p-6 fade-up">
+    <div class="dash-panel p-6 fade-up">
         <div class="flex items-center justify-between mb-2">
             <h2 class="text-lg font-medium text-gray-900">Income Categories</h2>
             <span class="text-xs text-gray-500 font-medium">Quick Add & Transaction forms</span>
@@ -102,7 +102,7 @@
     </div>
 
     <!-- Expense Categories -->
-    <div class="glass-card p-6 fade-up">
+    <div class="dash-panel p-6 fade-up">
         <div class="flex items-center justify-between mb-2">
             <h2 class="text-lg font-medium text-gray-900">Expense Categories</h2>
             <span class="text-xs text-gray-500 font-medium">Tax-deductible expenses reduce tax</span>
@@ -121,7 +121,7 @@
     </div>
 
     <!-- Inventory categories -->
-    <div class="glass-card p-6 fade-up">
+    <div class="dash-panel p-6 fade-up">
         <div class="flex items-center justify-between mb-2">
             <h2 class="text-lg font-medium text-gray-900">Inventory Categories</h2>
             <span class="text-xs text-gray-500 font-medium">Assets, not expenses</span>
@@ -143,7 +143,7 @@
     </div>
 
     <!-- Reset categories -->
-    <div class="glass-card p-6 fade-up">
+    <div class="dash-panel p-6 fade-up">
         <h2 class="text-lg font-medium text-gray-900 mb-2">Reset Categories</h2>
         <p class="text-sm text-gray-400 mb-4 font-medium">Reset all categories to defaults. Custom categories removed, existing transactions not affected.</p>
         <form method="POST" action="{{ url_port('settings.reset_categories') }}" onsubmit="return confirm('Reset all categories to defaults?')">
@@ -155,7 +155,7 @@
     {% include 'settings/_team.html' %}
 
     <!-- My account -->
-    <div class="glass-card p-6 fade-up">
+    <div class="dash-panel p-6 fade-up">
         <h2 class="text-lg font-medium text-gray-900 mb-4">My account</h2>
         <div class="flex items-center gap-4">
             <div>
@@ -165,7 +165,7 @@
         </div>
     </div>
 
-    <div class="glass-card p-6 border-2 border-red-200/50 fade-up">
+    <div class="dash-panel dash-panel-danger p-6 fade-up">
         <h2 class="text-lg font-medium text-red-500 mb-2">Danger Zone</h2>
         <p class="text-sm text-gray-400 mb-4 font-medium">These actions are irreversible.</p>
         <a href="{{ url_port('auth.logout') }}" class="inline-flex items-center gap-2 px-5 py-2.5 glass-card text-sm font-medium text-red-500">

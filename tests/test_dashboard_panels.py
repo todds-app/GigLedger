@@ -86,3 +86,25 @@ def test_reports_sections_are_panels(app):
     for heading in ('Income vs. Expenses', 'Monthly Breakdown', 'Top Clients',
                     'Expense Categories', 'Quarterly Comparison', 'Key Insights'):
         assert heading in main
+
+
+# Settings takes the same panels: each section framed, the Danger Zone
+# edged so it is not mistaken for an ordinary section.
+
+def test_settings_sections_are_panels(app):
+    body = login_as(app).get('/settings').get_data(as_text=True)
+    # Business, Tax Rate, Currency, three category lists, Reset Categories,
+    # Team, My account, Danger Zone.
+    assert len(_panels(body)) == 10
+    assert not re.search(r'<div class="glass-card p-6', body)
+    for heading in ('Business', 'Tax Rate', 'Currency', 'Income Categories',
+                    'Expense Categories', 'Inventory Categories', 'Reset Categories',
+                    'Team', 'My account', 'Danger Zone'):
+        assert f'>{heading}</h2>' in body
+    danger = body.index('>Danger Zone</h2>')
+    assert 'dash-panel dash-panel-danger' in body[body.rindex('<div', 0, danger):danger]
+
+
+def test_danger_panel_style_is_defined():
+    css = open('design_portal/static/app.css').read()
+    assert re.search(r'\.dash-panel-danger\s*\{[^}]*border-color', css)

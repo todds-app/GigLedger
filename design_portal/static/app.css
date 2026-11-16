@@ -104,6 +104,9 @@ td, .tabular { font-variant-numeric: tabular-nums; }
    and client cards below, without their hover, since a panel is not a link.
    Figures inside a panel keep the hairline-above-figure pattern. */
 .dash-panel { background: var(--paper-warm); border: var(--rule-weight) solid var(--hairline); border-radius: 0; box-shadow: none; }
+/* Settings' Danger Zone: the same panel, edged in a muted red so it is not
+   mistaken for an ordinary section. */
+.dash-panel-danger { border-color: #b8877f; }
 
 /* ---------- Project and client cards ----------
    The one place the app departs from "no cards", by request: on the Projects
