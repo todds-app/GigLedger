@@ -16,14 +16,16 @@
     </div>
 
     <!-- Tax Summary -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="bouncy-card p-6 border-2 border-amber-200 fade-up">
+    <div id="tax-summary" class="dash-panel p-6 fade-up">
+    <h2 class="text-lg font-medium text-gray-900 mb-4">This Year</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
+        <div class="py-2 border-t border-gray-200">
             <div class="flex items-center gap-3 mb-2 relative z-10">
                 <div><p class="text-sm font-medium text-gray-400">Total Tax Obligation</p><p class="text-2xl font-medium text-amber-600">{{ currency | currency_symbol }}{{ tax_obligation | money }}</p></div>
             </div>
             <p class="text-xs text-gray-500 font-medium relative z-10">Money you should set aside for taxes this year</p>
         </div>
-        <div class="bouncy-card p-6 border-2 border-brand-200 fade-up">
+        <div class="py-2 border-t border-gray-200">
             <div class="flex items-center gap-3 mb-2 relative z-10">
                 <div><p class="text-sm font-medium text-gray-400">Safe to Spend</p><p class="text-2xl font-medium {% if safe_balance >= 0 %}text-brand-700{% else %}text-red-500{% endif %}">{{ currency | currency_symbol }}{{ safe_balance | money }}</p></div>
             </div>
@@ -31,10 +33,14 @@
         </div>
     </div>
 
+    </div>
+
     <!-- Quarterly Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div id="tax-quarters" class="dash-panel p-6 fade-up">
+    <h2 class="text-lg font-medium text-gray-900 mb-4">Quarters</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-5">
         {% for q in quarters %}
-        <div class="bouncy-card p-6 {% if q.is_current %}border-2 border-brand-200{% endif %} fade-up fade-up-delay-{{ loop.index }}">
+        <div class="py-2 border-t {% if q.is_current %}border-t-2 border-gray-900{% else %}border-gray-200{% endif %}">
             <div class="flex items-center justify-between mb-4 relative z-10">
                 <h3 class="text-xl font-medium text-gray-900">Q{{ q.quarter }}</h3>
                 <div class="flex items-center gap-2">
@@ -57,8 +63,10 @@
         {% endfor %}
     </div>
 
+    </div>
+
     <!-- How It's Calculated -->
-    <div class="glass-card p-6 fade-up">
+    <div id="tax-method" class="dash-panel p-6 fade-up">
         <h2 class="text-lg font-medium text-gray-900 mb-4">How taxes are calculated</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div class="p-5 bg-white/50">

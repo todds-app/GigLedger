@@ -44,3 +44,45 @@ def test_panel_order_keeps_hours_first(app):
 def test_panel_style_is_defined():
     css = open('design_portal/static/app.css').read()
     assert re.search(r'\.dash-panel\s*\{[^}]*border: var\(--rule-weight\) solid var\(--hairline\)', css)
+
+
+# Taxes and Reports take the dashboard's panels: every section framed, and
+# each loose row of figure cards gathered into one panel under a heading.
+
+def _section(body, pid, end):
+    start = body.index(f'id="{pid}"')
+    assert 'dash-panel' in body[body.rindex('<div', 0, start):start + 60]
+    return body[start:body.index(end, start)]
+
+
+def test_taxes_sections_are_panels(app):
+    body = login_as(app).get('/taxes').get_data(as_text=True)
+    main = body.split('<main', 1)[-1]
+    assert len(_panels(body)) == 3
+    assert 'glass-card' not in main and 'bouncy-card' not in body
+    summary = _section(body, 'tax-summary', '<!-- Quarterly Cards -->')
+    assert '>This Year</h2>' in summary
+    assert 'Total Tax Obligation' in summary and 'Safe to Spend' in summary
+    quarters = _section(body, 'tax-quarters', "<!-- How It's Calculated -->")
+    assert '>Quarters</h2>' in quarters
+    for q in ('Q1', 'Q2', 'Q3', 'Q4'):
+        assert f'>{q}</h3>' in quarters
+    # The current quarter is still marked, now by a heavier rule.
+    assert quarters.count('border-t-2 border-gray-900') == 1
+    assert 'How taxes are calculated' in _section(body, 'tax-method', '</main>')
+
+
+def test_reports_sections_are_panels(app):
+    body = login_as(app).get('/reports').get_data(as_text=True)
+    main = body.split('<main', 1)[-1]
+    # Year at a Glance, chart, monthly table, top clients, expense
+    # categories, quarterly comparison, key insights.
+    assert len(_panels(body)) == 7
+    assert 'glass-card' not in main and 'bouncy-card' not in body
+    year = _section(body, 'year-at-a-glance', '<!-- Income vs Expenses Bar Chart -->')
+    assert '>Year at a Glance</h2>' in year
+    for figure in ('Income', 'Expenses', 'Net', 'Savings'):
+        assert figure in year
+    for heading in ('Income vs. Expenses', 'Monthly Breakdown', 'Top Clients',
+                    'Expense Categories', 'Quarterly Comparison', 'Key Insights'):
+        assert heading in main

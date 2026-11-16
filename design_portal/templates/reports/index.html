@@ -20,9 +20,11 @@
     </div>
 
     <!-- 4 Hero Cards -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+    <div id="year-at-a-glance" class="dash-panel p-6 fade-up">
+    <h2 class="text-lg font-medium text-gray-900 mb-4">Year at a Glance</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-5">
         <!-- Yearly Income -->
-        <div class="bouncy-card p-6 fade-up">
+        <div class="py-2 border-t border-gray-200">
             <div class="flex items-center justify-between mb-4 relative z-10">
                 <span class="candy-badge">Income</span>
             </div>
@@ -31,7 +33,7 @@
         </div>
 
         <!-- Yearly Expenses -->
-        <div class="bouncy-card p-6 fade-up">
+        <div class="py-2 border-t border-gray-200">
             <div class="flex items-center justify-between mb-4 relative z-10">
                 <span class="ds-label whitespace-nowrap">Expenses</span>
             </div>
@@ -40,7 +42,7 @@
         </div>
 
         <!-- Yearly Net -->
-        <div class="bouncy-card p-6 fade-up">
+        <div class="py-2 border-t border-gray-200">
             <div class="flex items-center justify-between mb-4 relative z-10">
                 <span class="candy-badge">Net</span>
             </div>
@@ -49,7 +51,7 @@
         </div>
 
         <!-- Avg Savings Rate -->
-        <div class="bouncy-card p-6 fade-up">
+        <div class="py-2 border-t border-gray-200">
             <div class="flex items-center justify-between mb-4 relative z-10">
                 <span class="ds-label whitespace-nowrap">Savings</span>
             </div>
@@ -58,8 +60,10 @@
         </div>
     </div>
 
+    </div>
+
     <!-- Income vs Expenses Bar Chart -->
-    <div class="glass-card p-6 fade-up">
+    <div class="dash-panel p-6 fade-up">
         <div class="flex items-center justify-between mb-4">
             <div>
                 <h2 class="text-lg font-medium text-gray-900">Income vs. Expenses</h2>
@@ -76,7 +80,7 @@
     </div>
 
     <!-- Monthly Breakdown Table -->
-    <div class="glass-card p-6 fade-up">
+    <div class="dash-panel p-6 fade-up">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
             <div>
                 <h2 class="text-lg font-medium text-gray-900">Monthly Breakdown</h2>
@@ -133,7 +137,7 @@
     <!-- Top Clients + Expense Categories -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Top Clients -->
-        <div class="glass-card p-6 fade-up">
+        <div class="dash-panel p-6 fade-up">
             <div class="flex items-center justify-between mb-4">
                 <div>
                     <h2 class="text-lg font-medium text-gray-900">Top Clients</h2>
@@ -163,7 +167,7 @@
         </div>
 
         <!-- Expense Categories -->
-        <div class="glass-card p-6 fade-up">
+        <div class="dash-panel p-6 fade-up">
             <div class="flex items-center justify-between mb-4">
                 <div>
                     <h2 class="text-lg font-medium text-gray-900">Expense Categories</h2>
@@ -194,16 +198,16 @@
     </div>
 
     <!-- Quarterly Comparison -->
-    <div class="glass-card p-6 fade-up">
+    <div class="dash-panel p-6 fade-up">
         <div class="flex items-center justify-between mb-4">
             <div>
                 <h2 class="text-lg font-medium text-gray-900">Quarterly Comparison</h2>
                 <p class="text-sm text-gray-400 font-medium">How each quarter performed</p>
             </div>
         </div>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-5">
             {% for q in quarterly_data %}
-            <div class="bouncy-card p-4 text-center fade-up" style="animation-delay: {{ 0.05 * loop.index }}s">
+            <div class="py-2 border-t border-gray-200 text-center">
                 <div class="mb-3">
                     <span class="ds-label whitespace-nowrap">Q{{ q.quarter }}</span>
                 </div>
@@ -231,7 +235,7 @@
     </div>
 
     <!-- Key Insights -->
-    <div class="glass-card p-6 fade-up">
+    <div class="dash-panel p-6 fade-up">
         <div class="flex items-center justify-between mb-4">
             <div>
                 <h2 class="text-lg font-medium text-gray-900">Key Insights</h2>
