@@ -39,54 +39,25 @@
     <div id="money-this-month" class="dash-panel p-6 fade-up">
     <h2 class="text-lg font-medium text-gray-900 mb-4">This Month</h2>
     <div class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-5">
-        <!-- Income Card -->
         <div class="py-2 border-t border-gray-200">
-            <div class="flex items-center justify-between mb-4 relative z-10">
-                <div class="flex items-center gap-1">
-                    <span class="candy-badge">Income</span>
-                    {% if income_trend > 0 %}
-                    <span class="text-xs text-green-500 font-medium">+{{ income_trend | int }}%</span>
-                    {% elif income_trend < 0 %}
-                    <span class="text-xs text-red-500 font-medium">{{ income_trend | int }}%</span>
-                    {% endif %}
-                </div>
-            </div>
-            <p class="text-sm text-gray-400 mb-1 font-medium relative z-10">This Month</p>
-            <p class="text-2xl font-medium text-gray-900 relative z-10">{{ currency | currency_symbol }}{{ month_income | money }}</p>
+            <p class="ds-label">Income</p>
+            <p class="text-3xl font-medium text-gray-900 mt-2 tabular-nums">{{ currency | currency_symbol }}{{ month_income | money }}</p>
+            <p class="text-xs text-gray-500 mt-1 font-medium">{% if income_trend %}{{ '+' if income_trend > 0 else '' }}{{ income_trend | int }}% on last month{% else %}&nbsp;{% endif %}</p>
         </div>
-
-        <!-- Expenses Card -->
         <div class="py-2 border-t border-gray-200">
-            <div class="flex items-center justify-between mb-4 relative z-10">
-                <div class="flex items-center gap-1">
-                    <span class="ds-label whitespace-nowrap">Expenses</span>
-                    {% if expense_trend > 0 %}
-                    <span class="text-xs text-red-500 font-medium">+{{ expense_trend | int }}%</span>
-                    {% elif expense_trend < 0 %}
-                    <span class="text-xs text-green-500 font-medium">{{ expense_trend | int }}%</span>
-                    {% endif %}
-                </div>
-            </div>
-            <p class="text-sm text-gray-400 mb-1 font-medium relative z-10">This Month</p>
-            <p class="text-2xl font-medium text-gray-900 relative z-10">{{ currency | currency_symbol }}{{ month_expenses | money }}</p>
+            <p class="ds-label">Expenses</p>
+            <p class="text-3xl font-medium text-gray-900 mt-2 tabular-nums">{{ currency | currency_symbol }}{{ month_expenses | money }}</p>
+            <p class="text-xs text-gray-500 mt-1 font-medium">{% if expense_trend %}{{ '+' if expense_trend > 0 else '' }}{{ expense_trend | int }}% on last month{% else %}&nbsp;{% endif %}</p>
         </div>
-
-        <!-- Safe to Spend Card (KILLER FEATURE) -->
         <div class="py-2 border-t border-gray-200">
-            <div class="flex items-center justify-between mb-4 relative z-10">
-                <span class="candy-badge">Safe to Spend</span>
-            </div>
-            <p class="text-sm text-gray-400 mb-1 font-medium relative z-10">After Tax Reserve</p>
-            <p class="text-2xl font-medium {% if safe_balance >= 0 %}text-brand-700{% else %}text-red-500{% endif %} relative z-10">{{ currency | currency_symbol }}{{ safe_balance | money }}</p>
+            <p class="ds-label">Safe to Spend</p>
+            <p class="text-3xl font-medium text-gray-900 mt-2 tabular-nums">{{ currency | currency_symbol }}{{ safe_balance | money }}</p>
+            <p class="text-xs text-gray-500 mt-1 font-medium">After tax reserve</p>
         </div>
-
-        <!-- Tax Reserve Card -->
         <div class="py-2 border-t border-gray-200">
-            <div class="flex items-center justify-between mb-4 relative z-10">
-                <span class="ds-label whitespace-nowrap">Tax Reserve</span>
-            </div>
-            <p class="text-sm text-gray-400 mb-1 font-medium relative z-10">Set aside for tax</p>
-            <p class="text-2xl font-medium text-amber-600 relative z-10">{{ currency | currency_symbol }}{{ tax_obligation | money }}</p>
+            <p class="ds-label">Tax Reserve</p>
+            <p class="text-3xl font-medium text-gray-900 mt-2 tabular-nums">{{ currency | currency_symbol }}{{ tax_obligation | money }}</p>
+            <p class="text-xs text-gray-500 mt-1 font-medium">Set aside for tax</p>
         </div>
     </div>
 
@@ -95,7 +66,7 @@
     <!-- Chart + Quick Add -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Income vs Expenses Chart -->
-        <div class="lg:col-span-2 dash-panel p-6 fade-up">
+        <div id="income-chart" class="lg:col-span-2 dash-panel p-6 fade-up flex flex-col">
             <div class="flex items-center justify-between mb-4">
                 <div>
                     <h2 class="text-lg font-medium text-gray-900">Income vs. Expenses</h2>
@@ -106,7 +77,7 @@
                     <span class="flex items-center gap-1.5"><span class="w-3 h-3 bg-stone-300"></span> Expenses</span>
                 </div>
             </div>
-            <div class="relative" style="height: 300px;">
+            <div class="relative flex-1" style="min-height: 300px;">
                 <canvas id="incomeExpenseChart"></canvas>
             </div>
         </div>
@@ -170,36 +141,23 @@
     <h2 class="text-lg font-medium text-gray-900 mb-4">Cash Position</h2>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-5">
         <div class="py-2 border-t border-gray-200">
-            <div class="flex items-center gap-3 mb-2">
-                <h3 class="text-sm font-medium text-gray-400">Bank Balance</h3>
-            </div>
-            <p class="text-3xl font-medium text-gray-900">{{ currency | currency_symbol }}{{ balance | money }}</p>
+            <p class="ds-label">Bank Balance</p>
+            <p class="text-3xl font-medium text-gray-900 mt-2 tabular-nums">{{ currency | currency_symbol }}{{ balance | money }}</p>
             <p class="text-xs text-gray-500 mt-1 font-medium">All-time net</p>
         </div>
-
         <div class="py-2 border-t border-gray-200">
-            <div class="flex items-center gap-3 mb-2">
-                <h3 class="text-sm font-medium text-gray-400">Runway</h3>
-            </div>
-            <p class="text-3xl font-medium {% if runway_months >= 6 %}text-green-600{% elif runway_months >= 3 %}text-yellow-600{% else %}text-red-500{% endif %}">
-                {% if runway_months == 'inf' %}&infin;{% else %}{{ runway_months | decimal1 }}{% endif %} months
-            </p>
+            <p class="ds-label">Runway</p>
+            <p class="text-3xl font-medium text-gray-900 mt-2 tabular-nums">{% if runway_months == 'inf' %}&infin;{% else %}{{ runway_months | decimal1 }}{% endif %} months</p>
             <p class="text-xs text-gray-500 mt-1 font-medium">Avg {{ currency | currency_symbol }}{{ avg_monthly_expenses | money }}/mo</p>
         </div>
-
         <div class="py-2 border-t border-gray-200">
-            <div class="flex items-center gap-3 mb-2">
-                <h3 class="text-sm font-medium text-gray-400">Net This Month</h3>
-            </div>
-            <p class="text-3xl font-medium {% if net_this_month >= 0 %}text-green-600{% else %}text-red-500{% endif %}">{{ currency | currency_symbol }}{{ net_this_month | money }}</p>
-            <p class="text-xs text-gray-500 mt-1 font-medium">Income - expenses</p>
+            <p class="ds-label">Net This Month</p>
+            <p class="text-3xl font-medium text-gray-900 mt-2 tabular-nums">{{ currency | currency_symbol }}{{ net_this_month | money }}</p>
+            <p class="text-xs text-gray-500 mt-1 font-medium">Income &minus; expenses</p>
         </div>
-
         <div class="py-2 border-t border-gray-200">
-            <div class="flex items-center gap-3 mb-2">
-                <h3 class="text-sm font-medium text-gray-400">Monthly Commitments</h3>
-            </div>
-            <p class="text-3xl font-medium text-amber-600">{{ currency | currency_symbol }}{{ monthly_commitment | money }}</p>
+            <p class="ds-label">Monthly Commitments</p>
+            <p class="text-3xl font-medium text-gray-900 mt-2 tabular-nums">{{ currency | currency_symbol }}{{ monthly_commitment | money }}</p>
             <p class="text-xs text-gray-500 mt-1 font-medium">Recurring expenses</p>
         </div>
     </div>

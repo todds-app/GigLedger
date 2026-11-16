@@ -76,27 +76,34 @@
 
     <!-- Summary bar -->
     {% if transactions %}
-    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 fade-up">
-        <div class="glass-card px-4 py-3 text-center">
-            <p class="text-xs text-green-500 font-medium">Total Income</p>
-            <p class="text-lg font-medium text-green-600">{{ currency | currency_symbol }}{{ total_income | money }}</p>
-        </div>
-        <div class="glass-card px-4 py-3 text-center">
-            <p class="text-xs text-red-400 font-medium">Total Expenses</p>
-            <p class="text-lg font-medium text-red-500">{{ currency | currency_symbol }}{{ total_expenses | money }}</p>
-        </div>
-        <div class="glass-card px-4 py-3 text-center">
-            <p class="text-xs text-brand-500 font-medium">Deductible</p>
-            <p class="text-lg font-medium text-brand-600">{{ currency | currency_symbol }}{{ total_deductible | money }}</p>
-        </div>
-        <div class="glass-card px-4 py-3 text-center border border-green-200/50">
-            <p class="text-xs text-green-500 font-medium">Tax Saving</p>
-            <p class="text-lg font-medium text-green-600">{{ currency | currency_symbol }}{{ tax_saving | money }}</p>
-            <p class="text-[10px] text-green-400 font-medium">at {{ (business.default_tax_rate * 100) | int }}%</p>
-        </div>
-        <div class="glass-card px-4 py-3 text-center">
-            <p class="text-xs text-gray-400 font-medium">Net</p>
-            <p class="text-lg font-medium {% if net >= 0 %}text-green-600{% else %}text-red-500{% endif %}">{{ currency | currency_symbol }}{{ net | money }}</p>
+    <div id="tx-totals" class="dash-panel p-6 fade-up">
+        <h2 class="text-lg font-medium text-gray-900 mb-4">Totals</h2>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-5">
+            <div class="py-2 border-t border-gray-200">
+                <p class="ds-label">Total Income</p>
+                <p class="text-2xl font-medium text-gray-900 mt-2 tabular-nums">{{ currency | currency_symbol }}{{ total_income | money }}</p>
+                <p class="text-xs text-gray-500 mt-1 font-medium">&nbsp;</p>
+            </div>
+            <div class="py-2 border-t border-gray-200">
+                <p class="ds-label">Total Expenses</p>
+                <p class="text-2xl font-medium text-gray-900 mt-2 tabular-nums">{{ currency | currency_symbol }}{{ total_expenses | money }}</p>
+                <p class="text-xs text-gray-500 mt-1 font-medium">&nbsp;</p>
+            </div>
+            <div class="py-2 border-t border-gray-200">
+                <p class="ds-label">Deductible</p>
+                <p class="text-2xl font-medium text-gray-900 mt-2 tabular-nums">{{ currency | currency_symbol }}{{ total_deductible | money }}</p>
+                <p class="text-xs text-gray-500 mt-1 font-medium">Deductible expenses</p>
+            </div>
+            <div class="py-2 border-t border-gray-200">
+                <p class="ds-label">Tax Saving</p>
+                <p class="text-2xl font-medium text-gray-900 mt-2 tabular-nums">{{ currency | currency_symbol }}{{ tax_saving | money }}</p>
+                <p class="text-xs text-gray-500 mt-1 font-medium">At {{ (business.default_tax_rate * 100) | int }}%</p>
+            </div>
+            <div class="py-2 border-t border-gray-200">
+                <p class="ds-label">Net</p>
+                <p class="text-2xl font-medium text-gray-900 mt-2 tabular-nums">{{ currency | currency_symbol }}{{ net | money }}</p>
+                <p class="text-xs text-gray-500 mt-1 font-medium">Income &minus; expenses</p>
+            </div>
         </div>
     </div>
     {% endif %}
@@ -133,11 +140,9 @@
                         </td>
                         <td class="px-3 py-3.5 text-center">
                             {% if tx.is_expense and tx.is_tax_deductible %}
-                            <span class="ds-label whitespace-nowrap">
-                                Yes
-                            </span>
+                            <span class="text-sm font-medium text-gray-900">Yes</span>
                             {% else %}
-                            <span class="text-xs text-gray-500 font-medium">No</span>
+                            <span class="text-sm text-gray-500">No</span>
                             {% endif %}
                         </td>
                         <td class="px-3 py-3.5 text-right whitespace-nowrap">
